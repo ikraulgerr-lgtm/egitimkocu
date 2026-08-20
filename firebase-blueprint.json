@@ -1,0 +1,360 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account information and credits",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "User ID matching request.auth.uid"
+        },
+        "ad": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "User full name"
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "User email address"
+        },
+        "kredi": {
+          "type": "number",
+          "description": "Remaining analysis credits"
+        },
+        "maxKredi": {
+          "type": "number",
+          "description": "Max credit allowance"
+        },
+        "seri": {
+          "type": "number",
+          "description": "Daily streak count"
+        },
+        "xp": {
+          "type": "number",
+          "description": "Total experience points"
+        },
+        "isPremium": {
+          "type": "boolean",
+          "description": "Pro subscription status"
+        },
+        "sinif": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Grade / exam target"
+        },
+        "avatarUrl": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Avatar image URL"
+        }
+      },
+      "required": ["id", "ad", "email", "kredi", "seri", "xp"]
+    },
+    "QuestionRecord": {
+      "title": "Question Analysis Record",
+      "description": "A saved or analyzed question stored as text and choices in the user question pool",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Question ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner User ID"
+        },
+        "ders": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Subject name"
+        },
+        "konu": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Topic name"
+        },
+        "ocrMetin": {
+          "type": "string",
+          "maxLength": 5000,
+          "description": "Extracted OCR text or question text"
+        },
+        "gorselUrl": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Optional small image URL or empty string"
+        },
+        "siklar": {
+          "type": "array",
+          "description": "Text choices list (A, B, C, D, E)"
+        },
+        "dogruSikIndex": {
+          "type": "number",
+          "description": "Index of the correct choice (0=A, 1=B, etc.)"
+        },
+        "tarih": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "ISO date string"
+        },
+        "hataTuru": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Pedagogical error classification"
+        },
+        "isSaved": {
+          "type": "boolean",
+          "description": "Whether saved in Error Pool"
+        },
+        "isSolved": {
+          "type": "boolean",
+          "description": "Whether solved by user"
+        },
+        "kisiselNot": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "User custom note on question"
+        },
+        "sesliNot": {
+          "type": "string",
+          "description": "Audio recording data URL or audio link"
+        },
+        "voiceNotes": {
+          "type": "array",
+          "description": "List of recorded text voice notes"
+        },
+        "sokratikIpucu": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Socratic hint text"
+        },
+        "pedagojikTeshis": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Pedagogical diagnosis"
+        },
+        "ebbinghausTarihi": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Ebbinghaus review target date"
+        },
+        "olusturmaTarihi": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Creation date"
+        }
+      },
+      "required": ["id", "userId", "ders", "konu", "ocrMetin", "tarih"]
+    },
+    "CommunityPost": {
+      "title": "Community Question Post",
+      "description": "Public post shared in the student community",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Post ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Author UID"
+        },
+        "yazarAd": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Author display name"
+        },
+        "yazarAvatar": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Author avatar URL"
+        },
+        "zaman": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Formatted timestamp"
+        },
+        "ders": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Subject"
+        },
+        "soruMetni": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Question text"
+        },
+        "gorselUrl": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Optional image URL"
+        },
+        "cevapSayisi": {
+          "type": "number",
+          "description": "Total answer count"
+        },
+        "hasAiAnswer": {
+          "type": "boolean",
+          "description": "Whether AI responded"
+        },
+        "begeniSayisi": {
+          "type": "number",
+          "description": "Like count"
+        }
+      },
+      "required": ["id", "userId", "yazarAd", "ders", "soruMetni"]
+    },
+    "ScheduleItem": {
+      "title": "Study Schedule Task",
+      "description": "A task in the user study planner",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Schedule Item ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner User ID"
+        },
+        "ders": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Subject"
+        },
+        "konu": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Topic"
+        },
+        "hedefSoru": {
+          "type": "number",
+          "description": "Target question count"
+        },
+        "tamamlananSoru": {
+          "type": "number",
+          "description": "Completed question count"
+        },
+        "tamamlandi": {
+          "type": "boolean",
+          "description": "Completion flag"
+        },
+        "saat": {
+          "type": "string",
+          "maxLength": 20,
+          "description": "Time label"
+        }
+      },
+      "required": ["id", "userId", "ders", "konu", "tamamlandi"]
+    },
+    "Friend": {
+      "title": "Friend Item",
+      "description": "Friend contact in user network",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Friend ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner User ID"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Friend name"
+        },
+        "avatar": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Friend avatar"
+        },
+        "xp": {
+          "type": "number",
+          "description": "Friend XP"
+        },
+        "streak": {
+          "type": "number",
+          "description": "Friend streak"
+        }
+      },
+      "required": ["id", "userId", "name"]
+    },
+    "DenemeRecord": {
+      "title": "Mock Exam Tracking Record",
+      "description": "User mock exam result and nets",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Deneme ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner User ID"
+        },
+        "sinavTuru": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Exam type e.g. TYT, AYT, LGS"
+        },
+        "yayinEvi": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Publisher name"
+        },
+        "tarih": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Exam date"
+        },
+        "toplamNet": {
+          "type": "number",
+          "description": "Total net count"
+        },
+        "notlar": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "User notes on exam"
+        },
+        "dersler": {
+          "type": "array",
+          "description": "Subject breakdown list"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["id", "userId", "sinavTuru", "yayinEvi", "toplamNet"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User account documents"
+    },
+    "/users/{userId}/questions/{questionId}": {
+      "schema": { "$ref": "#/entities/QuestionRecord" },
+      "description": "User question history and error pool"
+    },
+    "/users/{userId}/schedule/{scheduleId}": {
+      "schema": { "$ref": "#/entities/ScheduleItem" },
+      "description": "User personal study schedule items"
+    },
+    "/users/{userId}/friends/{friendId}": {
+      "schema": { "$ref": "#/entities/Friend" },
+      "description": "User friends list"
+    },
+    "/users/{userId}/denemeler/{denemeId}": {
+      "schema": { "$ref": "#/entities/DenemeRecord" },
+      "description": "User mock exam results tracking"
+    },
+    "/community/{postId}": {
+      "schema": { "$ref": "#/entities/CommunityPost" },
+      "description": "Public community posts"
+    }
+  }
+}

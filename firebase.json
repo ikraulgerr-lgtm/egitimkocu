@@ -1,0 +1,18 @@
+{
+  "firestore": {
+    "databaseId": "ai-studio-edumind-20b64783-4f16-4998-b766-0f8bf0aa1a7d",
+    "rules": "firestore.rules",
+    "edition": "ENTERPRISE",
+    "dataAccessMode": "FIRESTORE_NATIVE"
+  },
+  "auth": {
+    "authorizedDomains": ["localhost", "172.16.20.125"],
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Eğitim Koçum AI",
+        "supportEmail": "ogrenci@egitimkocum.ai"
+      }
+    }
+  }
+}

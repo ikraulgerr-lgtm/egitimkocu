@@ -1,0 +1,20 @@
+{
+  "appId": "ai.egitimkocum.app",
+  "appName": "Eğitim Koçum AI",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": [
+        "google.com"
+      ]
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon",
+      "iconColor": "#4338ca"
+    }
+  }
+}

@@ -1,0 +1,117 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection test path used by testConnection()
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // User documents
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      // Any signed-in user can write to any user's doc (for latestNotification field & mutual friends)
+      allow write: if isSignedIn();
+
+      // User questions subcollection
+      match /questions/{questionId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // User schedule subcollection
+      match /schedule/{scheduleId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // User friends subcollection — any signed-in user can write (for mutual friendship)
+      match /friends/{friendId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn();
+      }
+
+      // User notifications subcollection — any signed-in user can send a notification
+      match /notifications/{notifId} {
+        allow read: if isOwner(userId);
+        allow create: if isSignedIn();
+        allow update, delete: if isOwner(userId);
+      }
+
+      // User friend_invites subcollection
+      match /friend_invites/{inviteId} {
+        allow read: if isOwner(userId);
+        allow create: if isSignedIn();
+        allow update, delete: if isOwner(userId);
+      }
+
+      // User pomo_invites subcollection
+      match /pomo_invites/{inviteId} {
+        allow read: if isOwner(userId);
+        allow create: if isSignedIn();
+        allow update, delete: if isOwner(userId);
+      }
+
+      // User denemeler subcollection
+      match /denemeler/{denemeId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Top-level notifications collection
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() &&
+        (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() &&
+        (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+    }
+
+    // Top-level friend_invites collection
+    match /friend_invites/{inviteId} {
+      allow read: if isSignedIn() &&
+        (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() &&
+        (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+    }
+
+    // Top-level pomo_invites collection
+    match /pomo_invites/{inviteId} {
+      allow read: if isSignedIn() &&
+        (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() &&
+        (resource.data.senderId == request.auth.uid || resource.data.recipientId == request.auth.uid);
+    }
+
+    // Pomodoro rooms — any signed-in user can read/write
+    match /rooms/{roomId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Cheer messages in rooms
+    match /rooms/{roomId}/cheers/{cheerDoc} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Community posts — public feed readable and writable by all users so everyone sees all questions instantly
+    match /community/{postId} {
+      allow read, write: if true;
+    }
+  }
+}
+
