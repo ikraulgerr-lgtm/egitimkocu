@@ -163,147 +163,95 @@ export const DenemeTakibiView: React.FC<DenemeTakibiViewProps> = ({ onRewardXp, 
       : null;
 
   return (
-    <div className="space-y-6 pb-20">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-indigo-600 via-primary to-purple-600 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
-          <span className="material-symbols-outlined text-[180px]">analytics</span>
+    <div className="space-y-4 sm:space-y-5 pb-20">
+      {/* Header Banner - Compact & Modern */}
+      <div className="bg-gradient-to-r from-indigo-600 via-primary to-purple-600 rounded-2xl p-4 sm:p-5 text-white shadow-md relative overflow-hidden">
+        <div className="absolute -right-6 -bottom-6 opacity-10 pointer-events-none">
+          <span className="material-symbols-outlined text-[120px]">analytics</span>
         </div>
 
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider text-white">
-              <span className="material-symbols-outlined text-sm">trending_up</span>
+        <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white">
+              <span className="material-symbols-outlined text-xs">trending_up</span>
               Deneme Net İstatistiği
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black">Deneme Sınavı Net Takibi</h1>
-            <p className="text-xs sm:text-sm text-white/80 font-medium">
-              TYT, AYT ve LGS deneme netlerini düzenli kaydet, grafiklerle net artışını izle ve AI yönlendirmesiyle zayıf konularını güçlendir.
+            <h1 className="text-lg sm:text-xl font-black">Deneme Sınavı Net Takibi</h1>
+            <p className="text-xs text-white/85 font-medium">
+              TYT, AYT ve LGS deneme netlerini düzenli kaydet, gelişimini takip et.
             </p>
           </div>
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="w-full md:w-auto bg-white text-primary hover:bg-slate-100 font-extrabold text-sm px-6 py-3.5 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shrink-0"
+            className="w-full sm:w-auto bg-white text-primary hover:bg-slate-100 font-extrabold text-xs sm:text-sm px-4 sm:px-5 py-2.5 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-lg">add_chart</span>
-            <span>Yeni Deneme Neti Ekle</span>
+            <span className="material-symbols-outlined text-base">add_chart</span>
+            <span>+ Yeni Deneme Ekle</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-surface p-4 rounded-2xl border border-card-border shadow-xs space-y-1">
+      {/* KPI Stats Grid - Compact */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="bg-surface p-3 sm:p-3.5 rounded-xl border border-card-border shadow-2xs space-y-0.5">
           <div className="flex items-center justify-between text-text-muted">
-            <span className="text-xs font-bold">Toplam Deneme</span>
-            <span className="material-symbols-outlined text-primary text-xl">assignment</span>
+            <span className="text-[11px] font-bold">Toplam Deneme</span>
+            <span className="material-symbols-outlined text-primary text-base">assignment</span>
           </div>
-          <div className="text-2xl font-black text-text-main">{totalCount} Adet</div>
-          <p className="text-[11px] text-text-muted">Sisteme kayıtlı denemeler</p>
+          <div className="text-lg sm:text-xl font-black text-text-main">{totalCount} Adet</div>
+          <p className="text-[10px] text-text-muted">Kayıtlı denemeler</p>
         </div>
 
-        <div className="bg-surface p-4 rounded-2xl border border-card-border shadow-xs space-y-1">
+        <div className="bg-surface p-3 sm:p-3.5 rounded-xl border border-card-border shadow-2xs space-y-0.5">
           <div className="flex items-center justify-between text-text-muted">
-            <span className="text-xs font-bold">Ortalama Net</span>
-            <span className="material-symbols-outlined text-indigo-500 text-xl">insights</span>
+            <span className="text-[11px] font-bold">Ortalama Net</span>
+            <span className="material-symbols-outlined text-indigo-500 text-base">insights</span>
           </div>
-          <div className="text-2xl font-black text-text-main">{avgNet} Net</div>
-          <p className="text-[11px] text-text-muted">Genel net ortalamanız</p>
+          <div className="text-lg sm:text-xl font-black text-text-main">{avgNet} Net</div>
+          <p className="text-[10px] text-text-muted">Genel ortalama</p>
         </div>
 
-        <div className="bg-surface p-4 rounded-2xl border border-card-border shadow-xs space-y-1">
+        <div className="bg-surface p-3 sm:p-3.5 rounded-xl border border-card-border shadow-2xs space-y-0.5">
           <div className="flex items-center justify-between text-text-muted">
-            <span className="text-xs font-bold">En Yüksek Net</span>
-            <span className="material-symbols-outlined text-amber-500 text-xl">emoji_events</span>
+            <span className="text-[11px] font-bold">En Yüksek Net</span>
+            <span className="material-symbols-outlined text-amber-500 text-base">emoji_events</span>
           </div>
-          <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
-            {maxNetRecord ? `${maxNetRecord.toplamNet} Net` : '-'}
+          <div className="text-lg sm:text-xl font-black text-amber-600 dark:text-amber-400">
+            {maxNetRecord ? `${maxNetRecord.toplamNet} N` : '-'}
           </div>
-          <p className="text-[11px] text-text-muted truncate">
+          <p className="text-[10px] text-text-muted truncate">
             {maxNetRecord ? `${maxNetRecord.sinavTuru} - ${maxNetRecord.yayinEvi}` : 'Henüz veri yok'}
           </p>
         </div>
 
-        <div className="bg-surface p-4 rounded-2xl border border-card-border shadow-xs space-y-1">
+        <div className="bg-surface p-3 sm:p-3.5 rounded-xl border border-card-border shadow-2xs space-y-0.5">
           <div className="flex items-center justify-between text-text-muted">
-            <span className="text-xs font-bold">Son Değişim</span>
-            <span className="material-symbols-outlined text-emerald-500 text-xl">show_chart</span>
+            <span className="text-[11px] font-bold">Son Değişim</span>
+            <span className="material-symbols-outlined text-emerald-500 text-base">show_chart</span>
           </div>
           <div
-            className={`text-2xl font-black ${
+            className={`text-lg sm:text-xl font-black ${
               netDiff && parseFloat(netDiff) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
             }`}
           >
-            {netDiff !== null ? `${parseFloat(netDiff) >= 0 ? '+' : ''}${netDiff} Net` : 'Aritmetik Trend'}
+            {netDiff !== null ? `${parseFloat(netDiff) >= 0 ? '+' : ''}${netDiff} N` : '-'}
           </div>
-          <p className="text-[11px] text-text-muted">Son 2 deneme kıyası</p>
+          <p className="text-[10px] text-text-muted">Son 2 deneme farkı</p>
         </div>
       </div>
 
-      {/* Visual Chart Graphic Section */}
-      {sortedByDate.length > 0 && (
-        <div className="bg-surface p-6 rounded-3xl border border-card-border shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-black text-base text-text-main flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">ssid_chart</span>
-                Net Gelişim Trend Grafiği
-              </h3>
-              <p className="text-xs text-text-muted">Zaman içerisindeki deneme netlerinizin yükseliş grafiği</p>
-            </div>
-            <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
-              {sortedByDate.length} Deneme
-            </span>
-          </div>
-
-          {/* SVG Bar / Trend Chart */}
-          <div className="pt-4 pb-2">
-            <div className="h-48 w-full flex items-end justify-between gap-2 sm:gap-4 px-2 border-b border-card-border pb-2">
-              {sortedByDate.map((d, i) => {
-                const maxVal = Math.max(...sortedByDate.map((item) => item.toplamNet), 100);
-                const heightPercent = Math.max(12, Math.min(100, (d.toplamNet / maxVal) * 100));
-
-                return (
-                  <div key={d.id} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group relative">
-                    {/* Tooltip */}
-                    <div className="absolute -top-12 bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-20 whitespace-nowrap shadow-lg">
-                      {d.yayinEvi}: <span className="text-emerald-400">{d.toplamNet} Net</span>
-                    </div>
-
-                    <span className="text-[10px] sm:text-xs font-black text-primary group-hover:scale-110 transition-all">
-                      {d.toplamNet}
-                    </span>
-
-                    <div
-                      style={{ height: `${heightPercent}%` }}
-                      className="w-full max-w-[40px] bg-gradient-to-t from-primary/80 to-indigo-500 rounded-t-xl group-hover:brightness-125 transition-all shadow-md relative overflow-hidden"
-                    >
-                      <div className="absolute top-0 inset-x-0 h-1 bg-white/40" />
-                    </div>
-
-                    <span className="text-[10px] text-text-muted font-bold truncate max-w-[60px] text-center">
-                      {d.sinavTuru} #{i + 1}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Filter Tabs & List Header */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-1.5 bg-surface-container-low p-1.5 rounded-2xl border border-card-border overflow-x-auto">
+      <div className="space-y-3 sm:space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-xl border border-card-border overflow-x-auto">
             {['HEPSİ', 'TYT', 'AYT', 'LGS', 'YDT', 'KPSS'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveFilter(tab)}
-                className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer whitespace-nowrap ${
                   activeFilter === tab
-                    ? 'bg-primary text-white shadow-sm'
+                    ? 'bg-primary text-white shadow-2xs'
                     : 'text-text-muted hover:text-text-main hover:bg-surface-container-high'
                 }`}
               >
@@ -319,72 +267,72 @@ export const DenemeTakibiView: React.FC<DenemeTakibiViewProps> = ({ onRewardXp, 
 
         {/* List of Deneme Cards */}
         {filteredDenemeler.length === 0 ? (
-          <div className="bg-surface p-12 text-center rounded-3xl border border-dashed border-card-border space-y-3">
-            <span className="material-symbols-outlined text-4xl text-text-muted">find_in_page</span>
-            <p className="text-sm font-bold text-text-main">
+          <div className="bg-surface p-8 text-center rounded-2xl border border-dashed border-card-border space-y-2">
+            <span className="material-symbols-outlined text-3xl text-text-muted">find_in_page</span>
+            <p className="text-xs font-bold text-text-main">
               {activeFilter === 'HEPSİ' ? 'Henüz kaydedilmiş bir deneme yok.' : `${activeFilter} türünde deneme bulunamadı.`}
             </p>
-            <p className="text-xs text-text-muted max-w-sm mx-auto">
+            <p className="text-[11px] text-text-muted max-w-sm mx-auto">
               Çözdüğün deneme sınavlarının netlerini girerek gelişimini hemen takip etmeye başla!
             </p>
             <button
               onClick={() => setIsModalOpen(true)}
-              className="mt-2 bg-primary text-white font-bold text-xs px-4 py-2.5 rounded-xl cursor-pointer hover:brightness-110"
+              className="mt-1 bg-primary text-white font-bold text-xs px-3.5 py-2 rounded-xl cursor-pointer hover:brightness-110"
             >
               + Deneme Ekle
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {filteredDenemeler.map((d) => (
               <div
                 key={d.id}
-                className="bg-surface p-5 rounded-3xl border border-card-border shadow-xs hover:border-primary/40 transition-all space-y-4 flex flex-col justify-between"
+                className="bg-surface p-4 rounded-2xl border border-card-border shadow-2xs hover:border-primary/40 transition-all space-y-3 flex flex-col justify-between"
               >
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {/* Card Top Info */}
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="bg-primary/10 text-primary text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
+                      <div className="flex items-center gap-1.5">
+                        <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
                           {d.sinavTuru}
                         </span>
-                        <span className="text-xs text-text-muted font-semibold">{d.tarih}</span>
+                        <span className="text-[11px] text-text-muted font-semibold">{d.tarih}</span>
                       </div>
-                      <h4 className="font-black text-base text-text-main mt-1">{d.yayinEvi}</h4>
+                      <h4 className="font-extrabold text-sm text-text-main mt-1">{d.yayinEvi}</h4>
                     </div>
 
                     <div className="text-right shrink-0">
-                      <div className="text-2xl font-black text-primary">{d.toplamNet}</div>
-                      <span className="text-[10px] font-bold text-text-muted uppercase">Toplam Net</span>
+                      <div className="text-xl font-black text-primary">{d.toplamNet}</div>
+                      <span className="text-[9px] font-bold text-text-muted uppercase">Toplam Net</span>
                     </div>
                   </div>
 
                   {/* Subject Breakdown Badges */}
-                  <div className="grid grid-cols-2 gap-2 bg-surface-container-low p-3 rounded-2xl border border-card-border">
+                  <div className="grid grid-cols-2 gap-1.5 bg-surface-container-low p-2.5 rounded-xl border border-card-border">
                     {d.dersler.map((ders, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-text-main truncate max-w-[90px]">{ders.dersAdi}:</span>
+                      <div key={idx} className="flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-text-main truncate max-w-[80px]">{ders.dersAdi}:</span>
                         <div className="flex items-center gap-1">
                           <span className="text-emerald-600 font-bold">{ders.dogru}D</span>
                           <span className="text-rose-500 font-bold">{ders.yanlis}Y</span>
-                          <span className="font-black text-primary ml-1">={ders.net}N</span>
+                          <span className="font-black text-primary ml-0.5">={ders.net}N</span>
                         </div>
                       </div>
                     ))}
                   </div>
 
                   {d.notlar && (
-                    <p className="text-xs text-text-muted bg-amber-500/10 text-amber-900 dark:text-amber-200 p-2.5 rounded-xl border border-amber-500/20 italic">
-                      " {d.notlar} "
+                    <p className="text-[11px] text-text-muted bg-amber-500/10 text-amber-900 dark:text-amber-200 p-2 rounded-lg border border-amber-500/20 italic">
+                      "{d.notlar}"
                     </p>
                   )}
                 </div>
 
                 {/* Footer Controls */}
-                <div className="flex items-center justify-between pt-3 border-t border-card-border">
+                <div className="flex items-center justify-between pt-2 border-t border-card-border">
                   <span className="text-[10px] text-text-muted font-medium">
-                    Doğru Yanlış Oranı: %
+                    Doğruluk: %
                     {Math.round(
                       (d.dersler.reduce((a, b) => a + b.dogru, 0) /
                         Math.max(1, d.dersler.reduce((a, b) => a + b.dogru + b.yanlis + b.bos, 0))) *
@@ -394,9 +342,9 @@ export const DenemeTakibiView: React.FC<DenemeTakibiViewProps> = ({ onRewardXp, 
 
                   <button
                     onClick={() => handleDelete(d.id)}
-                    className="text-xs font-bold text-rose-500 hover:text-rose-700 flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] font-bold text-rose-500 hover:text-rose-700 flex items-center gap-1 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm">delete</span>
+                    <span className="material-symbols-outlined text-xs">delete</span>
                     Sil
                   </button>
                 </div>
@@ -405,6 +353,58 @@ export const DenemeTakibiView: React.FC<DenemeTakibiViewProps> = ({ onRewardXp, 
           </div>
         )}
       </div>
+
+      {/* Visual Chart Graphic Section - Moved to Bottom */}
+      {sortedByDate.length > 0 && (
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl border border-card-border shadow-2xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-extrabold text-sm sm:text-base text-text-main flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-primary text-lg">ssid_chart</span>
+                Net Gelişim Trend Grafiği
+              </h3>
+              <p className="text-[11px] text-text-muted">Zaman içerisindeki deneme netlerinizin yükseliş grafiği</p>
+            </div>
+            <span className="text-[11px] font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
+              {sortedByDate.length} Deneme
+            </span>
+          </div>
+
+          {/* SVG Bar / Trend Chart */}
+          <div className="pt-2 pb-1">
+            <div className="h-40 w-full flex items-end justify-between gap-2 sm:gap-3 px-1 border-b border-card-border pb-1.5">
+              {sortedByDate.map((d, i) => {
+                const maxVal = Math.max(...sortedByDate.map((item) => item.toplamNet), 100);
+                const heightPercent = Math.max(12, Math.min(100, (d.toplamNet / maxVal) * 100));
+
+                return (
+                  <div key={d.id} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group relative">
+                    {/* Tooltip */}
+                    <div className="absolute -top-10 bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-20 whitespace-nowrap shadow-lg">
+                      {d.yayinEvi}: <span className="text-emerald-400">{d.toplamNet} Net</span>
+                    </div>
+
+                    <span className="text-[10px] font-black text-primary group-hover:scale-110 transition-all">
+                      {d.toplamNet}
+                    </span>
+
+                    <div
+                      style={{ height: `${heightPercent}%` }}
+                      className="w-full max-w-[32px] bg-gradient-to-t from-primary/80 to-indigo-500 rounded-t-lg group-hover:brightness-125 transition-all shadow-2xs relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 inset-x-0 h-0.5 bg-white/40" />
+                    </div>
+
+                    <span className="text-[9px] text-text-muted font-bold truncate max-w-[50px] text-center">
+                      #{i + 1}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ADD DENEME MODAL */}
       {isModalOpen && (
