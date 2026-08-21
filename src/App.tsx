@@ -37,6 +37,7 @@ import { DenemeTakibiView } from './components/DenemeTakibiView';
 import { analyzeQuestionService, generateSimilarQuestionService } from './lib/geminiClient';
 import { NotificationSettingsModal } from './components/NotificationSettingsModal';
 import { runSmartNotificationChecks, sendNativeNotification, requestNotificationPermissions } from './lib/notificationService';
+import { initializeAdMob } from './lib/admobService';
 import { PremiumVideoModal } from './components/PremiumVideoModal';
 import { NoCreditsModal } from './components/NoCreditsModal';
 import { AuthModal } from './components/AuthModal';
@@ -118,9 +119,10 @@ export function App() {
     }
   };
 
-  // Request notification permissions on app mount
+  // Request notification permissions and initialize AdMob on app mount
   useEffect(() => {
     requestNotificationPermissions();
+    initializeAdMob();
   }, []);
 
   // Listen to Firestore real-time notifications, pomo_invites, friend_invites & real-time friends

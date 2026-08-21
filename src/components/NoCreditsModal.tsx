@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 
+import { showRewardedAd } from '../lib/admobService';
+
 interface NoCreditsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -22,25 +24,36 @@ export const NoCreditsModal: React.FC<NoCreditsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleStartWatchAd = () => {
+  const handleStartWatchAd = async () => {
     setIsWatchingAd(true);
-    setAdProgress(0);
+    setAdProgress(10);
 
-    const interval = setInterval(() => {
-      setAdProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
+    const progressTimer = setInterval(() => {
+      setAdProgress((prev) => (prev >= 85 ? 85 : prev + 15));
+    }, 350);
+
+    try {
+      await showRewardedAd(
+        (earnedAmount) => {
+          clearInterval(progressTimer);
+          setAdProgress(100);
           setTimeout(() => {
             setIsWatchingAd(false);
-            setAdProgress(0);
-            onWatchAdSuccess(1); // Grants +1 credit
+            onWatchAdSuccess(earnedAmount || 1);
             onClose();
           }, 300);
-          return 100;
+        },
+        () => {
+          clearInterval(progressTimer);
+          setIsWatchingAd(false);
         }
-        return prev + 25; // 4 steps = 3-4 seconds
-      });
-    }, 600);
+      );
+    } catch (err) {
+      clearInterval(progressTimer);
+      setIsWatchingAd(false);
+      onWatchAdSuccess(1);
+      onClose();
+    }
   };
 
   return (
