@@ -1,4 +1,4 @@
-package ai.egitimkocum.app;
+package com.egitimkocumai;
 
 import com.getcapacitor.BridgeActivity;
 

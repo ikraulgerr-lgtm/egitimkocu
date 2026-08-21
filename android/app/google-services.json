@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:576668557444:android:ef3a10acddfc8c5ae622d1",
         "android_client_info": {
-          "package_name": "ai.egitimkocum.app"
+          "package_name": "com.egitimkocumai"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "576668557444-um9crmnnddmaepidcfg2o7jg7v2muhge.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "ai.egitimkocum.app",
+            "package_name": "com.egitimkocumai",
             "certificate_hash": "3b0275730ddcf9328682d91d4328e4f7e97db7b6"
           }
         },
