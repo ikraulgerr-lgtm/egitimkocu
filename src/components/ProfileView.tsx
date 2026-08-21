@@ -145,6 +145,54 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     return true;
   });
 
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState<boolean>(false);
+
+  const handleCustomPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 256;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          if (onUpdateAvatar) {
+            onUpdateAvatar(compressedDataUrl);
+          }
+        }
+        setIsUploadingPhoto(false);
+        setIsAvatarModalOpen(false);
+      };
+      img.onerror = () => setIsUploadingPhoto(false);
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => setIsUploadingPhoto(false);
+    reader.readAsDataURL(file);
+  };
+
   const handleSelectAvatar = (url: string) => {
     if (onUpdateAvatar) {
       onUpdateAvatar(url);
@@ -892,8 +940,33 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
 
             <p className="text-xs text-text-muted">
-              Profilinizde ve derece sıralamalarında görünecek avatar stilinizi aşağıdan seçebilirsiniz:
+              Profilinizde ve derece sıralamalarında görünecek fotoğrafınızı yükleyebilir veya hazır avatar seçeneklerinden birini seçebilirsiniz:
             </p>
+
+            {/* Custom Photo Upload Card */}
+            <div className="bg-surface-container-low p-3 rounded-2xl border border-card-border flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-xl">add_a_photo</span>
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-xs text-text-main">Kendi Fotoğrafını Yükle</h4>
+                  <p className="text-[10px] text-text-muted">Galeriden veya kameradan yeni fotoğraf seç</p>
+                </div>
+              </div>
+
+              <label className="bg-primary hover:bg-primary/90 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl cursor-pointer transition-all shadow-xs flex items-center gap-1 shrink-0 active:scale-95">
+                <span className="material-symbols-outlined text-sm">upload</span>
+                <span>{isUploadingPhoto ? 'Yükleniyor...' : 'Fotoğraf Seç'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCustomPhotoUpload}
+                  className="hidden"
+                  disabled={isUploadingPhoto}
+                />
+              </label>
+            </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
               {AVATAR_OPTIONS.map((item) => {

@@ -590,14 +590,78 @@ export function App() {
     }
   }, [user?.id]);
 
-  // Helper to sync user state to Firestore & Firebase Auth profile
+  // Helper to sync user state to Firestore, Firebase Auth profile & Mutual Friends
   const syncUserToFirestore = async (updatedUser: Kullanici) => {
     if (auth.currentUser) {
       try {
-        const userDocRef = doc(db, 'users', auth.currentUser.uid);
-        await setDoc(userDocRef, updatedUser, { merge: true });
+        const myUid = auth.currentUser.uid;
+        const userDocRef = doc(db, 'users', myUid);
+        const cleanUserData = JSON.parse(
+          JSON.stringify({
+            ...updatedUser,
+            displayName: updatedUser.ad,
+            photoURL: updatedUser.avatarUrl,
+            updatedAt: new Date().toISOString(),
+          })
+        );
+        await setDoc(userDocRef, cleanUserData, { merge: true });
+
+        // Update Firebase Auth profile displayName & photoURL
+        const profileUpdates: { displayName?: string; photoURL?: string } = {};
         if (updatedUser.ad && auth.currentUser.displayName !== updatedUser.ad) {
-          await updateProfile(auth.currentUser, { displayName: updatedUser.ad });
+          profileUpdates.displayName = updatedUser.ad;
+        }
+        if (updatedUser.avatarUrl && auth.currentUser.photoURL !== updatedUser.avatarUrl) {
+          profileUpdates.photoURL = updatedUser.avatarUrl;
+        }
+        if (Object.keys(profileUpdates).length > 0) {
+          await updateProfile(auth.currentUser, profileUpdates).catch(() => {});
+        }
+
+        // Mutual Sync: Update this user's name & avatar in all mutual friends' friend documents
+        try {
+          const myFriendsSnap = await getDocs(collection(db, 'users', myUid, 'friends'));
+          for (const fDoc of myFriendsSnap.docs) {
+            const friendId = fDoc.id;
+            if (friendId && !friendId.startsWith('f_')) {
+              const friendRef = doc(db, 'users', friendId, 'friends', myUid);
+              await updateDoc(friendRef, {
+                name: updatedUser.ad || 'Öğrenci',
+                avatar: updatedUser.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                xp: updatedUser.xp || 0,
+                streak: updatedUser.seri || 1,
+              }).catch(() => {});
+            }
+          }
+        } catch (e) {}
+
+        // Active Pomodoro Room Sync: Update user's member entry in active room
+        const savedRoomStr = localStorage.getItem('active_pomo_group_room');
+        if (savedRoomStr) {
+          try {
+            const room = JSON.parse(savedRoomStr);
+            if (room && room.code && Array.isArray(room.members)) {
+              let changed = false;
+              const updatedMembers = room.members.map((m: any) => {
+                if (m.id === myUid || m.id === updatedUser.id) {
+                  changed = true;
+                  return {
+                    ...m,
+                    name: updatedUser.ad || m.name,
+                    avatar: updatedUser.avatarUrl || m.avatar,
+                  };
+                }
+                return m;
+              });
+              if (changed) {
+                const updatedRoom = { ...room, members: updatedMembers };
+                const cleanRoom = JSON.parse(JSON.stringify(updatedRoom));
+                localStorage.setItem('active_pomo_group_room', JSON.stringify(cleanRoom));
+                await setDoc(doc(db, 'pomo_rooms', room.code), cleanRoom, { merge: true }).catch(() => {});
+                await setDoc(doc(db, 'users', `pomo_room_${room.code}`), cleanRoom, { merge: true }).catch(() => {});
+              }
+            }
+          } catch (e) {}
         }
       } catch (err) {
         console.warn('Error syncing user profile to Firestore:', err);
