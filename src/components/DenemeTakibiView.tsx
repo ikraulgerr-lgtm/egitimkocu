@@ -60,6 +60,15 @@ export const DenemeTakibiView: React.FC<DenemeTakibiViewProps> = ({ onRewardXp, 
     setDenemeler(getDenemeler());
   }, []);
 
+  // Clean form when modal opens or closes
+  useEffect(() => {
+    if (!isModalOpen) {
+      setYayinEvi('');
+      setNotlar('');
+      setTarih(new Date().toISOString().split('T')[0]);
+    }
+  }, [isModalOpen]);
+
   // When sinavTuru changes in modal, load template subjects
   useEffect(() => {
     const template = DEFAULT_SUBJECTS_MAP[sinavTuru] || DEFAULT_SUBJECTS_MAP['Diğer'];

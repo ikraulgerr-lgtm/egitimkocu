@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Kullanici } from '../types';
 import { auth, db, loginWithGoogle, resetPasswordFirebase, loginWithEmailFirebase, registerWithEmailFirebase } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, collection, query, where } from 'firebase/firestore';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -22,6 +22,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   // Form states
   const [name, setName] = useState<string>('');
+  const [username, setUsername] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [newPassword, setNewPassword] = useState<string>('');
@@ -35,6 +36,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [resendCountdown, setResendCountdown] = useState<number>(0);
+
+  // Auto clean form inputs when modal opens or switches mode
+  useEffect(() => {
+    if (isOpen) {
+      setErrorMsg(null);
+      setPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setOtpCode('');
+    }
+  }, [isOpen, mode]);
 
   // Reset loading state if tab changes or user returns to window
   useEffect(() => {
@@ -79,6 +91,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           setLoading(false);
           return;
         }
+
+        // Validate username format
+        const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+        if (!cleanUsername || cleanUsername.length < 3 || cleanUsername.length > 20) {
+          setErrorMsg('Kullanıcı adı en az 3, en fazla 20 karakter olmalı ve yalnızca küçük harf, rakam ve alt tire (_) içermelidir.');
+          setLoading(false);
+          return;
+        }
+
+        // Check if username is already taken in Firestore
+        try {
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('kullaniciAdi_lower', '==', cleanUsername));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            setErrorMsg(`"@${cleanUsername}" kullanıcı adı zaten başkası tarafından alınmış. Lütfen başka bir kullanıcı adı seçin.`);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.warn('Username uniqueness check warning:', e);
+        }
+
         if (password.length < 8) {
           setErrorMsg('Şifreniz en az 8 karakter olmalıdır.');
           setLoading(false);
@@ -100,11 +135,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         const cleanName = name.trim() || 'Öğrenci';
         const fbUser = await registerWithEmailFirebase(email.trim(), password, cleanName);
         try {
-          await setDoc(doc(db, 'users', fbUser.uid), { ad: cleanName, email: fbUser.email || email }, { merge: true });
+          await setDoc(doc(db, 'users', fbUser.uid), {
+            id: fbUser.uid,
+            ad: cleanName,
+            kullaniciAdi: cleanUsername,
+            kullaniciAdi_lower: cleanUsername,
+            email: fbUser.email || email.trim(),
+            kredi: 10,
+            maxKredi: 10,
+            seri: 1,
+            xp: 0,
+            isPremium: false,
+            sinif: 'YKS / LGS Hazırlık',
+            avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+            targetExam: selectedExam,
+            targetExamDate: examDate,
+            createdAt: new Date().toISOString(),
+          }, { merge: true });
         } catch (e) {}
+
         onLoginSuccess({
           id: fbUser.uid,
           ad: cleanName,
+          kullaniciAdi: cleanUsername,
+          kullaniciAdi_lower: cleanUsername,
           email: fbUser.email || email,
           targetExam: selectedExam,
           targetExamDate: examDate,
@@ -112,9 +166,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onClose();
       } else {
         const fbUser = await loginWithEmailFirebase(email.trim(), password);
+        let userKullaniciAdi = 'ogrenci';
+        try {
+          const userDocSnap = await getDoc(doc(db, 'users', fbUser.uid));
+          if (userDocSnap.exists() && userDocSnap.data()?.kullaniciAdi) {
+            userKullaniciAdi = userDocSnap.data().kullaniciAdi;
+          }
+        } catch (e) {}
+
         onLoginSuccess({
           id: fbUser.uid,
           ad: fbUser.displayName || name.trim() || 'Öğrenci',
+          kullaniciAdi: userKullaniciAdi,
           email: fbUser.email || email,
         });
         onClose();
@@ -301,11 +364,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   try {
                     const firebaseUser = await loginWithGoogle();
                     if (firebaseUser) {
+                      let finalUsername = 'ogrenci';
+                      try {
+                        const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
+                        if (userSnap.exists() && userSnap.data()?.kullaniciAdi) {
+                          finalUsername = userSnap.data().kullaniciAdi;
+                        } else {
+                          const base = (firebaseUser.email?.split('@')[0] || firebaseUser.displayName || 'ogrenci')
+                            .toLowerCase()
+                            .replace(/[^a-z0-9_]/g, '')
+                            .slice(0, 12);
+                          finalUsername = `${base || 'ogrenci'}_${Math.floor(100 + Math.random() * 900)}`;
+                          await setDoc(doc(db, 'users', firebaseUser.uid), {
+                            id: firebaseUser.uid,
+                            ad: firebaseUser.displayName || 'Öğrenci',
+                            kullaniciAdi: finalUsername,
+                            kullaniciAdi_lower: finalUsername.toLowerCase(),
+                            email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
+                            avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                            updatedAt: new Date().toISOString(),
+                          }, { merge: true });
+                        }
+                      } catch (e) {}
+
                       onLoginSuccess({
                         id: firebaseUser.uid,
                         ad: firebaseUser.displayName || 'Öğrenci',
+                        kullaniciAdi: finalUsername,
+                        kullaniciAdi_lower: finalUsername.toLowerCase(),
                         email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
-                        avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                        avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
                       });
                       onClose();
                     }
@@ -316,14 +404,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         id: auth.currentUser.uid,
                         ad: auth.currentUser.displayName || 'Öğrenci',
                         email: auth.currentUser.email || 'ogrenci@egitimkocum.ai',
-                        avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                        avatarUrl: auth.currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
                       });
                       onClose();
                       return;
                     }
 
                     if (err?.code === 'auth/cancelled-popup-request') {
-                      // Silently handled
                       return;
                     } else if (err?.code === 'auth/popup-closed-by-user') {
                       setErrorMsg('Giriş penceresi kapatıldı.');
@@ -377,6 +464,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         required
                       />
                     </div>
+                  </div>
+
+                  {/* Unique Username Field */}
+                  <div>
+                    <label className="block text-xs font-bold text-text-muted mb-1 ml-1">Kullanıcı Adı (@)</label>
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted text-lg">
+                        alternate_email
+                      </span>
+                      <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => {
+                          const val = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                          setUsername(val);
+                        }}
+                        placeholder="kullanici_adi (Örn: ahmet_yks)"
+                        className="w-full bg-surface-container-low border border-card-border rounded-xl py-3 pl-10 pr-4 text-xs text-text-main focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+                        required
+                      />
+                    </div>
+                    <span className="text-[10px] text-text-muted ml-1 mt-0.5 block">Yalnızca küçük harf, rakam ve alt tire (_) kullanılabilir.</span>
                   </div>
 
                   {/* Exam Target Selection */}

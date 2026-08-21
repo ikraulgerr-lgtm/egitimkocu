@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Kullanici, Arkadas } from '../types';
 import { db, auth } from '../lib/firebase';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 
 interface LeaderboardViewProps {
   currentUser: Kullanici;
@@ -13,6 +13,7 @@ interface LeaderUser {
   id?: string;
   rank: number;
   name: string;
+  kullaniciAdi?: string;
   avatar: string;
   xp: number;
   streak: number;
@@ -30,15 +31,14 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   const [isLoadingGlobal, setIsLoadingGlobal] = useState<boolean>(false);
   const [sentRequestUserIds, setSentRequestUserIds] = useState<{ [uid: string]: boolean }>({});
 
-  // Fetch all registered users in Turkey from Firestore
+  // Real-time live synchronization of all registered users from Firestore
   useEffect(() => {
-    let isMounted = true;
-    async function fetchAllRegisteredUsers() {
-      setIsLoadingGlobal(true);
-      try {
-        const uColRef = collection(db, 'users');
-        const snap = await getDocs(uColRef);
-        
+    setIsLoadingGlobal(true);
+    const uColRef = collection(db, 'users');
+
+    const unsubscribe = onSnapshot(
+      uColRef,
+      (snap) => {
         let fetchedList: LeaderUser[] = snap.docs.map((dSnap) => {
           const data = dSnap.data();
           const isSelf = dSnap.id === currentUser.id || (data.email && data.email === currentUser.email);
@@ -46,10 +46,11 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           return {
             id: dSnap.id,
             rank: 0,
-            name: isSelf ? `${nameStr} (Sen)` : nameStr,
-            avatar: data.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-            xp: typeof data.xp === 'number' ? data.xp : 0,
-            streak: typeof data.seri === 'number' ? data.seri : 1,
+            name: isSelf ? `${currentUser.ad || nameStr} (Sen)` : nameStr,
+            kullaniciAdi: isSelf ? (currentUser.kullaniciAdi || data.kullaniciAdi || 'ogrenci') : (data.kullaniciAdi || 'ogrenci'),
+            avatar: isSelf ? (currentUser.avatarUrl || data.avatarUrl) : (data.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1'),
+            xp: isSelf ? (typeof currentUser.xp === 'number' ? currentUser.xp : (data.xp || 0)) : (typeof data.xp === 'number' ? data.xp : 0),
+            streak: isSelf ? (currentUser.seri || data.seri || 1) : (typeof data.seri === 'number' ? data.seri : 1),
             isCurrentUser: isSelf,
           };
         });
@@ -61,6 +62,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
             id: currentUser.id,
             rank: 0,
             name: `${currentUser.ad || 'Öğrenci'} (Sen)`,
+            kullaniciAdi: currentUser.kullaniciAdi || 'ogrenci',
             avatar: currentUser.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
             xp: currentUser.xp || 0,
             streak: currentUser.seri || 1,
@@ -77,23 +79,16 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           rank: idx + 1,
         }));
 
-        if (isMounted) {
-          setGlobalUsers(rankedGlobal);
-        }
-      } catch (err) {
-        console.warn('Leaderboard users fetch warning:', err);
-      } finally {
-        if (isMounted) {
-          setIsLoadingGlobal(false);
-        }
+        setGlobalUsers(rankedGlobal);
+        setIsLoadingGlobal(false);
+      },
+      (err) => {
+        console.warn('Realtime Leaderboard sync warning:', err);
+        setIsLoadingGlobal(false);
       }
-    }
+    );
 
-    fetchAllRegisteredUsers();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => unsubscribe();
   }, [currentUser]);
 
   // Build dynamic friends list including currentUser, sorted by XP descending
@@ -101,6 +96,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     id: currentUser.id,
     rank: 1,
     name: `${currentUser.ad} (Sen)`,
+    kullaniciAdi: currentUser.kullaniciAdi || 'ogrenci',
     avatar: currentUser.avatarUrl,
     xp: currentUser.xp,
     streak: currentUser.seri,
@@ -113,6 +109,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
       id: f.id,
       rank: 0,
       name: f.name,
+      kullaniciAdi: f.kullaniciAdi,
       avatar: f.avatar,
       xp: f.xp,
       streak: f.streak,
@@ -345,9 +342,16 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                 </div>
 
                 <div>
-                  <p className={`font-extrabold text-xs sm:text-sm ${userItem.isCurrentUser ? 'text-primary' : 'text-text-main'}`}>
-                    {userItem.name}
-                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className={`font-extrabold text-xs sm:text-sm ${userItem.isCurrentUser ? 'text-primary' : 'text-text-main'}`}>
+                      {userItem.name}
+                    </p>
+                    {userItem.kullaniciAdi && (
+                      <span className="text-[10px] font-mono text-primary font-bold">
+                        @{userItem.kullaniciAdi}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 text-[11px] text-text-muted">
                     <span className="text-amber-500 font-bold">🔥 {userItem.streak} Gün Seri</span>
                     {userItem.prevRank && (

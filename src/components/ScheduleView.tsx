@@ -138,6 +138,19 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     }
   }, [activeGroupRoom]);
 
+  // Clean form inputs when modals close
+  useEffect(() => {
+    if (!isAddModalOpen) {
+      setFormKonu('');
+    }
+  }, [isAddModalOpen]);
+
+  useEffect(() => {
+    if (!isJoinRoomModalOpen) {
+      setJoinRoomCodeInput('');
+    }
+  }, [isJoinRoomModalOpen]);
+
   // Real-time Group Pomodoro room synchronization (100% Pure Firebase Firestore)
   useEffect(() => {
     if (!activeGroupRoom?.code) return;

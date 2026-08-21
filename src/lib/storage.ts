@@ -3,17 +3,25 @@ import { sanitizeObjectMath } from './mathUtils';
 import { db, auth, handleFirestoreError, OperationType } from './firebase';
 import { doc, setDoc, getDoc, getDocs, collection, deleteDoc } from 'firebase/firestore';
 
-const USER_KEY = 'edumind_user';
-const QUESTIONS_KEY = 'edumind_questions';
-const COMMUNITY_KEY = 'edumind_community';
-const SCHEDULE_KEY = 'edumind_schedule';
-const THEME_KEY = 'edumind_theme';
-const FRIENDS_KEY = 'edumind_friends';
-const DENEME_KEY = 'edumind_deneme';
+const BASE_USER_KEY = 'edumind_user';
+const BASE_QUESTIONS_KEY = 'edumind_questions';
+const BASE_COMMUNITY_KEY = 'edumind_community';
+const BASE_SCHEDULE_KEY = 'edumind_schedule';
+const BASE_THEME_KEY = 'edumind_theme';
+const BASE_FRIENDS_KEY = 'edumind_friends';
+const BASE_DENEME_KEY = 'edumind_deneme';
 
-const INITIAL_USER: Kullanici = {
+export function getScopedKey(baseKey: string, userId?: string): string {
+  const uid = userId || auth.currentUser?.uid;
+  if (!uid) return baseKey;
+  return `${baseKey}_${uid}`;
+}
+
+export const INITIAL_USER: Kullanici = {
   id: 'usr_new',
   ad: 'Yeni Öğrenci',
+  kullaniciAdi: 'ogrenci',
+  kullaniciAdi_lower: 'ogrenci',
   email: 'ogrenci@egitimkocum.ai',
   kredi: 10,
   maxKredi: 10,
@@ -27,14 +35,16 @@ const INITIAL_USER: Kullanici = {
   customExamName: '',
 };
 
-const INITIAL_FRIENDS: Arkadas[] = [];
+export const INITIAL_FRIENDS: Arkadas[] = [];
+export const INITIAL_QUESTIONS: SoruKaydi[] = [];
+export const INITIAL_SCHEDULE: ProgramOgesi[] = [];
+export const INITIAL_DENEMELER: DenemeRecord[] = [];
 
-const INITIAL_QUESTIONS: SoruKaydi[] = [];
-
-const INITIAL_COMMUNITY: ToplulukSoru[] = [
+export const INITIAL_COMMUNITY: ToplulukSoru[] = [
   {
     id: 'c_welcome',
     yazarAd: 'Eğitim Koçum AI Rehberlik',
+    kullaniciAdi: 'rehberlik_ai',
     yazarAvatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
     zaman: '15 dk önce',
     createdAt: Date.now() - 1000 * 60 * 15,
@@ -48,6 +58,7 @@ const INITIAL_COMMUNITY: ToplulukSoru[] = [
       {
         id: 'ans_welcome',
         yazarAd: 'Eğitim Koçum AI Pedagoji',
+        kullaniciAdi: 'pedagoji_ai',
         avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
         metin: 'Soru analizi başlatmak için ana sayfadaki kamera veya metin alanını kullanabilirsin.',
         isAi: true,
@@ -58,31 +69,35 @@ const INITIAL_COMMUNITY: ToplulukSoru[] = [
   },
 ];
 
-const INITIAL_SCHEDULE: ProgramOgesi[] = [];
+export function resetToCleanState(userId?: string): Kullanici {
+  const userKey = getScopedKey(BASE_USER_KEY, userId);
+  const qKey = getScopedKey(BASE_QUESTIONS_KEY, userId);
+  const sKey = getScopedKey(BASE_SCHEDULE_KEY, userId);
+  const fKey = getScopedKey(BASE_FRIENDS_KEY, userId);
+  const dKey = getScopedKey(BASE_DENEME_KEY, userId);
 
-export function resetToCleanState(): Kullanici {
-  localStorage.setItem(USER_KEY, JSON.stringify(INITIAL_USER));
-  localStorage.setItem(QUESTIONS_KEY, JSON.stringify(INITIAL_QUESTIONS));
-  localStorage.setItem(COMMUNITY_KEY, JSON.stringify(INITIAL_COMMUNITY));
-  localStorage.setItem(SCHEDULE_KEY, JSON.stringify(INITIAL_SCHEDULE));
-  localStorage.setItem(FRIENDS_KEY, JSON.stringify(INITIAL_FRIENDS));
+  localStorage.setItem(userKey, JSON.stringify(INITIAL_USER));
+  localStorage.setItem(qKey, JSON.stringify(INITIAL_QUESTIONS));
+  localStorage.setItem(sKey, JSON.stringify(INITIAL_SCHEDULE));
+  localStorage.setItem(fKey, JSON.stringify(INITIAL_FRIENDS));
+  localStorage.setItem(dKey, JSON.stringify(INITIAL_DENEMELER));
   return { ...INITIAL_USER };
 }
 
-export function getFriends(): Arkadas[] {
-  const data = localStorage.getItem(FRIENDS_KEY);
+export function getFriends(userId?: string): Arkadas[] {
+  const key = getScopedKey(BASE_FRIENDS_KEY, userId);
+  const data = localStorage.getItem(key);
   if (!data) {
-    localStorage.setItem(FRIENDS_KEY, JSON.stringify(INITIAL_FRIENDS));
+    localStorage.setItem(key, JSON.stringify(INITIAL_FRIENDS));
     return INITIAL_FRIENDS;
   }
   try {
     const parsed: Arkadas[] = JSON.parse(data);
     if (Array.isArray(parsed)) {
-      // Clean out any legacy mock friends
       const mockIds = ['f_1', 'f_2', 'f_3', 'f_4', 'f_5'];
       const cleaned = parsed.filter((f) => !mockIds.includes(f.id));
       if (cleaned.length !== parsed.length) {
-        localStorage.setItem(FRIENDS_KEY, JSON.stringify(cleaned));
+        localStorage.setItem(key, JSON.stringify(cleaned));
       }
       return cleaned;
     }
@@ -92,21 +107,28 @@ export function getFriends(): Arkadas[] {
   }
 }
 
-export function saveFriends(friends: Arkadas[]): void {
-  localStorage.setItem(FRIENDS_KEY, JSON.stringify(friends));
+export function saveFriends(friends: Arkadas[], userId?: string): void {
+  const key = getScopedKey(BASE_FRIENDS_KEY, userId);
+  localStorage.setItem(key, JSON.stringify(friends));
 }
 
-export function addFriend(friend: Arkadas): Arkadas[] {
-  const friends = getFriends();
-  const exists = friends.some((f) => f.id === friend.id || (f.name.toLowerCase() === friend.name.toLowerCase() && f.avatar === friend.avatar));
+export function addFriend(friend: Arkadas, userId?: string): Arkadas[] {
+  const friends = getFriends(userId);
+  const exists = friends.some(
+    (f) =>
+      f.id === friend.id ||
+      (f.name.toLowerCase() === friend.name.toLowerCase() && f.avatar === friend.avatar) ||
+      (friend.kullaniciAdi && f.kullaniciAdi && f.kullaniciAdi.toLowerCase() === friend.kullaniciAdi.toLowerCase())
+  );
   if (!exists) {
     const updated = [friend, ...friends];
-    saveFriends(updated);
-    if (auth.currentUser) {
-      const path = `users/${auth.currentUser.uid}/friends/${friend.id}`;
-      setDoc(doc(db, 'users', auth.currentUser.uid, 'friends', friend.id), {
+    saveFriends(updated, userId);
+    const uid = userId || auth.currentUser?.uid;
+    if (uid) {
+      const path = `users/${uid}/friends/${friend.id}`;
+      setDoc(doc(db, 'users', uid, 'friends', friend.id), {
         ...friend,
-        userId: auth.currentUser.uid,
+        userId: uid,
       }, { merge: true }).catch((err) => {
         handleFirestoreError(err, OperationType.WRITE, path);
       });
@@ -116,13 +138,14 @@ export function addFriend(friend: Arkadas): Arkadas[] {
   return friends;
 }
 
-export function removeFriend(friendId: string): Arkadas[] {
-  const friends = getFriends();
+export function removeFriend(friendId: string, userId?: string): Arkadas[] {
+  const friends = getFriends(userId);
   const updated = friends.filter((f) => f.id !== friendId);
-  saveFriends(updated);
-  if (auth.currentUser) {
-    const path = `users/${auth.currentUser.uid}/friends/${friendId}`;
-    deleteDoc(doc(db, 'users', auth.currentUser.uid, 'friends', friendId)).catch((err) => {
+  saveFriends(updated, userId);
+  const uid = userId || auth.currentUser?.uid;
+  if (uid) {
+    const path = `users/${uid}/friends/${friendId}`;
+    deleteDoc(doc(db, 'users', uid, 'friends', friendId)).catch((err) => {
       handleFirestoreError(err, OperationType.DELETE, path);
     });
   }
@@ -131,13 +154,14 @@ export function removeFriend(friendId: string): Arkadas[] {
 
 import { getTurkeyDateString } from './dateUtils';
 
-export function getUser(): Kullanici {
-  const data = localStorage.getItem(USER_KEY);
+export function getUser(userId?: string): Kullanici {
+  const key = getScopedKey(BASE_USER_KEY, userId);
+  const data = localStorage.getItem(key);
   const todayTr = getTurkeyDateString();
 
   if (!data) {
     const initialUserWithReset = { ...INITIAL_USER, lastResetDate: todayTr };
-    localStorage.setItem(USER_KEY, JSON.stringify(initialUserWithReset));
+    localStorage.setItem(key, JSON.stringify(initialUserWithReset));
     return initialUserWithReset;
   }
   try {
@@ -146,18 +170,19 @@ export function getUser(): Kullanici {
       ...INITIAL_USER,
       ...parsed,
       ad: parsed.ad && parsed.ad !== 'Selin Yılmaz' ? parsed.ad : 'Öğrenci',
+      kullaniciAdi: parsed.kullaniciAdi || 'ogrenci',
+      kullaniciAdi_lower: (parsed.kullaniciAdi || 'ogrenci').toLowerCase(),
       targetExam: parsed.targetExam || 'YKS',
       targetExamDate: parsed.targetExamDate || '2027-06-19',
       customExamName: parsed.customExamName || '',
       lastResetDate: parsed.lastResetDate || todayTr,
     };
 
-    // Midnight 00:00 Turkey Time reset check
     if (user.lastResetDate !== todayTr) {
       user.kredi = 10;
       user.maxKredi = 10;
       user.lastResetDate = todayTr;
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      localStorage.setItem(key, JSON.stringify(user));
     }
 
     if (!user.isPremium && user.kredi > 10) {
@@ -169,51 +194,46 @@ export function getUser(): Kullanici {
   }
 }
 
-export function saveUser(user: Kullanici): void {
-  // Enforce max 10 credits limit for non-premium users
+export function saveUser(user: Kullanici, userId?: string): void {
   if (!user.isPremium && user.kredi > 10) {
     user.kredi = 10;
   }
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
-  if (auth.currentUser) {
-    const path = `users/${auth.currentUser.uid}`;
-    setDoc(doc(db, 'users', auth.currentUser.uid), user, { merge: true }).catch((err) => {
+  const key = getScopedKey(BASE_USER_KEY, userId || user.id);
+  localStorage.setItem(key, JSON.stringify(user));
+
+  const uid = userId || auth.currentUser?.uid || user.id;
+  if (uid && !uid.startsWith('usr_new')) {
+    const path = `users/${uid}`;
+    const cleanUser = JSON.parse(JSON.stringify({
+      ...user,
+      kullaniciAdi_lower: (user.kullaniciAdi || '').toLowerCase(),
+      updatedAt: new Date().toISOString(),
+    }));
+    setDoc(doc(db, 'users', uid), cleanUser, { merge: true }).catch((err) => {
       handleFirestoreError(err, OperationType.WRITE, path);
     });
   }
 }
 
-export function addCredits(amount: number): Kullanici {
-  const user = getUser();
+export function addCredits(amount: number, userId?: string): Kullanici {
+  const user = getUser(userId);
   const maxLimit = user.isPremium ? 999 : 10;
   user.kredi = Math.min(maxLimit, user.kredi + amount);
-  saveUser(user);
+  saveUser(user, userId);
   return user;
 }
 
-const QUESTIONS_BACKUP_KEY = 'edumind_questions_permanent_backup';
-const QUESTIONS_ARCHIVE_KEY = 'edumind_questions_archive_mirror';
-
-export function getQuestions(): SoruKaydi[] {
-  let rawData = localStorage.getItem(QUESTIONS_KEY);
-
-  // Auto-recovery: If primary is empty or missing, recover from permanent backup or archive
-  if (!rawData || rawData === '[]') {
-    rawData = localStorage.getItem(QUESTIONS_BACKUP_KEY) || localStorage.getItem(QUESTIONS_ARCHIVE_KEY);
-    if (rawData && rawData !== '[]') {
-      localStorage.setItem(QUESTIONS_KEY, rawData);
-    }
-  }
+export function getQuestions(userId?: string): SoruKaydi[] {
+  const qKey = getScopedKey(BASE_QUESTIONS_KEY, userId);
+  const rawData = localStorage.getItem(qKey);
 
   if (!rawData) {
-    localStorage.setItem(QUESTIONS_KEY, JSON.stringify(INITIAL_QUESTIONS));
     return INITIAL_QUESTIONS;
   }
 
   try {
     const parsed = JSON.parse(rawData);
     if (Array.isArray(parsed)) {
-      // Only filter out ancient legacy demo mocks (never filter real student questions)
       const cleaned = parsed
         .filter((q) => {
           const id = (q.id || '').toLowerCase();
@@ -221,51 +241,29 @@ export function getQuestions(): SoruKaydi[] {
           return !isLegacyDemo;
         })
         .map((q) => sanitizeObjectMath(q));
-
-      // Always maintain permanent backups
-      localStorage.setItem(QUESTIONS_KEY, JSON.stringify(cleaned));
-      if (cleaned.length > 0) {
-        localStorage.setItem(QUESTIONS_BACKUP_KEY, JSON.stringify(cleaned));
-        localStorage.setItem(QUESTIONS_ARCHIVE_KEY, JSON.stringify(cleaned));
-      }
       return cleaned;
     }
     return [];
   } catch {
-    // If JSON parsing fails, attempt recovery from backup
-    const backupRaw = localStorage.getItem(QUESTIONS_BACKUP_KEY);
-    if (backupRaw) {
-      try {
-        const backupParsed = JSON.parse(backupRaw);
-        if (Array.isArray(backupParsed)) return backupParsed.map((q) => sanitizeObjectMath(q));
-      } catch {}
-    }
     return [];
   }
 }
 
 export function stripHeavyImages(q: SoruKaydi): SoruKaydi {
   const copy = { ...q };
-  // Strip heavy base64 image strings to store questions and options as compact text in Firebase
   if (copy.gorselUrl && (copy.gorselUrl.startsWith('data:image') || copy.gorselUrl.length > 500)) {
     copy.gorselUrl = '';
   }
   return copy;
 }
 
-export function saveQuestions(questions: SoruKaydi[]): void {
+export function saveQuestions(questions: SoruKaydi[], userId?: string): void {
   const sanitized = questions.map((q) => sanitizeObjectMath(stripHeavyImages(q)));
-  
-  // Save to Primary and Immutable Multi-Tier Backups
-  localStorage.setItem(QUESTIONS_KEY, JSON.stringify(sanitized));
-  if (sanitized.length > 0) {
-    localStorage.setItem(QUESTIONS_BACKUP_KEY, JSON.stringify(sanitized));
-    localStorage.setItem(QUESTIONS_ARCHIVE_KEY, JSON.stringify(sanitized));
-  }
+  const qKey = getScopedKey(BASE_QUESTIONS_KEY, userId);
+  localStorage.setItem(qKey, JSON.stringify(sanitized));
 
-  if (auth.currentUser) {
-    const uid = auth.currentUser.uid;
-    // 1. Sync individual question documents
+  const uid = userId || auth.currentUser?.uid;
+  if (uid) {
     sanitized.forEach((sanitizedQuestion) => {
       const path = `users/${uid}/questions/${sanitizedQuestion.id}`;
       const firestoreData = JSON.parse(JSON.stringify({
@@ -276,44 +274,31 @@ export function saveQuestions(questions: SoruKaydi[]): void {
         handleFirestoreError(err, OperationType.WRITE, path);
       });
     });
-
-    // 2. Save complete questions archive snapshot in Firestore for guaranteed disaster recovery
-    if (sanitized.length > 0) {
-      const backupPath = `users/${uid}/backup/questions_archive`;
-      const cleanArchiveData = JSON.parse(JSON.stringify({
-        questions: sanitized,
-        updatedAt: Date.now(),
-        userId: uid,
-      }));
-      setDoc(doc(db, 'users', uid, 'backup', 'questions_archive'), cleanArchiveData, { merge: true }).catch((err) => {
-        handleFirestoreError(err, OperationType.WRITE, backupPath);
-      });
-    }
   }
 }
 
-export function saveQuestion(question: SoruKaydi): SoruKaydi[] {
-  const list = getQuestions();
+export function saveQuestion(question: SoruKaydi, userId?: string): SoruKaydi[] {
+  const list = getQuestions(userId);
   const sanitizedQuestion = sanitizeObjectMath(stripHeavyImages(question));
-  const index = list.findIndex(q => q.id === sanitizedQuestion.id);
+  const index = list.findIndex((q) => q.id === sanitizedQuestion.id);
   if (index >= 0) {
     list[index] = sanitizedQuestion;
   } else {
     list.unshift(sanitizedQuestion);
   }
-
-  // Save to all backup layers
-  saveQuestions(list);
+  saveQuestions(list, userId);
   return list;
 }
 
-export function deleteQuestion(id: string): SoruKaydi[] {
-  const list = getQuestions().filter(q => q.id !== id);
-  localStorage.setItem(QUESTIONS_KEY, JSON.stringify(list));
+export function deleteQuestion(id: string, userId?: string): SoruKaydi[] {
+  const list = getQuestions(userId).filter((q) => q.id !== id);
+  const qKey = getScopedKey(BASE_QUESTIONS_KEY, userId);
+  localStorage.setItem(qKey, JSON.stringify(list));
 
-  if (auth.currentUser) {
-    const path = `users/${auth.currentUser.uid}/questions/${id}`;
-    deleteDoc(doc(db, 'users', auth.currentUser.uid, 'questions', id)).catch((err) => {
+  const uid = userId || auth.currentUser?.uid;
+  if (uid) {
+    const path = `users/${uid}/questions/${id}`;
+    deleteDoc(doc(db, 'users', uid, 'questions', id)).catch((err) => {
       handleFirestoreError(err, OperationType.DELETE, path);
     });
   }
@@ -337,13 +322,13 @@ export function getCommunityPosts(): ToplulukSoru[] {
 export const getPosts = getCommunityPosts;
 
 export function savePosts(posts: ToplulukSoru[]): void {
-  localStorage.setItem(COMMUNITY_KEY, JSON.stringify(posts));
+  localStorage.setItem(BASE_COMMUNITY_KEY, JSON.stringify(posts));
 }
 
 export function saveCommunityPost(post: ToplulukSoru): ToplulukSoru[] {
   const posts = getCommunityPosts();
   posts.unshift(post);
-  localStorage.setItem(COMMUNITY_KEY, JSON.stringify(posts));
+  localStorage.setItem(BASE_COMMUNITY_KEY, JSON.stringify(posts));
 
   if (auth.currentUser) {
     const path = `community/${post.id}`;
@@ -360,19 +345,20 @@ export function saveCommunityPost(post: ToplulukSoru): ToplulukSoru[] {
 
 export function toggleLikeCommunityPost(id: string): ToplulukSoru[] {
   const posts = getCommunityPosts();
-  const post = posts.find(p => p.id === id);
+  const post = posts.find((p) => p.id === id);
   if (post) {
     post.isLiked = !post.isLiked;
     post.begeniSayisi += post.isLiked ? 1 : -1;
-    localStorage.setItem(COMMUNITY_KEY, JSON.stringify(posts));
+    localStorage.setItem(BASE_COMMUNITY_KEY, JSON.stringify(posts));
   }
   return posts;
 }
 
-export function getSchedule(): ProgramOgesi[] {
-  const data = localStorage.getItem(SCHEDULE_KEY);
+export function getSchedule(userId?: string): ProgramOgesi[] {
+  const key = getScopedKey(BASE_SCHEDULE_KEY, userId);
+  const data = localStorage.getItem(key);
   if (!data) {
-    localStorage.setItem(SCHEDULE_KEY, JSON.stringify(INITIAL_SCHEDULE));
+    localStorage.setItem(key, JSON.stringify(INITIAL_SCHEDULE));
     return INITIAL_SCHEDULE;
   }
   try {
@@ -382,14 +368,16 @@ export function getSchedule(): ProgramOgesi[] {
   }
 }
 
-export function saveSchedule(schedule: ProgramOgesi[]): void {
-  localStorage.setItem(SCHEDULE_KEY, JSON.stringify(schedule));
-  if (auth.currentUser) {
+export function saveSchedule(schedule: ProgramOgesi[], userId?: string): void {
+  const key = getScopedKey(BASE_SCHEDULE_KEY, userId);
+  localStorage.setItem(key, JSON.stringify(schedule));
+  const uid = userId || auth.currentUser?.uid;
+  if (uid) {
     schedule.forEach((item) => {
-      const path = `users/${auth.currentUser!.uid}/schedule/${item.id}`;
-      setDoc(doc(db, 'users', auth.currentUser!.uid, 'schedule', item.id), {
+      const path = `users/${uid}/schedule/${item.id}`;
+      setDoc(doc(db, 'users', uid, 'schedule', item.id), {
         ...item,
-        userId: auth.currentUser!.uid,
+        userId: uid,
       }, { merge: true }).catch((err) => {
         handleFirestoreError(err, OperationType.WRITE, path);
       });
@@ -397,26 +385,28 @@ export function saveSchedule(schedule: ProgramOgesi[]): void {
   }
 }
 
-export function toggleScheduleItem(id: string): ProgramOgesi[] {
-  const items = getSchedule();
-  const item = items.find(i => i.id === id);
+export function toggleScheduleItem(id: string, userId?: string): ProgramOgesi[] {
+  const items = getSchedule(userId);
+  const item = items.find((i) => i.id === id);
   if (item) {
     item.tamamlandi = !item.tamamlandi;
-    saveSchedule(items);
+    saveSchedule(items, userId);
   }
   return items;
 }
 
-export function saveScheduleLocally(schedule: ProgramOgesi[]): void {
-  localStorage.setItem(SCHEDULE_KEY, JSON.stringify(schedule));
+export function saveScheduleLocally(schedule: ProgramOgesi[], userId?: string): void {
+  const key = getScopedKey(BASE_SCHEDULE_KEY, userId);
+  localStorage.setItem(key, JSON.stringify(schedule));
 }
 
-export function deleteScheduleItem(id: string): ProgramOgesi[] {
-  const items = getSchedule().filter(i => i.id !== id);
-  saveScheduleLocally(items);
-  if (auth.currentUser) {
-    const path = `users/${auth.currentUser.uid}/schedule/${id}`;
-    deleteDoc(doc(db, 'users', auth.currentUser.uid, 'schedule', id)).catch((err) => {
+export function deleteScheduleItem(id: string, userId?: string): ProgramOgesi[] {
+  const items = getSchedule(userId).filter((i) => i.id !== id);
+  saveScheduleLocally(items, userId);
+  const uid = userId || auth.currentUser?.uid;
+  if (uid) {
+    const path = `users/${uid}/schedule/${id}`;
+    deleteDoc(doc(db, 'users', uid, 'schedule', id)).catch((err) => {
       handleFirestoreError(err, OperationType.DELETE, path);
     });
   }
@@ -424,13 +414,13 @@ export function deleteScheduleItem(id: string): ProgramOgesi[] {
 }
 
 export function getTheme(): 'light' | 'dark' {
-  const theme = localStorage.getItem(THEME_KEY);
+  const theme = localStorage.getItem(BASE_THEME_KEY);
   if (theme === 'dark' || theme === 'light') return theme;
   return 'light';
 }
 
 export function saveTheme(theme: 'light' | 'dark'): void {
-  localStorage.setItem(THEME_KEY, theme);
+  localStorage.setItem(BASE_THEME_KEY, theme);
   if (theme === 'dark') {
     document.documentElement.classList.add('dark');
     document.documentElement.classList.remove('light');
@@ -442,24 +432,23 @@ export function saveTheme(theme: 'light' | 'dark'): void {
 
 export const setTheme = saveTheme;
 
-const INITIAL_DENEMELER: DenemeRecord[] = [];
-
-export function saveDenemelerLocally(denemeler: DenemeRecord[]): void {
-  localStorage.setItem(DENEME_KEY, JSON.stringify(denemeler));
+export function saveDenemelerLocally(denemeler: DenemeRecord[], userId?: string): void {
+  const key = getScopedKey(BASE_DENEME_KEY, userId);
+  localStorage.setItem(key, JSON.stringify(denemeler));
 }
 
-export function getDenemeler(): DenemeRecord[] {
-  const data = localStorage.getItem(DENEME_KEY);
+export function getDenemeler(userId?: string): DenemeRecord[] {
+  const key = getScopedKey(BASE_DENEME_KEY, userId);
+  const data = localStorage.getItem(key);
   if (!data) {
-    localStorage.setItem(DENEME_KEY, JSON.stringify([]));
+    localStorage.setItem(key, JSON.stringify([]));
     return [];
   }
   try {
     const parsed: DenemeRecord[] = JSON.parse(data);
-    // Clean up sample mock items if present in user's localStorage
     const cleaned = parsed.filter((item) => item.id !== 'd_1' && item.id !== 'd_2');
     if (cleaned.length !== parsed.length) {
-      localStorage.setItem(DENEME_KEY, JSON.stringify(cleaned));
+      localStorage.setItem(key, JSON.stringify(cleaned));
     }
     return cleaned;
   } catch {
@@ -467,8 +456,8 @@ export function getDenemeler(): DenemeRecord[] {
   }
 }
 
-export function saveDeneme(deneme: DenemeRecord): DenemeRecord[] {
-  const existing = getDenemeler();
+export function saveDeneme(deneme: DenemeRecord, userId?: string): DenemeRecord[] {
+  const existing = getDenemeler(userId);
   const index = existing.findIndex((d) => d.id === deneme.id);
   let updated: DenemeRecord[];
   if (index >= 0) {
@@ -477,16 +466,17 @@ export function saveDeneme(deneme: DenemeRecord): DenemeRecord[] {
   } else {
     updated = [deneme, ...existing];
   }
-  localStorage.setItem(DENEME_KEY, JSON.stringify(updated));
+  saveDenemelerLocally(updated, userId);
 
-  if (auth.currentUser) {
-    const path = `users/${auth.currentUser.uid}/denemeler/${deneme.id}`;
+  const uid = userId || auth.currentUser?.uid;
+  if (uid) {
+    const path = `users/${uid}/denemeler/${deneme.id}`;
     const safeData = JSON.parse(JSON.stringify({
       ...deneme,
-      userId: auth.currentUser.uid,
+      userId: uid,
       notlar: deneme.notlar || '',
     }));
-    setDoc(doc(db, 'users', auth.currentUser.uid, 'denemeler', deneme.id), safeData, { merge: true }).catch((err) => {
+    setDoc(doc(db, 'users', uid, 'denemeler', deneme.id), safeData, { merge: true }).catch((err) => {
       handleFirestoreError(err, OperationType.WRITE, path);
     });
   }
@@ -494,14 +484,15 @@ export function saveDeneme(deneme: DenemeRecord): DenemeRecord[] {
   return updated;
 }
 
-export function deleteDeneme(id: string): DenemeRecord[] {
-  const existing = getDenemeler();
+export function deleteDeneme(id: string, userId?: string): DenemeRecord[] {
+  const existing = getDenemeler(userId);
   const updated = existing.filter((d) => d.id !== id);
-  localStorage.setItem(DENEME_KEY, JSON.stringify(updated));
+  saveDenemelerLocally(updated, userId);
 
-  if (auth.currentUser) {
-    const path = `users/${auth.currentUser.uid}/denemeler/${id}`;
-    deleteDoc(doc(db, 'users', auth.currentUser.uid, 'denemeler', id)).catch((err) => {
+  const uid = userId || auth.currentUser?.uid;
+  if (uid) {
+    const path = `users/${uid}/denemeler/${id}`;
+    deleteDoc(doc(db, 'users', uid, 'denemeler', id)).catch((err) => {
       handleFirestoreError(err, OperationType.DELETE, path);
     });
   }

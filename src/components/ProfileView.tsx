@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Kullanici, SoruKaydi, ActiveTab, Arkadas } from '../types';
 import { calculateBadges, Rozet } from '../lib/badgeUtils';
+import { db, auth } from '../lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export const AVATAR_OPTIONS = [
   {
@@ -110,16 +112,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   // Profile Settings States
   const [activeSettingsTab, setActiveSettingsTab] = useState<'profile' | 'security' | 'notifications' | 'account'>('profile');
   const [editName, setEditName] = useState<string>(user.ad);
+  const [editKullaniciAdi, setEditKullaniciAdi] = useState<string>(user.kullaniciAdi || 'ogrenci');
   const [editSinif, setEditSinif] = useState<string>(user.sinif || SINIF_OPTIONS[0]);
   const [editEmail, setEditEmail] = useState<string>(user.email || '');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
 
   // Sync profile form state when user prop updates
   React.useEffect(() => {
     setEditName(user.ad);
+    setEditKullaniciAdi(user.kullaniciAdi || 'ogrenci');
     setEditSinif(user.sinif || SINIF_OPTIONS[0]);
     setEditEmail(user.email || '');
-  }, [user.ad, user.sinif, user.email]);
+  }, [user.ad, user.kullaniciAdi, user.sinif, user.email]);
 
   // Password Security Form States
   const [currentPassword, setCurrentPassword] = useState<string>('');
@@ -200,13 +205,38 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setIsAvatarModalOpen(false);
   };
 
-  const handleSaveProfileInfo = (e: React.FormEvent) => {
+  const handleSaveProfileInfo = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaveErrorMsg(null);
+    setSaveSuccessMsg(null);
     if (!editName.trim()) return;
+
+    const cleanUsername = editKullaniciAdi.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (!cleanUsername || cleanUsername.length < 3 || cleanUsername.length > 20) {
+      setSaveErrorMsg('Kullanıcı adı en az 3, en fazla 20 karakter olmalı ve yalnızca küçük harf, rakam ve alt tire (_) içermelidir.');
+      return;
+    }
+
+    // If username changed, check uniqueness in Firestore
+    if (cleanUsername !== (user.kullaniciAdi || '').toLowerCase()) {
+      try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('kullaniciAdi_lower', '==', cleanUsername));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          setSaveErrorMsg(`"@${cleanUsername}" kullanıcı adı zaten başkası tarafından alınmış.`);
+          return;
+        }
+      } catch (err) {
+        console.warn('Username check warning:', err);
+      }
+    }
 
     if (onUpdateUser) {
       onUpdateUser({
         ad: editName.trim(),
+        kullaniciAdi: cleanUsername,
+        kullaniciAdi_lower: cleanUsername,
         sinif: editSinif,
         email: editEmail.trim(),
       });
@@ -269,7 +299,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </button>
             </h2>
 
-            <div className="flex items-center justify-center gap-2 mt-1.5 flex-wrap">
+            {/* Username Badge */}
+            <p className="text-xs font-mono text-indigo-200 mt-0.5">
+              @{user.kullaniciAdi || 'ogrenci'}
+            </p>
+
+            <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
               <div className="inline-flex items-center gap-1 bg-slate-950/50 border border-white/30 backdrop-blur-md px-3 py-0.5 rounded-full text-xs font-black text-white shadow-xs">
                 <span>🎓 {user.sinif}</span>
               </div>
@@ -458,6 +493,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
             )}
 
+            {saveErrorMsg && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-bold flex items-center gap-2">
+                <span className="material-symbols-outlined text-base">error</span>
+                <span>{saveErrorMsg}</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-extrabold text-text-main">Ad Soyad</label>
@@ -467,9 +509,30 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   onChange={(e) => setEditName(e.target.value)}
                   className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main font-bold focus:outline-none focus:border-primary"
                   placeholder="Örn: Ahmet Yılmaz"
+                  required
                 />
               </div>
 
+              {/* Unique Username field */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-extrabold text-text-main">Kullanıcı Adı (@)</label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-base">
+                    alternate_email
+                  </span>
+                  <input
+                    type="text"
+                    value={editKullaniciAdi}
+                    onChange={(e) => setEditKullaniciAdi(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                    className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 pl-9 text-xs text-text-main font-bold focus:outline-none focus:border-primary font-mono"
+                    placeholder="kullanici_adi"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-extrabold text-text-main">Sınıf / Sınav Hedefi</label>
                 <select
@@ -484,19 +547,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   ))}
                 </select>
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-extrabold text-text-main block">
-                <span>E-Posta Adresi</span>
-              </label>
-              <input
-                type="email"
-                value={editEmail}
-                onChange={(e) => setEditEmail(e.target.value)}
-                className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main font-bold focus:outline-none focus:border-primary"
-                placeholder="ogrenci@egitimkocum.ai"
-              />
+              <div className="space-y-1.5">
+                <label className="text-xs font-extrabold text-text-main block">
+                  <span>E-Posta Adresi</span>
+                </label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main font-bold focus:outline-none focus:border-primary"
+                  placeholder="ogrenci@egitimkocum.ai"
+                />
+              </div>
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-card-border">

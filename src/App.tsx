@@ -158,7 +158,7 @@ export function App() {
               }
               return n.type === 'pomo_invite';
             });
-            if (latestUnreadInvite) {
+            if (latestUnreadInvite && !deliveredNativeNotifsRef.current.has(latestUnreadInvite.id)) {
               notifyDeviceForIncomingInvite(latestUnreadInvite);
               setActiveBannerNotif(latestUnreadInvite);
             }
@@ -167,82 +167,23 @@ export function App() {
           }
         }, () => {});
 
-        // 2. Top-level pomo_invites collection listener in Firebase
-        unsubPomo = onSnapshot(collection(db, 'pomo_invites'), (snap) => {
-          if (!snap.empty) {
-            const list: Bildirim[] = [];
-            snap.docs.forEach((d) => {
-              const data = d.data() as Bildirim & { recipientId?: string; recipientName?: string };
-              const isForMe = data.recipientId === uid || (data.recipientName && user.ad && data.recipientName.trim().toLowerCase() === user.ad.trim().toLowerCase());
-              if (isForMe && !data.isSenderCopy && data.senderId !== uid) {
-                list.push({ id: d.id, ...data });
-              }
-            });
-            if (list.length > 0) {
-              setNotifications((prev) => {
-                const map = new Map<string, Bildirim>();
-                prev.forEach((n) => map.set(n.id, n));
-                list.forEach((n) => map.set(n.id, n));
-                return Array.from(map.values());
-              });
-              const unreadInvite = list.find((n) => !n.read && n.type === 'pomo_invite');
-              if (unreadInvite) {
-                notifyDeviceForIncomingInvite(unreadInvite);
-                setActiveBannerNotif(unreadInvite);
-              }
-            }
-          }
-        }, () => {});
-
-        // 3. Top-level friend_invites collection listener in Firebase
-        unsubFriend = onSnapshot(collection(db, 'friend_invites'), (snap) => {
-          if (!snap.empty) {
-            const list: Bildirim[] = [];
-            snap.docs.forEach((d) => {
-              const data = d.data() as Bildirim & { recipientId?: string; recipientName?: string };
-              const isForMe = data.recipientId === uid || (data.recipientName && user.ad && data.recipientName.trim().toLowerCase() === user.ad.trim().toLowerCase());
-              if (isForMe && !data.isSenderCopy && data.senderId !== uid) {
-                const isAlreadyFriend = friendsState.some((f) => f.id === data.senderId);
-                if (isAlreadyFriend) {
-                  cleanDeleteNotification(d.id);
-                } else {
-                  list.push({ id: d.id, ...data });
-                }
-              }
-            });
-            if (list.length > 0) {
-              setNotifications((prev) => {
-                const map = new Map<string, Bildirim>();
-                prev.forEach((n) => map.set(n.id, n));
-                list.forEach((n) => map.set(n.id, n));
-                return Array.from(map.values());
-              });
-              const unreadInvite = list.find((n) => !n.read && n.type === 'friend_request');
-              if (unreadInvite) {
-                notifyDeviceForIncomingInvite(unreadInvite);
-                setActiveBannerNotif(unreadInvite);
-              }
-            }
-          }
-        }, () => {});
-
-        // 4. Listen to real-time friends list so BOTH users update instantaneously!
+        // 2. Listen to real-time friends list so BOTH users update instantaneously!
         const friendsRef = collection(db, 'users', uid, 'friends');
         unsubFriends = onSnapshot(friendsRef, (fSnap) => {
           if (!fSnap.empty) {
             const loadedFriends: Arkadas[] = fSnap.docs.map((d) => d.data() as Arkadas);
             setFriendsState(loadedFriends);
-            saveFriends(loadedFriends);
+            saveFriends(loadedFriends, uid);
           }
         }, () => {});
 
-        // 5. Also listen to user doc field 'latestNotification' for instant floating banner pop-up
+        // 3. Listen to user doc field 'latestNotification' for instant floating banner pop-up
         unsubUserDoc = onSnapshot(doc(db, 'users', uid), (userSnap) => {
           if (userSnap.exists()) {
             const uData = userSnap.data();
             if (uData && uData.latestNotification && !uData.latestNotification.read) {
               const lNotif = uData.latestNotification as Bildirim;
-              if (lNotif.type === 'friend_request' || lNotif.type === 'pomo_invite') {
+              if ((lNotif.type === 'friend_request' || lNotif.type === 'pomo_invite') && !deliveredNativeNotifsRef.current.has(lNotif.id)) {
                 notifyDeviceForIncomingInvite(lNotif);
                 setActiveBannerNotif(lNotif);
               }
@@ -345,10 +286,13 @@ export function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const uid = firebaseUser.uid;
+        const userDocRef = doc(db, 'users', uid);
         try {
           const userSnap = await getDoc(userDocRef);
           const todayTr = getTurkeyDateString();
+          let currentUsername = 'ogrenci';
+
           if (userSnap.exists()) {
             const data = userSnap.data() as Kullanici;
             let userKredi = data.kredi ?? 10;
@@ -361,8 +305,9 @@ export function App() {
 
             let cleanName = data.ad;
             if (!cleanName || cleanName === 'Selin Yılmaz' || cleanName === 'Yeni Öğrenci') {
-              cleanName = firebaseUser.displayName || (user.ad && user.ad !== 'Selin Yılmaz' && user.ad !== 'Yeni Öğrenci' ? user.ad : 'Öğrenci');
+              cleanName = firebaseUser.displayName || 'Öğrenci';
             }
+            currentUsername = data.kullaniciAdi || (firebaseUser.email?.split('@')[0] || 'ogrenci').toLowerCase().replace(/[^a-z0-9_]/g, '');
             const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
             let finalAvatar = data.avatarUrl;
             if (!finalAvatar || finalAvatar.includes('googleusercontent.com') || finalAvatar.includes('google.com')) {
@@ -371,8 +316,10 @@ export function App() {
 
             const userData: Kullanici = {
               ...data,
-              id: firebaseUser.uid,
+              id: uid,
               ad: cleanName,
+              kullaniciAdi: currentUsername,
+              kullaniciAdi_lower: currentUsername.toLowerCase(),
               email: data.email || firebaseUser.email || 'ogrenci@egitimkocum.ai',
               avatarUrl: finalAvatar,
               kredi: userKredi,
@@ -380,14 +327,17 @@ export function App() {
               lastResetDate: userResetDate,
             };
             setUserState(userData);
-            saveUser(userData);
+            saveUser(userData, uid);
           } else {
-            const initialName = firebaseUser.displayName || (user.ad && user.ad !== 'Selin Yılmaz' && user.ad !== 'Yeni Öğrenci' ? user.ad : 'Öğrenci');
+            const initialName = firebaseUser.displayName || 'Öğrenci';
+            currentUsername = (firebaseUser.email?.split('@')[0] || 'ogrenci').toLowerCase().replace(/[^a-z0-9_]/g, '') + `_${Math.floor(100 + Math.random() * 900)}`;
             const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
             const newUserData: Kullanici = {
-              id: firebaseUser.uid,
+              id: uid,
               ad: initialName,
-              email: firebaseUser.email || user.email || 'ogrenci@egitimkocum.ai',
+              kullaniciAdi: currentUsername,
+              kullaniciAdi_lower: currentUsername.toLowerCase(),
+              email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
               kredi: 10,
               maxKredi: 10,
               seri: 1,
@@ -400,102 +350,88 @@ export function App() {
               invitedCount: 0,
               lastResetDate: todayTr,
             };
-            await setDoc(userDocRef, newUserData);
+            await setDoc(userDocRef, newUserData, { merge: true });
             setUserState(newUserData);
-            saveUser(newUserData);
+            saveUser(newUserData, uid);
+          }
 
-            // Clean state for fresh new registration
-            setQuestionsState([]);
-            saveQuestions([]);
-            setScheduleState([]);
-            saveSchedule([]);
-            setFriendsState([]);
-            saveFriends([]);
+          // Fetch user questions EXCLUSIVELY for this user
+          let userQuestions: SoruKaydi[] = [];
+          try {
+            const qColRef = collection(db, 'users', uid, 'questions');
+            const qSnap = await getDocs(qColRef);
+            if (!qSnap.empty) {
+              userQuestions = qSnap.docs.map((doc) => doc.data() as SoruKaydi);
+            } else {
+              // Fallback to this user's scoped local storage
+              userQuestions = getQuestions(uid);
+            }
+          } catch (err) {
+            console.warn('Could not fetch questions from Firestore, using user local scoped storage:', err);
+            userQuestions = getQuestions(uid);
+          }
+
+          setQuestionsState(userQuestions);
+          saveQuestions(userQuestions, uid);
+          if (userQuestions.length > 0) {
+            setSelectedQuestion(userQuestions[0]);
+          } else {
             setSelectedQuestion(null);
           }
 
-          // Fetch user questions from Firestore & Disaster Recovery Mirror
-          const currentLocalQuestions = getQuestions();
-          let loadedFromFirestore: SoruKaydi[] = [];
-
+          // Fetch user schedule EXCLUSIVELY for this user
+          let userSchedule: ProgramOgesi[] = [];
           try {
-            const qColRef = collection(db, 'users', firebaseUser.uid, 'questions');
-            const qSnap = await getDocs(qColRef);
-            if (!qSnap.empty) {
-              loadedFromFirestore = qSnap.docs.map(doc => doc.data() as SoruKaydi);
+            const sColRef = collection(db, 'users', uid, 'schedule');
+            const sSnap = await getDocs(sColRef);
+            if (!sSnap.empty) {
+              userSchedule = sSnap.docs.map((doc) => doc.data() as ProgramOgesi);
             } else {
-              // Check cloud backup archive document
-              const backupSnap = await getDoc(doc(db, 'users', firebaseUser.uid, 'backup', 'questions_archive'));
-              if (backupSnap.exists() && Array.isArray(backupSnap.data()?.questions)) {
-                loadedFromFirestore = backupSnap.data().questions as SoruKaydi[];
-              }
+              userSchedule = getSchedule(uid);
             }
           } catch (err) {
-            console.warn('Could not fetch questions from Firestore, using local backup:', err);
+            userSchedule = getSchedule(uid);
           }
+          setScheduleState(userSchedule);
+          saveSchedule(userSchedule, uid);
 
-          // Safe Merge: Merge Firestore questions with Local Storage questions so nothing is ever lost
-          const questionMap = new Map<string, SoruKaydi>();
-          currentLocalQuestions.forEach((q) => {
-            if (q && q.id) questionMap.set(q.id, q);
-          });
-          loadedFromFirestore.forEach((q) => {
-            if (q && q.id) questionMap.set(q.id, q);
-          });
-
-          const mergedQuestions = Array.from(questionMap.values());
-          if (mergedQuestions.length > 0) {
-            setQuestionsState(mergedQuestions);
-            saveQuestions(mergedQuestions);
-            setSelectedQuestion((prev) => prev || mergedQuestions[0] || null);
-          } else {
-            const fallbackLocal = getQuestions();
-            if (fallbackLocal.length > 0) {
-              setQuestionsState(fallbackLocal);
-              setSelectedQuestion(fallbackLocal[0]);
+          // Fetch user friends EXCLUSIVELY for this user
+          let userFriends: Arkadas[] = [];
+          try {
+            const fColRef = collection(db, 'users', uid, 'friends');
+            const fSnap = await getDocs(fColRef);
+            if (!fSnap.empty) {
+              userFriends = fSnap.docs.map((doc) => doc.data() as Arkadas);
+            } else {
+              userFriends = getFriends(uid);
             }
+          } catch (err) {
+            userFriends = getFriends(uid);
           }
+          setFriendsState(userFriends);
+          saveFriends(userFriends, uid);
 
-          // Fetch user schedule from Firestore
-          const sColRef = collection(db, 'users', firebaseUser.uid, 'schedule');
-          const sSnap = await getDocs(sColRef);
-          if (!sSnap.empty) {
-            const loadedSchedule: ProgramOgesi[] = sSnap.docs.map(doc => doc.data() as ProgramOgesi);
-            setScheduleState(loadedSchedule);
-            saveSchedule(loadedSchedule);
-          } else {
-            setScheduleState([]);
-            saveSchedule([]);
+          // Fetch user denemeler EXCLUSIVELY for this user
+          let userDenemeler: DenemeRecord[] = [];
+          try {
+            const dColRef = collection(db, 'users', uid, 'denemeler');
+            const dSnap = await getDocs(dColRef);
+            if (!dSnap.empty) {
+              userDenemeler = dSnap.docs.map((doc) => doc.data() as DenemeRecord);
+            } else {
+              userDenemeler = getDenemeler(uid);
+            }
+          } catch (err) {
+            userDenemeler = getDenemeler(uid);
           }
-
-          // Fetch user friends from Firestore
-          const fColRef = collection(db, 'users', firebaseUser.uid, 'friends');
-          const fSnap = await getDocs(fColRef);
-          if (!fSnap.empty) {
-            const loadedFriends: Arkadas[] = fSnap.docs.map(doc => doc.data() as Arkadas);
-            setFriendsState(loadedFriends);
-            saveFriends(loadedFriends);
-          } else {
-            setFriendsState([]);
-            saveFriends([]);
-          }
-
-          // Fetch user denemeler (mock exam tracking records) from Firestore
-          const dColRef = collection(db, 'users', firebaseUser.uid, 'denemeler');
-          const dSnap = await getDocs(dColRef);
-          if (!dSnap.empty) {
-            const loadedDenemeler: DenemeRecord[] = dSnap.docs.map(doc => doc.data() as DenemeRecord);
-            saveDenemelerLocally(loadedDenemeler);
-          } else {
-            saveDenemelerLocally([]);
-          }
+          saveDenemelerLocally(userDenemeler, uid);
 
           // Fetch community posts from Firestore
           try {
             const cColRef = collection(db, 'community');
             const cSnap = await getDocs(cColRef);
             if (!cSnap.empty) {
-              const loadedPosts: ToplulukSoru[] = cSnap.docs.map(doc => doc.data() as ToplulukSoru);
+              const loadedPosts: ToplulukSoru[] = cSnap.docs.map((doc) => doc.data() as ToplulukSoru);
               setPostsState(loadedPosts);
               savePosts(loadedPosts);
             }
@@ -509,7 +445,14 @@ export function App() {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
         }
       } else {
-        // Logged-out state: user must sign in or register (no guest user overwrite)
+        // Logged-out state: clean all in-memory user data so next login starts isolated
+        setUserState(INITIAL_USER);
+        setQuestionsState([]);
+        setScheduleState([]);
+        setFriendsState([]);
+        setDenemelerState([]);
+        setNotifications([]);
+        setSelectedQuestion(null);
         setIsAuthModalOpen(true);
       }
     });
@@ -600,6 +543,8 @@ export function App() {
           JSON.stringify({
             ...updatedUser,
             displayName: updatedUser.ad,
+            kullaniciAdi: updatedUser.kullaniciAdi || 'ogrenci',
+            kullaniciAdi_lower: (updatedUser.kullaniciAdi || 'ogrenci').toLowerCase(),
             photoURL: updatedUser.avatarUrl,
             updatedAt: new Date().toISOString(),
           })
@@ -625,12 +570,15 @@ export function App() {
             const friendId = fDoc.id;
             if (friendId && !friendId.startsWith('f_')) {
               const friendRef = doc(db, 'users', friendId, 'friends', myUid);
-              await updateDoc(friendRef, {
+              await setDoc(friendRef, {
+                id: myUid,
                 name: updatedUser.ad || 'Öğrenci',
+                kullaniciAdi: updatedUser.kullaniciAdi || 'ogrenci',
                 avatar: updatedUser.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
                 xp: updatedUser.xp || 0,
                 streak: updatedUser.seri || 1,
-              }).catch(() => {});
+                userId: friendId,
+              }, { merge: true }).catch(() => {});
             }
           }
         } catch (e) {}
@@ -648,6 +596,7 @@ export function App() {
                   return {
                     ...m,
                     name: updatedUser.ad || m.name,
+                    kullaniciAdi: updatedUser.kullaniciAdi || m.kullaniciAdi,
                     avatar: updatedUser.avatarUrl || m.avatar,
                   };
                 }
@@ -671,12 +620,12 @@ export function App() {
 
   const handleUpdateUser = (updatedUser: Kullanici) => {
     setUserState(updatedUser);
-    saveUser(updatedUser);
+    saveUser(updatedUser, updatedUser.id);
     syncUserToFirestore(updatedUser);
   };
 
   const handleAddFriend = async (newFriend: Arkadas) => {
-    const updated = addFriend(newFriend);
+    const updated = addFriend(newFriend, user.id);
     setFriendsState(updated);
 
     if (auth.currentUser) {
@@ -684,6 +633,7 @@ export function App() {
       const myFriendObj: Arkadas = {
         id: myUid,
         name: user.ad || 'Öğrenci',
+        kullaniciAdi: user.kullaniciAdi || 'ogrenci',
         avatar: user.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
         xp: user.xp || 0,
         streak: user.seri || 1,
@@ -692,11 +642,11 @@ export function App() {
 
       try {
         // Write to current user's friends collection in Firestore
-        await setDoc(doc(db, 'users', myUid, 'friends', newFriend.id), { ...newFriend, userId: myUid });
+        await setDoc(doc(db, 'users', myUid, 'friends', newFriend.id), { ...newFriend, userId: myUid }, { merge: true });
 
         // MUTUAL PERSISTENCE: Write current user to friend's friends collection in Firestore!
         if (newFriend.id && !newFriend.id.startsWith('f_')) {
-          await setDoc(doc(db, 'users', newFriend.id, 'friends', myUid), { ...myFriendObj, userId: newFriend.id });
+          await setDoc(doc(db, 'users', newFriend.id, 'friends', myUid), { ...myFriendObj, userId: newFriend.id }, { merge: true });
         }
       } catch (err) {
         console.warn('Error saving friend mutually to Firestore:', err);
@@ -1701,7 +1651,9 @@ export function App() {
               setQuestionsState([]);
               setScheduleState([]);
               setFriendsState([]);
+              setDenemelerState([]);
               setNotifications([]);
+              setSelectedQuestion(null);
               setActiveBannerNotif(null);
               setActiveTab('home');
               setIsAuthModalOpen(true);

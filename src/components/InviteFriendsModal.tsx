@@ -27,11 +27,20 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
+  // Reset inputs when modal opens or closes
+  React.useEffect(() => {
+    if (isOpen) {
+      setManualInput('');
+      setSearchError(null);
+      setIsSearching(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   // Fixed public live production URL so anyone anywhere can open and join
   const PUBLIC_APP_URL = 'https://gen-lang-client-0786231895.web.app';
-  const inviteUrl = `${PUBLIC_APP_URL}/?invite=${currentUser.id}&name=${encodeURIComponent(currentUser.ad || 'Öğrenci')}&avatar=${encodeURIComponent(currentUser.avatarUrl || '')}&xp=${currentUser.xp || 0}`;
+  const inviteUrl = `${PUBLIC_APP_URL}/?invite=${currentUser.id}&name=${encodeURIComponent(currentUser.ad || 'Öğrenci')}&username=${encodeURIComponent(currentUser.kullaniciAdi || '')}&avatar=${encodeURIComponent(currentUser.avatarUrl || '')}&xp=${currentUser.xp || 0}`;
   const shareText = `🎓 Selam! Eğitim Koçum AI ile YKS/LGS sorularımı çözüp yapay zeka analizi alıyorum. Benimle arkadaş olmak ve ders yarışına katılmak için tıkla:`;
 
   const handleCopyLink = async () => {
@@ -64,8 +73,13 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
   const handleManualAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setSearchError(null);
-    const rawInput = manualInput.trim();
+    let rawInput = manualInput.trim();
     if (!rawInput) return;
+
+    // Strip leading '@' if entered
+    if (rawInput.startsWith('@')) {
+      rawInput = rawInput.substring(1).trim();
+    }
 
     // Check if user pasted a link with ?invite=...
     let targetUidOrName = rawInput;
@@ -79,14 +93,16 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
       }
     } catch (e) {}
 
-    const normalizedInput = targetUidOrName.toLocaleLowerCase('tr-TR');
-    const normalizedCurrentUser = (currentUser.ad || '').toLocaleLowerCase('tr-TR');
+    const normalizedInput = targetUidOrName.toLowerCase();
+    const normalizedCurrentUser = (currentUser.ad || '').toLowerCase();
+    const normalizedCurrentUsername = (currentUser.kullaniciAdi || '').toLowerCase();
 
     // 1. Self check
     if (
       targetUidOrName === currentUser.id ||
       normalizedInput === normalizedCurrentUser ||
-      (currentUser.email && normalizedInput === currentUser.email.toLocaleLowerCase('tr-TR'))
+      normalizedInput === normalizedCurrentUsername ||
+      (currentUser.email && normalizedInput === currentUser.email.toLowerCase())
     ) {
       setSearchError('Kendinizi arkadaş olarak ekleyemezsiniz.');
       return;
@@ -96,7 +112,8 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
     const alreadyFriend = friends.some(
       (f) =>
         f.id === targetUidOrName ||
-        f.name.toLocaleLowerCase('tr-TR') === normalizedInput
+        (f.name && f.name.toLowerCase() === normalizedInput) ||
+        (f.kullaniciAdi && f.kullaniciAdi.toLowerCase() === normalizedInput)
     );
     if (alreadyFriend) {
       setSearchError(`"${rawInput}" zaten arkadaş listenizde kayıtlı.`);
@@ -112,7 +129,7 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
     }
 
     try {
-      let matchedUser: { id: string; ad: string; avatarUrl?: string; xp?: number; seri?: number } | null = null;
+      let matchedUser: { id: string; ad: string; kullaniciAdi?: string; avatarUrl?: string; xp?: number; seri?: number } | null = null;
 
       // 1. First try direct lookup by UID if input is an ID
       try {
@@ -122,6 +139,7 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
           matchedUser = {
             id: directSnap.id,
             ad: dData.ad || 'Öğrenci',
+            kullaniciAdi: dData.kullaniciAdi || 'ogrenci',
             avatarUrl: dData.avatarUrl,
             xp: dData.xp || 100,
             seri: dData.seri || 1,
@@ -129,7 +147,7 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
         }
       } catch (e) {}
 
-      // 2. Search across Firebase users if not found by direct ID
+      // 2. Search across Firebase users by username, email or name
       if (!matchedUser) {
         const usersSnap = await getDocs(collection(db, 'users'));
         const firebaseUsers: Kullanici[] = usersSnap.docs.map((doc) => ({
@@ -139,15 +157,23 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
 
         const found = firebaseUsers.find((u) => {
           if (u.id === currentUser.id) return false;
-          const userAd = (u.ad || '').toLocaleLowerCase('tr-TR');
-          const userEmail = (u.email || '').toLocaleLowerCase('tr-TR');
-          return u.id === targetUidOrName || userAd === normalizedInput || userEmail === normalizedInput || userAd.includes(normalizedInput);
+          const userAd = (u.ad || '').toLowerCase();
+          const userKullaniciAdi = (u.kullaniciAdi || '').toLowerCase();
+          const userEmail = (u.email || '').toLowerCase();
+          return (
+            u.id === targetUidOrName ||
+            userKullaniciAdi === normalizedInput ||
+            userEmail === normalizedInput ||
+            userAd === normalizedInput ||
+            userAd.includes(normalizedInput)
+          );
         });
 
         if (found) {
           matchedUser = {
             id: found.id,
             ad: found.ad,
+            kullaniciAdi: found.kullaniciAdi || 'ogrenci',
             avatarUrl: found.avatarUrl,
             xp: found.xp || 100,
             seri: found.seri || 1,
@@ -157,7 +183,7 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
 
       if (!matchedUser) {
         setSearchError(
-          `"${rawInput}" adıyla veya kimliğiyle kayıtlı bir kullanıcı bulunamadı. Lütfen tam adını veya davet bağlantısını girdiğinizden emin olun.`
+          `"@${rawInput}" kullanıcı adıyla veya adıyla kayıtlı bir öğrenci bulunamadı. Lütfen kullanıcı adını kontrol edin.`
         );
         setIsSearching(false);
         return;
@@ -166,6 +192,7 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
       // Send Friend Request Notification to target user in Firebase Firestore
       const notifId = `notif_friend_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const myName = currentUser.ad || 'Öğrenci';
+      const myUsername = currentUser.kullaniciAdi || 'ogrenci';
       const myAvatar = currentUser.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
       const myId = currentUser.id || auth.currentUser.uid;
 
@@ -173,12 +200,14 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
         id: notifId,
         type: 'friend_request' as const,
         title: '👥 Arkadaşlık İsteği',
-        message: `${myName} sana arkadaşlık isteği gönderdi! İsteği kabul ederek arkadaş sıralamasında yarışabilirsiniz.`,
+        message: `@${myUsername} (${myName}) sana arkadaşlık isteği gönderdi! İsteği kabul ederek arkadaş sıralamasında yarışabilirsiniz.`,
         senderId: myId,
         senderName: myName,
+        senderUsername: myUsername,
         senderAvatar: myAvatar,
         recipientId: matchedUser.id,
         recipientName: matchedUser.ad,
+        recipientUsername: matchedUser.kullaniciAdi,
         createdAt: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
         read: false,
       };
@@ -196,7 +225,7 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
         console.error('Arkadaşlık isteği gönderme hatası:', e);
       }
 
-      showToast(`📩 ${matchedUser.ad} kullanıcısına arkadaşlık isteği gönderildi!`);
+      showToast(`📩 @${matchedUser.kullaniciAdi || matchedUser.ad} kullanıcısına arkadaşlık isteği gönderildi!`);
       setManualInput('');
       setSearchError(null);
     } catch (err: any) {
@@ -380,6 +409,9 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
                     />
                     <div>
                       <p className="font-black text-xs text-text-main">{friend.name}</p>
+                      {friend.kullaniciAdi && (
+                        <p className="text-[10px] text-primary font-mono font-bold">@{friend.kullaniciAdi}</p>
+                      )}
                       <p className="text-[10px] text-text-muted font-bold">
                         🔥 {friend.streak || 1} Gün Seri
                       </p>

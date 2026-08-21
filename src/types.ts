@@ -67,6 +67,7 @@ export interface SoruKaydi {
 export interface Arkadas {
   id: string;
   name: string;
+  kullaniciAdi?: string;
   avatar: string;
   xp: number;
   streak: number;
@@ -77,6 +78,8 @@ export interface Arkadas {
 export interface Kullanici {
   id: string;
   ad: string;
+  kullaniciAdi?: string;
+  kullaniciAdi_lower?: string;
   kredi: number;
   maxKredi: number;
   seri: number;
@@ -97,6 +100,7 @@ export interface Kullanici {
 export interface ToplulukCevap {
   id: string;
   yazarAd: string;
+  kullaniciAdi?: string;
   avatar: string;
   metin: string;
   isAi: boolean;
@@ -108,6 +112,7 @@ export interface ToplulukSoru {
   id: string;
   userId?: string;
   yazarAd: string;
+  kullaniciAdi?: string;
   yazarAvatar: string;
   zaman: string;
   createdAt?: number;
@@ -171,9 +176,11 @@ export interface Bildirim {
   message: string;
   senderId?: string;
   senderName?: string;
+  senderUsername?: string;
   senderAvatar?: string;
   recipientId?: string;
   recipientName?: string;
+  recipientUsername?: string;
   roomCode?: string;
   roomTitle?: string;
   createdAt: string;

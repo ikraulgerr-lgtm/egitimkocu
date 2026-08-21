@@ -76,6 +76,12 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const [newText, setNewText] = useState<string>('');
   const [askTarget, setAskTarget] = useState<'ai_and_community' | 'community_only'>('ai_and_community');
 
+  useEffect(() => {
+    if (!isAskModalOpen) {
+      setNewText('');
+    }
+  }, [isAskModalOpen]);
+
   const categories = ['Hepsi', 'Matematik', 'Fizik', 'Türkçe', 'Biyoloji', 'Kimya', 'Tarih'];
 
   const filteredPosts = localPosts.filter((post) => {
@@ -119,6 +125,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
       id: `c_${now}`,
       userId: currentUid,
       yazarAd: user.ad || 'Öğrenci',
+      kullaniciAdi: user.kullaniciAdi || 'ogrenci',
       yazarAvatar: user.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
       createdAt: now,
       zaman: 'Az önce',
@@ -134,6 +141,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
             {
               id: `ans_${now}`,
               yazarAd: 'Eğitim Koçum AI',
+              kullaniciAdi: 'egitimkocum_ai',
               avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=EduMindCoachAI&backgroundColor=6366f1',
               metin: aiAnswerText,
               isAi: true,
@@ -428,6 +436,11 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-black text-xs sm:text-sm text-text-main">{post.yazarAd}</span>
+                        {post.kullaniciAdi && (
+                          <span className="text-[10px] font-mono text-primary font-bold">
+                            @{post.kullaniciAdi}
+                          </span>
+                        )}
                         <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-black border border-primary/20">
                           {post.ders}
                         </span>
