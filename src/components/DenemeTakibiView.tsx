@@ -120,7 +120,7 @@ export const DenemeTakibiView: React.FC<DenemeTakibiViewProps> = ({ onRewardXp, 
       tarih: tarih || new Date().toISOString().split('T')[0],
       dersler: derslerResult,
       toplamNet: Number(currentTotalNet.toFixed(2)),
-      notlar: notlar.trim() || undefined,
+      notlar: notlar.trim() || '',
       createdAt: Date.now(),
     };
 

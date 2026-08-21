@@ -165,7 +165,7 @@ export function App() {
           } else {
             setNotifications([]);
           }
-        });
+        }, () => {});
 
         // 2. Top-level pomo_invites collection listener in Firebase
         unsubPomo = onSnapshot(collection(db, 'pomo_invites'), (snap) => {
@@ -192,7 +192,7 @@ export function App() {
               }
             }
           }
-        });
+        }, () => {});
 
         // 3. Top-level friend_invites collection listener in Firebase
         unsubFriend = onSnapshot(collection(db, 'friend_invites'), (snap) => {
@@ -224,7 +224,7 @@ export function App() {
               }
             }
           }
-        });
+        }, () => {});
 
         // 4. Listen to real-time friends list so BOTH users update instantaneously!
         const friendsRef = collection(db, 'users', uid, 'friends');
@@ -234,7 +234,7 @@ export function App() {
             setFriendsState(loadedFriends);
             saveFriends(loadedFriends);
           }
-        });
+        }, () => {});
 
         // 5. Also listen to user doc field 'latestNotification' for instant floating banner pop-up
         unsubUserDoc = onSnapshot(doc(db, 'users', uid), (userSnap) => {
@@ -253,7 +253,7 @@ export function App() {
               });
             }
           }
-        });
+        }, () => {});
 
       } else {
         setNotifications([]);

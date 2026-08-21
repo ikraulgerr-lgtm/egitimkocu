@@ -481,10 +481,12 @@ export function saveDeneme(deneme: DenemeRecord): DenemeRecord[] {
 
   if (auth.currentUser) {
     const path = `users/${auth.currentUser.uid}/denemeler/${deneme.id}`;
-    setDoc(doc(db, 'users', auth.currentUser.uid, 'denemeler', deneme.id), {
+    const safeData = JSON.parse(JSON.stringify({
       ...deneme,
       userId: auth.currentUser.uid,
-    }, { merge: true }).catch((err) => {
+      notlar: deneme.notlar || '',
+    }));
+    setDoc(doc(db, 'users', auth.currentUser.uid, 'denemeler', deneme.id), safeData, { merge: true }).catch((err) => {
       handleFirestoreError(err, OperationType.WRITE, path);
     });
   }
