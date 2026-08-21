@@ -307,9 +307,9 @@ export function deleteQuestion(id: string, userId?: string): SoruKaydi[] {
 }
 
 export function getCommunityPosts(): ToplulukSoru[] {
-  const data = localStorage.getItem(COMMUNITY_KEY);
+  const data = localStorage.getItem(BASE_COMMUNITY_KEY);
   if (!data) {
-    localStorage.setItem(COMMUNITY_KEY, JSON.stringify(INITIAL_COMMUNITY));
+    localStorage.setItem(BASE_COMMUNITY_KEY, JSON.stringify(INITIAL_COMMUNITY));
     return INITIAL_COMMUNITY;
   }
   try {

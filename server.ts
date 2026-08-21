@@ -991,7 +991,7 @@ GÖRSELDE DERS SORUSU YOKSA OUTPUT FORMATI:
               },
             },
             {
-              text: `${systemInstruction}\n\nÖğrencinin sesli olarak sorduğu soruyu dikkatle dinle.\nÖNEMLİ KURAL - GEÇERSİZ / SAÇMA / BOŞ SES KONTROLÜ:\n- Eğer ses kaydında net bir ders sorusu/işlem yoksa (sessizlik, anlamsız sesler, gürültü, alakasız sohbet, rastgele heceler):\n  KESİNLİKLE "isUnreadable": true, "unreadableReason": "Soru anlaşılamadı veya geçerli bir ders sorusu tespit edilemedi. Lütfen sorunuzu net bir şekilde tekrar söyleyin.", "ders": "Analiz Edilemedi", "konu": "Soru Bulunamadı", "cozumAdimlari": [] döndür.\n- Eğer geçerli bir ders sorusu varsa 'isUnreadable': false yap, 'ocrMetin' alanına konuşulan soru metnini yaz ve pedagojik adımlarla tam çöz.\n\n${outputFormat}`,
+              text: `${systemInstruction}\n\nÖğrencinin sesli olarak sorduğu soruyu dikkatle dinle.\nÖNEMLİ KURAL - GEÇERSİZ / SAÇMA / BOŞ SES KONTROLÜ:\n- Eğer ses kaydında net bir ders sorusu/işlem yoksa (sessizlik, anlamsız sesler, gürültü, alakasız sohbet, rastgele heceler):\n  KESİNLİKLE "isUnreadable": true, "unreadableReason": "Soru anlaşılamadı veya geçerli bir ders sorusu tespit edilemedi. Lütfen sorunuzu net bir şekilde tekrar söyleyin.", "ders": "Analiz Edilemedi", "konu": "Soru Bulunamadı", "cozumAdimlari": [] döndür.\n- Eğer geçerli bir ders sorusu varsa 'isUnreadable': false yap, 'ocrMetin' alanına konuşulan soru metnini yaz ve pedagojik adımlarla tam çöz.`,
             },
           ];
 

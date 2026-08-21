@@ -18,7 +18,9 @@ import {
   getTheme,
   saveTheme,
   resetToCleanState,
+  getDenemeler,
   saveDenemelerLocally,
+  INITIAL_USER,
 } from './lib/storage';
 import { getTurkeyDateString } from './lib/dateUtils';
 import { trySolveMathExpression } from './lib/mathUtils';
@@ -149,7 +151,7 @@ export function App() {
             const latestUnreadInvite = list.find((n) => {
               if (n.read) return false;
               if (n.type === 'friend_request') {
-                const isAlreadyFriend = friendsState.some((f) => f.id === n.senderId);
+                const isAlreadyFriend = friends.some((f) => f.id === n.senderId);
                 if (isAlreadyFriend) {
                   cleanDeleteNotification(n.id);
                   return false;
@@ -450,7 +452,6 @@ export function App() {
         setQuestionsState([]);
         setScheduleState([]);
         setFriendsState([]);
-        setDenemelerState([]);
         setNotifications([]);
         setSelectedQuestion(null);
         setIsAuthModalOpen(true);
@@ -1651,7 +1652,6 @@ export function App() {
               setQuestionsState([]);
               setScheduleState([]);
               setFriendsState([]);
-              setDenemelerState([]);
               setNotifications([]);
               setSelectedQuestion(null);
               setActiveBannerNotif(null);
