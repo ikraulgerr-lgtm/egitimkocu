@@ -1093,93 +1093,93 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
       {/* Title & Add Button Header */}
       <div className="flex justify-between items-center gap-2">
         <div>
-          <h2 className="font-extrabold text-2xl tracking-tight text-text-main">
+          <h2 className="font-extrabold text-lg sm:text-xl tracking-tight text-text-main">
             Akıllı Ders & Pomodoro Programım
           </h2>
-          <p className="text-xs text-text-muted">
-            Günlük çalışma programını takip et, Pomodoro odaklanma zamanlayıcısı ile ders çalış ve görevlerini tamamla.
+          <p className="text-[11px] text-text-muted">
+            Haftalık çalışma planını takip et, Pomodoro odaklanma seanslarıyla çalış.
           </p>
         </div>
 
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="bg-primary text-white font-extrabold text-xs px-4 py-2.5 rounded-2xl hover:brightness-110 active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+          className="bg-primary text-white font-extrabold text-xs px-3.5 py-2 rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-md flex items-center gap-1 cursor-pointer whitespace-nowrap"
         >
-          <span className="material-symbols-outlined text-base">add</span>
-          <span>Ders / Görev Ekle</span>
+          <span className="material-symbols-outlined text-sm">add</span>
+          <span>+ Görev Ekle</span>
         </button>
       </div>
 
-      {/* Days Strip */}
-      <section className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+      {/* Days Strip - Compact */}
+      <section className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar">
         {days.map((d) => (
           <button
             key={d.day}
             onClick={() => setSelectedDay(d.day)}
-            className={`flex flex-col items-center justify-center min-w-[56px] h-20 rounded-2xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center min-w-[46px] sm:min-w-[52px] h-14 sm:h-16 rounded-xl transition-all cursor-pointer ${
               selectedDay === d.day
-                ? 'bg-primary text-white shadow-md scale-105'
+                ? 'bg-primary text-white shadow-sm scale-102 font-black'
                 : 'bg-card-bg text-text-muted border border-card-border hover:border-primary/40'
             }`}
           >
-            <span className="text-xs font-semibold">{d.day}</span>
-            <span className="font-extrabold text-lg">{d.date}</span>
+            <span className="text-[10px] font-bold">{d.day}</span>
+            <span className="font-black text-sm sm:text-base leading-tight">{d.date}</span>
             {d.isToday && (
-              <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${selectedDay === d.day ? 'bg-white' : 'bg-primary'}`} />
+              <span className={`w-1 h-1 rounded-full mt-0.5 ${selectedDay === d.day ? 'bg-white' : 'bg-primary'}`} />
             )}
           </button>
         ))}
       </section>
 
       {/* Timeline Schedule for Selected Day */}
-      <section className="space-y-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <h3 className="font-extrabold text-base sm:text-lg text-text-main flex flex-wrap items-center gap-2">
+      <section className="space-y-3">
+        <div className="flex justify-between items-center gap-2">
+          <h3 className="font-extrabold text-sm sm:text-base text-text-main flex items-center gap-2">
             <span>{days.find(d => d.day === selectedDay)?.name} Programı</span>
-            <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
+            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
               {currentDayItems.length} Görev
             </span>
           </h3>
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+            className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-sm">add_circle</span>
-            <span>Yeni Ders</span>
+            <span className="material-symbols-outlined text-xs">add_circle</span>
+            <span>+ Yeni Ders</span>
           </button>
         </div>
 
         {currentDayItems.length === 0 ? (
-          <div className="bg-card-bg rounded-3xl p-8 border border-card-border text-center space-y-3 shadow-xs">
-            <div className="w-14 h-14 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center">
-              <span className="material-symbols-outlined text-2xl">calendar_add_on</span>
+          <div className="bg-card-bg rounded-2xl p-6 border border-card-border text-center space-y-2.5 shadow-2xs">
+            <div className="w-10 h-10 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center">
+              <span className="material-symbols-outlined text-xl">calendar_add_on</span>
             </div>
-            <h4 className="font-extrabold text-base text-text-main">Bu Gün İçin Ders Eklenmemiş</h4>
-            <p className="text-xs text-text-muted max-w-sm mx-auto">
-              {days.find(d => d.day === selectedDay)?.name} günü için henüz şahsi bir çalışma programı eklemediniz. Butona basarak kendi ders programınızı ekleyebilirsiniz.
+            <h4 className="font-extrabold text-sm text-text-main">Bu Gün İçin Ders Eklenmemiş</h4>
+            <p className="text-[11px] text-text-muted max-w-sm mx-auto">
+              {days.find(d => d.day === selectedDay)?.name} günü için henüz bir çalışma programı eklemediniz.
             </p>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="bg-primary text-white font-extrabold text-xs px-5 py-2.5 rounded-full hover:brightness-110 transition-all cursor-pointer inline-flex items-center gap-1.5"
+              className="bg-primary text-white font-extrabold text-xs px-4 py-2 rounded-xl hover:brightness-110 transition-all cursor-pointer inline-flex items-center gap-1"
             >
-              <span className="material-symbols-outlined text-sm">add</span>
-              <span>Şahsi Programını Oluştur</span>
+              <span className="material-symbols-outlined text-xs">add</span>
+              <span>Program Ekle</span>
             </button>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {currentDayItems.map((item) => {
               const isBreak = item.ders === 'Dinlenme';
               const isRunning = activeSessionId === item.id;
 
               if (isBreak) {
                 return (
-                  <div key={item.id} className="bg-surface-container-low p-3.5 rounded-2xl border border-card-border flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-text-muted">coffee</span>
+                  <div key={item.id} className="bg-surface-container-low p-2.5 sm:p-3 rounded-xl border border-card-border flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span className="material-symbols-outlined text-text-muted text-lg">coffee</span>
                       <div>
-                        <span className="text-xs font-bold text-text-muted">{item.saat}</span>
+                        <span className="text-[10px] font-bold text-text-muted">{item.saat}</span>
                         <p className="text-xs font-extrabold text-text-main uppercase">{item.ders} ARASI</p>
                       </div>
                     </div>
@@ -1190,7 +1190,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                         className="text-text-muted hover:text-rose-500 p-1 cursor-pointer transition-colors"
                         title="Programdan Sil"
                       >
-                        <span className="material-symbols-outlined text-base">delete</span>
+                        <span className="material-symbols-outlined text-sm">delete</span>
                       </button>
                     )}
                   </div>
@@ -1200,42 +1200,42 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               return (
                 <div
                   key={item.id}
-                  className={`p-4 rounded-2xl border transition-all shadow-xs space-y-2 ${
+                  className={`p-3 sm:p-3.5 rounded-xl border transition-all shadow-2xs space-y-1.5 ${
                     item.tamamlandi 
                       ? 'bg-card-bg/60 border-card-border opacity-70' 
                       : isRunning 
-                      ? 'bg-card-bg border-2 border-emerald-500 ring-2 ring-emerald-500/20' 
+                      ? 'bg-card-bg border-2 border-emerald-500 ring-1 ring-emerald-500/20' 
                       : 'bg-card-bg border-card-border hover:border-primary/40'
                   }`}
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-xs font-extrabold text-primary block">{item.saat}</span>
-                      <h4 className={`font-extrabold text-base ${item.tamamlandi ? 'line-through text-text-muted' : 'text-text-main'}`}>
+                      <span className="text-[10px] font-extrabold text-primary block">{item.saat}</span>
+                      <h4 className={`font-extrabold text-sm ${item.tamamlandi ? 'line-through text-text-muted' : 'text-text-main'}`}>
                         {item.ders}
                       </h4>
                       <p className="text-xs text-text-muted">{item.konu}</p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       {onDeleteItem && (
                         <button
                           onClick={() => onDeleteItem(item.id)}
                           className="text-text-muted hover:text-rose-500 p-1 cursor-pointer transition-colors"
                           title="Sil"
                         >
-                          <span className="material-symbols-outlined text-base">delete</span>
+                          <span className="material-symbols-outlined text-sm">delete</span>
                         </button>
                       )}
 
                       <button
                         onClick={() => onToggleItem(item.id)}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors ${
+                        className={`w-7 h-7 rounded-full flex items-center justify-center cursor-pointer transition-colors ${
                           item.tamamlandi ? 'bg-emerald-600 text-white' : 'bg-surface-container-low text-text-muted hover:text-primary'
                         }`}
                         title={item.tamamlandi ? 'Tamamlandı olarak işaretlendi' : 'Tamamlandı işaretle'}
                       >
-                        <span className="material-symbols-outlined text-sm">
+                        <span className="material-symbols-outlined text-xs">
                           {item.tamamlandi ? 'check' : 'radio_button_unchecked'}
                         </span>
                       </button>
@@ -1243,13 +1243,13 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                   </div>
 
                   {!item.tamamlandi && (
-                    <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-t border-card-border text-xs">
+                    <div className="pt-1.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 border-t border-card-border text-[11px]">
                       <span className="text-text-muted flex items-center gap-1 font-mono font-bold">
-                        <span className="material-symbols-outlined text-sm text-primary">timer</span>
-                        {isRunning ? formatTime(remainingSeconds) : 'Süre Takibi Aktif'}
+                        <span className="material-symbols-outlined text-xs text-primary">timer</span>
+                        {isRunning ? formatTime(remainingSeconds) : 'Süre Takibi'}
                       </span>
 
-                      <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto justify-end">
+                      <div className="flex flex-wrap items-center gap-1 w-full sm:w-auto justify-end">
                         <button
                           onClick={() => {
                             setPomoSelectedItemId(item.id);
@@ -1257,15 +1257,15 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                             setIsPomoRunning(true);
                             document.getElementById('pomodoro-section')?.scrollIntoView({ behavior: 'smooth' });
                           }}
-                          className="px-3 py-1.5 rounded-xl bg-rose-600/10 text-rose-500 hover:bg-rose-600 hover:text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer border border-rose-500/20"
+                          className="px-2.5 py-1 rounded-lg bg-rose-600/10 text-rose-500 hover:bg-rose-600 hover:text-white font-bold text-[11px] flex items-center gap-0.5 transition-all cursor-pointer border border-rose-500/20"
                           title="Bu Görevi Pomodoro ile Başlat"
                         >
-                          <span>🍅 Pomodoro Başlat</span>
+                          <span>🍅 Pomodoro</span>
                         </button>
 
                         <button
                           onClick={() => handleStartSession(item)}
-                          className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition-all cursor-pointer ${
+                          className={`px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-0.5 transition-all cursor-pointer ${
                             isRunning 
                               ? isPaused 
                                 ? 'bg-amber-500 text-white' 
@@ -1273,11 +1273,11 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                               : 'bg-primary text-white hover:brightness-110 active:scale-95'
                           }`}
                         >
-                          <span className="material-symbols-outlined text-sm">
+                          <span className="material-symbols-outlined text-xs">
                             {isRunning ? (isPaused ? 'play_arrow' : 'pause') : 'play_arrow'}
                           </span>
                           <span>
-                            {isRunning ? (isPaused ? 'Devam Et' : 'Duraklat') : 'Serbest Çalışma'}
+                            {isRunning ? (isPaused ? 'Devam' : 'Duraklat') : 'Serbest'}
                           </span>
                         </button>
                       </div>
@@ -1290,19 +1290,19 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         )}
       </section>
 
-      {/* AI Suggestion Card */}
-      <section className="bg-gradient-to-r from-indigo-800 via-indigo-900 to-slate-950 p-5 rounded-2xl text-white shadow-md relative overflow-hidden space-y-2 border border-indigo-700/50">
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-amber-300 text-lg">auto_awesome</span>
-          <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+      {/* AI Suggestion Card - Compact */}
+      <section className="bg-gradient-to-r from-indigo-800 via-indigo-900 to-slate-950 p-3.5 sm:p-4 rounded-xl text-white shadow-md relative overflow-hidden space-y-1.5 border border-indigo-700/50">
+        <div className="flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-amber-300 text-base">auto_awesome</span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-amber-300">
             YAPAY ZEKA PROGRAM ÖNERİSİ
           </span>
         </div>
 
         {aiRecommendation ? (
           <>
-            <p className="text-sm font-medium leading-relaxed text-indigo-50">
-              Soru analizlerine göre zorlandığın <strong className="text-amber-300 font-bold">{aiRecommendation.ders} - {aiRecommendation.konu}</strong> konusuna bugün 30 dk ayırmalısın.
+            <p className="text-xs font-medium leading-relaxed text-indigo-50">
+              Zorlandığın <strong className="text-amber-300 font-bold">{aiRecommendation.ders} - {aiRecommendation.konu}</strong> konusuna bugün 30 dk ayırmalısın.
             </p>
 
             <button 
@@ -1315,67 +1315,67 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                   tamamlandi: false,
                 });
               }}
-              className="mt-2 bg-white text-indigo-950 font-black text-xs px-5 py-2.5 rounded-full hover:bg-slate-100 active:scale-95 transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+              className="mt-1 bg-white text-indigo-950 font-black text-[11px] px-3.5 py-1.5 rounded-lg hover:bg-slate-100 active:scale-95 transition-all shadow-md cursor-pointer flex items-center gap-1"
             >
-              <span className="material-symbols-outlined text-base text-primary">playlist_add</span>
+              <span className="material-symbols-outlined text-xs text-primary">playlist_add</span>
               <span>Programa Ekle ({selectedDay})</span>
             </button>
           </>
         ) : (
           <>
-            <p className="text-sm font-medium leading-relaxed text-indigo-50">
-              Henüz soru yüklemediniz. Soru yükleyip çözdürdükçe yapay zeka takıldığınız konuları analiz ederek buraya size özel ders çalışma önerileri ekleyecektir.
+            <p className="text-xs font-medium leading-relaxed text-indigo-50">
+              Soru yükleyip çözdürdükçe yapay zeka takıldığınız konulara göre buraya özel ders çalışma önerileri ekler.
             </p>
 
             {setActiveTab && (
               <button 
                 onClick={() => setActiveTab('home')}
-                className="mt-2 bg-white text-indigo-950 font-black text-xs px-5 py-2.5 rounded-full hover:bg-slate-100 active:scale-95 transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                className="mt-1 bg-white text-indigo-950 font-black text-[11px] px-3.5 py-1.5 rounded-lg hover:bg-slate-100 active:scale-95 transition-all shadow-md cursor-pointer flex items-center gap-1"
               >
-                <span className="material-symbols-outlined text-base text-primary">add_a_photo</span>
+                <span className="material-symbols-outlined text-xs text-primary">add_a_photo</span>
                 <span>İlk Sorunu Yükle & Analiz Et</span>
               </button>
             )}
           </>
         )}
 
-        <div className="absolute top-1/2 -right-6 -translate-y-1/2 opacity-15">
-          <span className="material-symbols-outlined text-[100px] text-white">psychology</span>
+        <div className="absolute top-1/2 -right-4 -translate-y-1/2 opacity-15">
+          <span className="material-symbols-outlined text-[64px] text-white">psychology</span>
         </div>
       </section>
 
-      {/* POMODORO FOCUS TIMER SECTION */}
-      <section id="pomodoro-section" className="bg-card-bg text-text-main p-5 rounded-3xl shadow-lg border border-card-border space-y-4 relative overflow-hidden dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-950 dark:to-indigo-950 dark:text-white dark:border-indigo-500/30">
+      {/* POMODORO FOCUS TIMER SECTION - Compact & Modern */}
+      <section id="pomodoro-section" className="bg-card-bg text-text-main p-3.5 sm:p-4 rounded-2xl shadow-md border border-card-border space-y-3 relative overflow-hidden dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-950 dark:to-indigo-950 dark:text-white dark:border-indigo-500/30">
         {/* Card Header & Mode Switcher */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-card-border dark:border-white/10 pb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🍅</span>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-card-border dark:border-white/10 pb-2.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-base">🍅</span>
             <div>
-              <h3 className="font-black text-sm text-text-main dark:text-white">
+              <h3 className="font-extrabold text-xs sm:text-sm text-text-main dark:text-white">
                 Pomodoro Odaklanma Zamanlayıcısı
               </h3>
-              <p className="text-[11px] text-text-muted dark:text-slate-300">Esnek Çalışma & Serbest Mola</p>
+              <p className="text-[10px] text-text-muted dark:text-slate-300">Esnek Çalışma & Mola</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 bg-surface-container-low dark:bg-slate-800/80 p-1 rounded-2xl border border-card-border dark:border-white/10">
+          <div className="flex items-center gap-1 bg-surface-container-low dark:bg-slate-800/80 p-0.5 rounded-xl border border-card-border dark:border-white/10">
             <button
               type="button"
               onClick={() => handleSelectPomoMode('work')}
-              className={`px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1 ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center gap-0.5 ${
                 pomoMode === 'work'
-                  ? 'bg-rose-600 text-white shadow-md'
+                  ? 'bg-rose-600 text-white shadow-xs'
                   : 'text-text-muted dark:text-slate-400 hover:text-text-main dark:hover:text-white'
               }`}
             >
-              <span>🍅 {customWorkMinutes} dk Çalışma</span>
+              <span>🍅 {customWorkMinutes} dk Çalış</span>
             </button>
             <button
               type="button"
               onClick={() => handleSelectPomoMode('break')}
-              className={`px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1 ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center gap-0.5 ${
                 pomoMode === 'break'
-                  ? 'bg-emerald-600 text-white shadow-md'
+                  ? 'bg-emerald-600 text-white shadow-xs'
                   : 'text-text-muted dark:text-slate-400 hover:text-text-main dark:hover:text-white'
               }`}
             >
@@ -1385,10 +1385,10 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         </div>
 
         {/* Custom Duration Selector Strip */}
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-surface-container-low dark:bg-slate-900/80 p-2.5 rounded-2xl border border-card-border dark:border-white/10">
-          <div className="flex items-center gap-1.5 flex-wrap text-xs">
-            <span className="text-[11px] font-extrabold text-primary dark:text-indigo-200 mr-1">
-              {pomoMode === 'work' ? '⏱️ Çalışma Süresi:' : '☕ Mola Süresi:'}
+        <div className="flex flex-wrap items-center justify-between gap-1.5 bg-surface-container-low dark:bg-slate-900/80 p-2 rounded-xl border border-card-border dark:border-white/10">
+          <div className="flex items-center gap-1 flex-wrap text-xs">
+            <span className="text-[10px] font-extrabold text-primary dark:text-indigo-200 mr-0.5">
+              {pomoMode === 'work' ? '⏱️ Süre:' : '☕ Mola:'}
             </span>
             {pomoMode === 'work' ? (
               [15, 25, 35, 45, 60].map((m) => (
@@ -1396,13 +1396,13 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                   key={m}
                   type="button"
                   onClick={() => handleSetWorkMinutes(m)}
-                  className={`px-2.5 py-1 rounded-xl font-bold transition-all text-xs cursor-pointer border ${
+                  className={`px-2 py-0.5 rounded-lg font-bold transition-all text-[11px] cursor-pointer border ${
                     customWorkMinutes === m
-                      ? 'bg-rose-500 text-white border-rose-600 shadow-xs'
+                      ? 'bg-rose-500 text-white border-rose-600 shadow-2xs'
                       : 'bg-card-bg dark:bg-slate-800 text-text-main dark:text-slate-300 border-card-border dark:border-transparent hover:border-rose-400'
                   }`}
                 >
-                  {m} dk
+                  {m}dk
                 </button>
               ))
             ) : (
@@ -1411,13 +1411,13 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                   key={m}
                   type="button"
                   onClick={() => handleSetBreakMinutes(m)}
-                  className={`px-2.5 py-1 rounded-xl font-bold transition-all text-xs cursor-pointer border ${
+                  className={`px-2 py-0.5 rounded-lg font-bold transition-all text-[11px] cursor-pointer border ${
                     customBreakMinutes === m
-                      ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs'
+                      ? 'bg-emerald-500 text-white border-emerald-600 shadow-2xs'
                       : 'bg-card-bg dark:bg-slate-800 text-text-main dark:text-slate-300 border-card-border dark:border-transparent hover:border-emerald-400'
                   }`}
                 >
-                  {m} dk
+                  {m}dk
                 </button>
               ))
             )}
@@ -1425,7 +1425,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
           {/* Custom Minute Input Box */}
           <div className="flex items-center gap-1">
-            <span className="text-[10px] text-text-muted dark:text-slate-400 font-bold">Özel:</span>
+            <span className="text-[9px] text-text-muted dark:text-slate-400 font-bold">Özel:</span>
             <input
               type="number"
               min="1"
@@ -1436,24 +1436,24 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 if (pomoMode === 'work') handleSetWorkMinutes(val);
                 else handleSetBreakMinutes(val);
               }}
-              className="w-14 bg-surface dark:bg-slate-950 border border-card-border dark:border-slate-700 rounded-lg px-2 py-0.5 text-xs text-center font-bold text-text-main dark:text-white focus:outline-none focus:border-primary"
+              className="w-12 bg-surface dark:bg-slate-950 border border-card-border dark:border-slate-700 rounded-md px-1.5 py-0.5 text-[11px] text-center font-bold text-text-main dark:text-white focus:outline-none focus:border-primary"
             />
-            <span className="text-[10px] text-text-muted dark:text-slate-400">dk</span>
+            <span className="text-[9px] text-text-muted dark:text-slate-400">dk</span>
           </div>
         </div>
 
         {/* Linked Task Selector */}
-        <div className="space-y-1">
-          <label className="text-[11px] font-bold text-text-main dark:text-indigo-200 flex items-center justify-between">
-            <span>Odaklanılacak Çalışma Modu:</span>
-            <span className="text-[10px] text-text-muted dark:text-slate-400 font-mono">
+        <div className="space-y-0.5">
+          <label className="text-[10px] font-bold text-text-main dark:text-indigo-200 flex items-center justify-between">
+            <span>Odaklanılacak Çalışma:</span>
+            <span className="text-[9px] text-text-muted dark:text-slate-400 font-mono">
               Bugün: {completedPomoCount} 🍅 ({completedPomoCount * customWorkMinutes} dk)
             </span>
           </label>
           <select
             value={pomoSelectedItemId}
             onChange={(e) => setPomoSelectedItemId(e.target.value)}
-            className="w-full bg-surface-container-low dark:bg-slate-900 border border-card-border dark:border-slate-700 rounded-xl p-2.5 text-xs text-text-main dark:text-white focus:outline-none focus:border-primary font-bold"
+            className="w-full bg-surface-container-low dark:bg-slate-900 border border-card-border dark:border-slate-700 rounded-lg p-2 text-[11px] text-text-main dark:text-white focus:outline-none focus:border-primary font-bold"
           >
             <option value="free">🚀 Serbest Çalışma (Görevsiz)</option>
             {uncompletedItems.map((item) => (
@@ -1465,60 +1465,60 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         </div>
 
         {/* Circular Display & Digital Counter */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-surface-container-low dark:bg-slate-950/70 p-4 rounded-2xl border border-card-border dark:border-white/5">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-surface-container-low dark:bg-slate-950/70 p-3 rounded-xl border border-card-border dark:border-white/5">
+          <div className="flex items-center gap-3">
             {/* Visual Progress Dial Ring */}
-            <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
+            <div className="relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shrink-0">
               <svg className="w-full h-full transform -rotate-90">
                 <circle
-                  cx="48"
-                  cy="48"
-                  r="40"
+                  cx="40"
+                  cy="40"
+                  r="32"
                   stroke="currentColor"
-                  strokeWidth="7"
+                  strokeWidth="5"
                   className="text-slate-200 dark:text-slate-800"
                   fill="transparent"
                 />
                 <circle
-                  cx="48"
-                  cy="48"
-                  r="40"
+                  cx="40"
+                  cy="40"
+                  r="32"
                   stroke="currentColor"
-                  strokeWidth="7"
+                  strokeWidth="5"
                   className={pomoMode === 'work' ? 'text-rose-500' : 'text-emerald-500'}
                   fill="transparent"
-                  strokeDasharray={251.2}
-                  strokeDashoffset={251.2 - (251.2 * pomoProgressPct) / 100}
+                  strokeDasharray={201}
+                  strokeDashoffset={201 - (201 * pomoProgressPct) / 100}
                   strokeLinecap="round"
                   style={{ transition: 'stroke-dashoffset 1s linear' }}
                 />
               </svg>
-              <span className="absolute text-2xl font-black font-mono tracking-tighter text-text-main dark:text-white">
+              <span className="absolute text-base sm:text-lg font-black font-mono tracking-tighter text-text-main dark:text-white">
                 {formatTime(pomoTimeLeft)}
               </span>
             </div>
 
             <div>
-              <div className="flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full ${isPomoRunning ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'}`} />
-                <span className="text-xs font-black uppercase tracking-wider text-text-muted dark:text-slate-300">
-                  {pomoMode === 'work' ? 'ODAKLANMA SEANSI' : 'DİNLENME MOLASI'}
+              <div className="flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${isPomoRunning ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'}`} />
+                <span className="text-[10px] font-black uppercase tracking-wider text-text-muted dark:text-slate-300">
+                  {pomoMode === 'work' ? 'ODAKLANMA' : 'MOLA'}
                 </span>
               </div>
-              <p className="text-sm font-extrabold text-text-main dark:text-white mt-0.5">
+              <p className="text-xs font-extrabold text-text-main dark:text-white mt-0.5">
                 {pomoMode === 'work'
-                  ? `🎯 ${customWorkMinutes} Dakika Çalışma`
-                  : `☕ ${customBreakMinutes} Dakika Mola`}
+                  ? `🎯 ${customWorkMinutes} Dk Çalışma`
+                  : `☕ ${customBreakMinutes} Dk Mola`}
               </p>
             </div>
           </div>
 
           {/* Action Control Buttons */}
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
             <button
               type="button"
               onClick={handleTogglePomo}
-              className={`flex-1 sm:flex-none px-5 py-3 rounded-2xl font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer ${
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl font-black text-xs flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer ${
                 isPomoRunning
                   ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
                   : pomoMode === 'work'
@@ -1526,7 +1526,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                   : 'bg-emerald-600 hover:bg-emerald-500 text-white'
               }`}
             >
-              <span className="material-symbols-outlined text-lg">
+              <span className="material-symbols-outlined text-base">
                 {isPomoRunning ? 'pause' : 'play_arrow'}
               </span>
               <span>{isPomoRunning ? 'Duraklat' : 'Başlat'}</span>
@@ -1535,16 +1535,16 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             <button
               type="button"
               onClick={() => handleResetPomo()}
-              className="p-3 rounded-2xl bg-surface-container-low dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-text-muted dark:text-slate-300 cursor-pointer border border-card-border dark:border-white/10"
+              className="p-2 rounded-xl bg-surface-container-low dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-text-muted dark:text-slate-300 cursor-pointer border border-card-border dark:border-white/10"
               title="Sıfırla"
             >
-              <span className="material-symbols-outlined text-base">restart_alt</span>
+              <span className="material-symbols-outlined text-sm">restart_alt</span>
             </button>
           </div>
         </div>
         {/* Pomodoro Progress Bar */}
-        <div className="space-y-1">
-          <div className="w-full bg-slate-200 dark:bg-slate-950 h-2 rounded-full overflow-hidden border border-card-border dark:border-white/5">
+        <div className="space-y-0.5">
+          <div className="w-full bg-slate-200 dark:bg-slate-950 h-1.5 rounded-full overflow-hidden border border-card-border dark:border-white/5">
             <div
               className={`h-full transition-all duration-1000 rounded-full ${
                 pomoMode === 'work'
@@ -1557,8 +1557,8 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         </div>
       </section>
 
-      {/* GROUP POMODORO & SHARED STUDY ROOM SECTION */}
-      <section className="bg-card-bg text-text-main p-5 rounded-3xl shadow-lg border border-card-border space-y-4 relative overflow-hidden dark:bg-gradient-to-br dark:from-indigo-950 dark:via-slate-900 dark:to-purple-950 dark:text-white dark:border-purple-500/30">
+      {/* GROUP POMODORO & SHARED STUDY ROOM SECTION - Compact */}
+      <section className="bg-card-bg text-text-main p-3.5 sm:p-4 rounded-2xl shadow-md border border-card-border space-y-3 relative overflow-hidden dark:bg-gradient-to-br dark:from-indigo-950 dark:via-slate-900 dark:to-purple-950 dark:text-white dark:border-purple-500/30">
         {/* Floating Cheer Pop Banner */}
         {cheerMessageBanner && (
           <div className="bg-amber-400 text-slate-950 p-2.5 rounded-2xl font-black text-xs text-center shadow-lg animate-bounce border border-amber-300">
