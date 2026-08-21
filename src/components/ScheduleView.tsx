@@ -1468,12 +1468,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-surface-container-low dark:bg-slate-950/70 p-3 rounded-xl border border-card-border dark:border-white/5">
           <div className="flex items-center gap-3">
             {/* Visual Progress Dial Ring */}
-            <div className="relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shrink-0">
-              <svg className="w-full h-full transform -rotate-90">
+            <div className="relative w-18 h-18 sm:w-20 sm:h-20 flex items-center justify-center shrink-0">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 80 80">
                 <circle
                   cx="40"
                   cy="40"
-                  r="32"
+                  r="34"
                   stroke="currentColor"
                   strokeWidth="5"
                   className="text-slate-200 dark:text-slate-800"
@@ -1482,18 +1482,18 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 <circle
                   cx="40"
                   cy="40"
-                  r="32"
+                  r="34"
                   stroke="currentColor"
                   strokeWidth="5"
                   className={pomoMode === 'work' ? 'text-rose-500' : 'text-emerald-500'}
                   fill="transparent"
-                  strokeDasharray={201}
-                  strokeDashoffset={201 - (201 * pomoProgressPct) / 100}
+                  strokeDasharray={213.6}
+                  strokeDashoffset={213.6 - (213.6 * pomoProgressPct) / 100}
                   strokeLinecap="round"
                   style={{ transition: 'stroke-dashoffset 1s linear' }}
                 />
               </svg>
-              <span className="absolute text-base sm:text-lg font-black font-mono tracking-tighter text-text-main dark:text-white">
+              <span className="absolute inset-0 flex items-center justify-center text-sm sm:text-base font-black font-mono tracking-tight text-text-main dark:text-white pointer-events-none">
                 {formatTime(pomoTimeLeft)}
               </span>
             </div>
