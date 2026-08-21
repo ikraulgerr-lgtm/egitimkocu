@@ -25,7 +25,7 @@ export const PremiumVideoModal: React.FC<PremiumVideoModalProps> = ({
                 <span className="material-symbols-outlined text-primary text-xl">auto_awesome</span>
               </div>
               <div>
-                <p className="font-black text-sm text-white">EduMind AI PRO</p>
+                <p className="font-black text-sm text-white">Eğitim Koçum AI PRO</p>
                 <p className="text-[11px] text-indigo-200">Kişiselleştirilmiş Akıllı Sınav Rehberi</p>
               </div>
             </div>
