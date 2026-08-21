@@ -970,6 +970,12 @@ GÖRSELDE DERS SORUSU YOKSA OUTPUT FORMATI:
             isUnreadable: true,
             ders: 'Analiz Edilemedi',
             konu: 'Soru Bulunamadı',
+            unreadableReason: 'Soru fotoğrafı net okunamadı veya analiz edilemedi. Lütfen sorunuzu daha net çekerek tekrar deneyin.',
+            cozumAdimlari: [],
+          });
+        }
+      }
+
       // If audioData is present
       if (audioData && typeof audioData === 'string' && audioData.includes('data:audio')) {
         const matches = audioData.match(/^data:(audio\/\w+);base64,(.+)$/);
