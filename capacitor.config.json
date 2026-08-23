@@ -10,7 +10,8 @@
       "skipNativeAuth": false,
       "providers": [
         "google.com"
-      ]
+      ],
+      "serverClientId": "576668557444-vkum7kn6aml5eoo07mi1a4o5ostpi3l9.apps.googleusercontent.com"
     },
     "LocalNotifications": {
       "smallIcon": "ic_stat_icon",
