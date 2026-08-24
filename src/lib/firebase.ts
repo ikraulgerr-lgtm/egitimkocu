@@ -80,25 +80,23 @@ export async function registerWithEmailFirebase(email: string, pass: string, nam
 export async function loginWithGoogle() {
   try {
     if (Capacitor.isNativePlatform()) {
-      try {
-        // Native Google Sign-In on Android (dialog without opening browser!)
-        const result = await FirebaseAuthentication.signInWithGoogle();
-        if (result.credential?.idToken) {
-          const credential = GoogleAuthProvider.credential(result.credential.idToken);
-          const userCred = await signInWithCredential(auth, credential);
-          return userCred.user;
-        }
-        if (auth.currentUser) return auth.currentUser;
-      } catch (nativeErr: any) {
-        console.warn('Native Google Auth failed, trying Web popup fallback:', nativeErr);
+      // Native Google Sign-In on Android (opens native bottom sheet dialog!)
+      const result = await FirebaseAuthentication.signInWithGoogle();
+      if (result.credential?.idToken) {
+        const credential = GoogleAuthProvider.credential(result.credential.idToken);
+        const userCred = await signInWithCredential(auth, credential);
+        return userCred.user;
       }
+      if (auth.currentUser) return auth.currentUser;
+      throw new Error('Google giriş kimliği alınamadı.');
+    } else {
+      // Web browser popup for desktop web
+      googleProvider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      const result = await signInWithPopup(auth, googleProvider);
+      return result.user;
     }
-    // Web browser popup or fallback
-    googleProvider.setCustomParameters({
-      prompt: 'select_account'
-    });
-    const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
   } catch (error: any) {
     console.warn('Google Auth Error:', error);
     throw error;
