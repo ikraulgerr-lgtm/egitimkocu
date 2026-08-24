@@ -124,7 +124,7 @@ function getApiKey(customKey?: string): string {
   const envKey =
     ((import.meta as any).env?.VITE_GEMINI_API_KEY as string) ||
     (process.env.GEMINI_API_KEY as string) ||
-    '';
+    'AIzaSyBHGeNQVbXEo15OUO17xJsEOeb8XVYKc4k';
   return envKey.trim();
 }
 
@@ -140,7 +140,7 @@ function getAIClient(customKey?: string): GoogleGenAI | null {
 }
 
 async function callGeminiClientWithFallback(ai: GoogleGenAI, contents: any, isJson: boolean = true): Promise<string> {
-  const modelsToTry = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-pro-preview'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-flash'];
   let lastErr: any = null;
 
   for (const modelName of modelsToTry) {

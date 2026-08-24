@@ -39,7 +39,7 @@ function getAIClient(userApiKey?: string): GoogleGenAI | null {
 
 // Call Gemini models with auto-fallback (using official supported models)
 async function callGeminiWithFallback(ai: GoogleGenAI, contents: any, isJson: boolean = true): Promise<string> {
-  const modelsToTry = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-pro-preview'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-flash'];
   let lastErr: any = null;
 
   for (const modelName of modelsToTry) {
