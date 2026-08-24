@@ -5,6 +5,7 @@ import { getSocraticHintService } from '../lib/geminiClient';
 import { FormattedMathText } from './FormattedMathText';
 import { AudioVoiceRecorder } from './AudioVoiceRecorder';
 import { FlashcardPracticeModal } from './FlashcardPracticeModal';
+import { startNativeSpeechRecognition } from '../lib/nativeSpeech';
 
 declare global {
   interface Window {
@@ -76,6 +77,8 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
 
   const noteRecognitionRef = useRef<any>(null);
   const chatRecognitionRef = useRef<any>(null);
+  const nativeNoteStopRef = useRef<(() => void) | null>(null);
+  const nativeChatStopRef = useRef<(() => void) | null>(null);
 
   const isSpeechSupported =
     typeof window !== 'undefined' &&
@@ -140,72 +143,25 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
 
   const toggleVoiceNoteRecording = async () => {
     if (isListeningForNote) {
-      if (noteRecognitionRef.current) {
-        try { noteRecognitionRef.current.stop(); } catch (e) {}
+      if (nativeNoteStopRef.current) {
+        try { nativeNoteStopRef.current(); } catch (e) {}
+        nativeNoteStopRef.current = null;
       }
       setIsListeningForNote(false);
     } else {
-      const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (!SpeechRecognitionClass) {
-        setSpeechError('Cihazınızda doğrudan ses tanıma desteği aktif değil. Metin alanına yazarak not ekleyebilirsiniz.');
-        return;
-      }
-
+      setSpeechError(null);
       try {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          micStream.getTracks().forEach((track) => track.stop());
-        }
-      } catch (micErr) {
-        console.warn('Microphone permission rejected:', micErr);
-        setSpeechError('🔒 Mikrofon İzni Gerekli. Lütfen cihaz ayarlarınızdan izin verin.');
-        return;
-      }
-
-      try {
-        const recognition = new SpeechRecognitionClass();
-        recognition.lang = 'tr-TR';
-        recognition.continuous = true;
-        recognition.interimResults = true;
-
-        recognition.onstart = () => {
-          setIsListeningForNote(true);
-          setSpeechError(null);
-        };
-
-        recognition.onresult = (event: any) => {
-          let finalTrans = '';
-          let interimTrans = '';
-          for (let i = 0; i < event.results.length; ++i) {
-            const trans = event.results[i][0]?.transcript || '';
-            if (event.results[i].isFinal) {
-              finalTrans += trans + ' ';
-            } else {
-              interimTrans += trans;
-            }
+        setIsListeningForNote(true);
+        const stopFn = await startNativeSpeechRecognition(
+          (transcription) => {
+            if (transcription) setKisiselNot(transcription);
+          },
+          (err) => {
+            console.warn('Voice note error:', err);
+            setIsListeningForNote(false);
           }
-          const full = (finalTrans + interimTrans).replace(/\s+/g, ' ').trim();
-          if (full) {
-            setKisiselNot(full);
-          }
-        };
-
-        recognition.onerror = (event: any) => {
-          console.warn('Speech recognition error:', event);
-          if (event.error !== 'no-speech' && event.error !== 'aborted') {
-            setSpeechError('Mikrofon ses tanıma uyarısı: ' + event.error);
-          }
-          setIsListeningForNote(false);
-        };
-
-        recognition.onend = () => {
-          if (noteRecognitionRef.current === recognition) {
-            try { recognition.start(); } catch (e) {}
-          }
-        };
-
-        noteRecognitionRef.current = recognition;
-        recognition.start();
+        );
+        nativeNoteStopRef.current = stopFn;
       } catch (err) {
         console.warn('Voice note start error:', err);
         setIsListeningForNote(false);
@@ -215,67 +171,27 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
 
   const toggleChatVoiceInput = async () => {
     if (isListeningForChat) {
-      if (chatRecognitionRef.current) {
-        try { chatRecognitionRef.current.stop(); } catch (e) {}
+      if (nativeChatStopRef.current) {
+        try { nativeChatStopRef.current(); } catch (e) {}
+        nativeChatStopRef.current = null;
       }
       setIsListeningForChat(false);
     } else {
-      const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (!SpeechRecognitionClass) {
-        setSpeechError('Cihazınızda doğrudan ses tanıma desteği aktif değil. Sorunuzu yazarak iletebilirsiniz.');
-        return;
-      }
-
+      setSpeechError(null);
       try {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          micStream.getTracks().forEach((track) => track.stop());
-        }
-      } catch (micErr) {
-        console.warn('Microphone permission rejected:', micErr);
-        setSpeechError('🔒 Mikrofon İzni Reddedildi. Cihaz ayarlarınızdan izin verin.');
-        return;
-      }
-
-      try {
-        const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognitionClass();
-        recognition.lang = 'tr-TR';
-        recognition.continuous = true;
-        recognition.interimResults = true;
-
-        recognition.onstart = () => {
-          setIsListeningForChat(true);
-        };
-
-        recognition.onresult = (event: any) => {
-          let finalTrans = '';
-          let interimTrans = '';
-          for (let i = 0; i < event.results.length; ++i) {
-            const trans = event.results[i][0]?.transcript || '';
-            if (event.results[i].isFinal) {
-              finalTrans += trans + ' ';
-            } else {
-              interimTrans += trans;
-            }
+        setIsListeningForChat(true);
+        const stopFn = await startNativeSpeechRecognition(
+          (transcription) => {
+            if (transcription) setCustomQuestionInput(transcription);
+          },
+          (err) => {
+            console.warn('Chat speech error:', err);
+            setIsListeningForChat(false);
           }
-          const full = (finalTrans + interimTrans).replace(/\s+/g, ' ').trim();
-          setCustomQuestionInput(full);
-        };
-
-        recognition.onerror = () => {
-          console.warn('Chat speech recognition warning');
-        };
-
-        recognition.onend = () => {
-          if (chatRecognitionRef.current === recognition) {
-            try { recognition.start(); } catch (e) {}
-          }
-        };
-
-        chatRecognitionRef.current = recognition;
-        recognition.start();
+        );
+        nativeChatStopRef.current = stopFn;
       } catch (err) {
+        console.warn('Chat voice input start error:', err);
         setIsListeningForChat(false);
       }
     }

@@ -10,10 +10,12 @@
     "clean": "rm -rf dist server.js",
     "lint": "npx tsc --noEmit",
     "build:android": "npm run build && npx cap sync android",
-    "cap:open": "npx cap open android"
+    "cap:open": "npx cap open android",
+    "postinstall": "node scripts/patch-speech.js"
   },
   "dependencies": {
     "@capacitor-community/admob": "^8.1.0",
+    "@capacitor-community/speech-recognition": "^7.0.1",
     "@capacitor-firebase/authentication": "^8.4.0",
     "@capacitor/android": "^8.5.0",
     "@capacitor/cli": "^8.5.0",

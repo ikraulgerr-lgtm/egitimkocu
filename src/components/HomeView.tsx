@@ -3,6 +3,7 @@ import { Kullanici, SoruKaydi, ActiveTab } from '../types';
 import { TodayRepetitionCard } from './TodayRepetitionCard';
 import { ExamCountdownWidget } from './ExamCountdownWidget';
 import { SavedNotesSection } from './SavedNotesSection';
+import { startNativeSpeechRecognition } from '../lib/nativeSpeech';
 
 interface HomeViewProps {
   user: Kullanici;
@@ -61,6 +62,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const audioChunksRef = useRef<Blob[]>([]);
   const voiceTimerRef = useRef<any>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
+  const nativeStopSpeechRef = useRef<(() => void) | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -97,6 +99,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
         speechRecognitionRef.current.abort();
       } catch (e) {}
       speechRecognitionRef.current = null;
+    }
+    if (nativeStopSpeechRef.current) {
+      try { nativeStopSpeechRef.current(); } catch (e) {}
+      nativeStopSpeechRef.current = null;
     }
 
     let audioPromise: Promise<string | null> = Promise.resolve(null);
@@ -156,6 +162,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
         speechRecognitionRef.current.abort();
       } catch (e) {}
       speechRecognitionRef.current = null;
+    }
+    if (nativeStopSpeechRef.current) {
+      try { nativeStopSpeechRef.current(); } catch (e) {}
+      nativeStopSpeechRef.current = null;
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try { mediaRecorderRef.current.stop(); } catch (e) {}
@@ -226,54 +236,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
       setVoiceRecordingSeconds((prev) => prev + 1);
     }, 1000);
 
-    // 3. Simultaneously try SpeechRecognition for real-time live transcription (if supported)
-    const SpeechRecognitionObj = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognitionObj) {
-      try {
-        if (speechRecognitionRef.current) {
-          try { speechRecognitionRef.current.abort(); } catch (e) {}
-        }
-
-        const recognition = new SpeechRecognitionObj();
-        recognition.lang = 'tr-TR';
-        recognition.continuous = true;
-        recognition.interimResults = true;
-
-        recognition.onresult = (e: any) => {
-          let finalTrans = '';
-          let interimTrans = '';
-          for (let i = 0; i < e.results.length; ++i) {
-            const trans = e.results[i][0]?.transcript || '';
-            if (e.results[i].isFinal) {
-              finalTrans += trans + ' ';
-            } else {
-              interimTrans += trans;
-            }
-          }
-          const full = (finalTrans + interimTrans).replace(/\s+/g, ' ').trim();
-          if (full) {
-            setVoiceQuestionTranscript(full);
-            setTextPrompt(full);
-          }
-        };
-
-        recognition.onerror = (e: any) => {
-          console.warn('Speech recognition warning:', e);
-        };
-
-        recognition.onend = () => {
-          if (speechRecognitionRef.current === recognition) {
-            try {
-              recognition.start();
-            } catch (e) {}
-          }
-        };
-
-        speechRecognitionRef.current = recognition;
-        recognition.start();
-      } catch (err: any) {
-        console.warn('Speech recognition start failed (relying on audio recording):', err);
+    // 3. Start Native / Web Speech Recognition for real-time live transcription
+    try {
+      if (nativeStopSpeechRef.current) {
+        nativeStopSpeechRef.current();
+        nativeStopSpeechRef.current = null;
       }
+      const stopFn = await startNativeSpeechRecognition((transcription) => {
+        if (transcription) {
+          setVoiceQuestionTranscript(transcription);
+          setTextPrompt(transcription);
+        }
+      });
+      nativeStopSpeechRef.current = stopFn;
+    } catch (err: any) {
+      console.warn('Native speech recognition start warning:', err);
     }
   };
 
