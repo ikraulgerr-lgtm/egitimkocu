@@ -59,6 +59,14 @@
           }
         },
         {
+          "client_id": "576668557444-releasekeyhash.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.egitimkocumai",
+            "certificate_hash": "0d7f831102821a9419f5945d18095ff47168f448"
+          }
+        },
+        {
           "client_id": "576668557444-vkum7kn6aml5eoo07mi1a4o5ostpi3l9.apps.googleusercontent.com",
           "client_type": 3
         }
