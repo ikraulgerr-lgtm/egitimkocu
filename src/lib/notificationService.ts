@@ -284,3 +284,34 @@ export async function runSmartNotificationChecks({
     markSentToday('exam_alert');
   }
 }
+
+export async function updatePomodoroLocalNotification(title: string, body: string, isFinished: boolean = false) {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const hasPerm = await LocalNotifications.checkPermissions();
+    if (hasPerm.display !== 'granted') {
+      await LocalNotifications.requestPermissions();
+    }
+    const POMO_NOTIF_ID = 99999;
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: POMO_NOTIF_ID,
+          title: title,
+          body: body,
+          schedule: { at: new Date(Date.now() + 100) },
+        },
+      ],
+    });
+  } catch (e) {
+    console.warn('Pomodoro local notification update error:', e);
+  }
+}
+
+export async function clearPomodoroLocalNotification() {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const POMO_NOTIF_ID = 99999;
+    await LocalNotifications.cancel({ notifications: [{ id: POMO_NOTIF_ID }] });
+  } catch (e) {}
+}

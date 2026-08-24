@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ProgramOgesi, SoruKaydi, ActiveTab, Arkadas, Kullanici, Bildirim } from '../types';
 import { LofiAudioWidget } from './LofiAudioWidget';
+import { playPomodoroBellSound } from '../lib/soundUtils';
+import { updatePomodoroLocalNotification, clearPomodoroLocalNotification } from '../lib/notificationService';
 import { db, auth } from '../lib/firebase';
 import { doc, getDoc, getDocFromServer, getDocs, collection, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
@@ -85,6 +87,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     return parseInt(localStorage.getItem('completed_pomodoros_count') || '0', 10);
   });
   const [pomoNotificationBanner, setPomoNotificationBanner] = useState<{ title: string; body: string; type: 'work' | 'break' } | null>(null);
+  const [isFullScreenFocus, setIsFullScreenFocus] = useState<boolean>(false);
 
   // Form State for Manual Task Creation
   const [formDers, setFormDers] = useState<string>('Matematik');
@@ -839,9 +842,11 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         setPomoTimeLeft((prev) => prev - 1);
       }, 1000);
     } else if (isPomoRunning && pomoTimeLeft === 0) {
-      // Timer Complete!
+      // Timer Complete! Play audible alert bell chime
       if (pomoMode === 'work') {
-        // Work Session Finished
+        // Work Session Finished - Play Work Complete Chime Bell!
+        playPomodoroBellSound('work_complete');
+
         const newCount = completedPomoCount + 1;
         setCompletedPomoCount(newCount);
         localStorage.setItem('completed_pomodoros_count', newCount.toString());
@@ -898,18 +903,22 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           `Harika bir çalışma seansı geçirdin! +${earnedXp} XP kazandın ve görevin tamamlandı. Şimdi ${customBreakMinutes} dakikalık mola zamanı.`,
           'work'
         );
+        updatePomodoroLocalNotification('🍅 Pomodoro Süresi Doldu!', `Mola zamanı başladı! ${customBreakMinutes} dk dinlenebilirsin.`, true);
 
         // Switch to Break Mode automatically
         setPomoMode('break');
         setPomoTimeLeft(customBreakMinutes * 60);
         setIsPomoRunning(false);
       } else {
-        // Break Finished
+        // Break Finished - Play Break Complete Chime Bell!
+        playPomodoroBellSound('break_complete');
+
         triggerNotification(
           `☕ ${customBreakMinutes} Dk Mola Sona Erdi!`,
           `Mola bitti, zihnin tazelendi! Yeni bir ${customWorkMinutes} dakikalık Pomodoro odaklanma seansına başlamaya hazır mısın?`,
           'break'
         );
+        updatePomodoroLocalNotification('☕ Mola Sona Erdi!', `Yeni bir ${customWorkMinutes} dakikalık çalışma seansına başlayabilirsin!`, true);
 
         // Switch back to Work Mode
         setPomoMode('work');
@@ -922,6 +931,20 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
       if (interval) clearInterval(interval);
     };
   }, [isPomoRunning, pomoTimeLeft, pomoMode, pomoSelectedItemId, scheduleItems, selectedDay, customWorkMinutes, customBreakMinutes, completedPomoCount, onToggleItem, onRewardXp]);
+
+  // Synchronize background notification countdown
+  useEffect(() => {
+    if (isPomoRunning) {
+      const minutes = Math.floor(pomoTimeLeft / 60);
+      const seconds = pomoTimeLeft % 60;
+      const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      const title = pomoMode === 'work' ? `🧠 Pomodoro Odaklanılıyor: ${timeStr}` : `☕ Mola Zamanı: ${timeStr}`;
+      const body = activeGroupRoom ? `Grup Odası: ${activeGroupRoom.title}` : 'Eğitim Koçum AI Odaklanma Seansı';
+      updatePomodoroLocalNotification(title, body);
+    } else {
+      clearPomodoroLocalNotification();
+    }
+  }, [isPomoRunning, pomoTimeLeft, pomoMode, activeGroupRoom]);
 
   const handleTogglePomo = () => {
     setIsPomoRunning(!isPomoRunning);
@@ -1395,6 +1418,20 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               <span>☕ {customBreakMinutes} dk Mola</span>
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsFullScreenFocus(true);
+              if (typeof document !== 'undefined' && document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+              }
+            }}
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 text-white font-extrabold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all shadow-md active:scale-95"
+          >
+            <span className="material-symbols-outlined text-sm">fullscreen</span>
+            <span>Tam Ekran Odaklanma</span>
+          </button>
         </div>
 
         {/* Custom Duration Selector Strip */}
@@ -1642,6 +1679,19 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsFullScreenFocus(true);
+                    if (typeof document !== 'undefined' && document.documentElement.requestFullscreen) {
+                      document.documentElement.requestFullscreen().catch(() => {});
+                    }
+                  }}
+                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs px-3 py-1.5 rounded-xl border border-purple-400/40 flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95 transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">fullscreen</span>
+                  <span>Tam Ekran Odaklan</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -2257,6 +2307,169 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* FULLSCREEN FOCUS MODE MODAL (Tam Ekran Odaklanma Modu) */}
+      {isFullScreenFocus && (
+        <div className="fixed inset-0 z-[99999] bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white flex flex-col justify-between p-4 sm:p-8 select-none animate-fadeIn overflow-y-auto">
+          {/* Header Bar */}
+          <div className="flex items-center justify-between w-full max-w-4xl mx-auto border-b border-white/10 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-xl shadow-inner">
+                {pomoMode === 'work' ? '🍅' : '☕'}
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-black tracking-wide text-white flex items-center gap-2">
+                  <span>{activeGroupRoom ? activeGroupRoom.title : 'Pomodoro Odaklanma Modu'}</span>
+                  {activeGroupRoom && (
+                    <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-500/40">
+                      🟢 CANLI ODA
+                    </span>
+                  )}
+                </h2>
+                <p className="text-xs text-indigo-300/80 font-medium">
+                  {pomoMode === 'work' ? `🧠 Odaklanma Seansı (${customWorkMinutes} Dk)` : `☕ Dinlenme & Mola (${customBreakMinutes} Dk)`}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                if (typeof document !== 'undefined' && document.fullscreenElement) {
+                  document.exitFullscreen().catch(() => {});
+                }
+                setIsFullScreenFocus(false);
+              }}
+              className="bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold px-3.5 py-2 rounded-xl border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <span className="material-symbols-outlined text-base">fullscreen_exit</span>
+              <span className="hidden sm:inline">Tam Ekrandan Çık</span>
+            </button>
+          </div>
+
+          {/* Main Focus Clock & Progress */}
+          <div className="flex flex-col items-center justify-center my-auto space-y-6 max-w-2xl mx-auto w-full text-center py-6">
+            {/* Mode Badge */}
+            <div className={`px-4 py-1.5 rounded-full text-xs font-extrabold border tracking-wider uppercase flex items-center gap-2 animate-pulse ${
+              pomoMode === 'work'
+                ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-rose-900/30'
+                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-emerald-900/30'
+            }`}>
+              <span className="w-2 h-2 rounded-full bg-current animate-ping" />
+              <span>{pomoMode === 'work' ? '🧠 Odaklanma Süresi' : '☕ Mola Süresi'}</span>
+            </div>
+
+            {/* Giant Clock */}
+            <div className="font-mono text-7xl sm:text-9xl font-black tracking-tighter drop-shadow-2xl text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-100 to-indigo-200">
+              {String(Math.floor(pomoTimeLeft / 60)).padStart(2, '0')}:{String(pomoTimeLeft % 60).padStart(2, '0')}
+            </div>
+
+            {/* Dynamic Progress Bar */}
+            <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden p-0.5 border border-white/10 max-w-md shadow-inner">
+              <div
+                className={`h-full rounded-full transition-all duration-1000 ${
+                  pomoMode === 'work' ? 'bg-gradient-to-r from-rose-500 via-purple-500 to-indigo-500' : 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                }`}
+                style={{
+                  width: `${Math.min(100, Math.max(0, ((pomoMode === 'work' ? WORK_TIME - pomoTimeLeft : BREAK_TIME - pomoTimeLeft) / (pomoMode === 'work' ? WORK_TIME : BREAK_TIME)) * 100))}%`,
+                }}
+              />
+            </div>
+
+            {/* Active Group Room Members */}
+            {activeGroupRoom && activeGroupRoom.members && activeGroupRoom.members.length > 0 && (
+              <div className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl space-y-3 max-w-lg shadow-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-indigo-200">👥 Canlı Katılımcılar ({activeGroupRoom.members.length})</span>
+                  <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    Birlikte Odaklanılıyor
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap justify-center gap-2">
+                  {activeGroupRoom.members.map((member) => (
+                    <div key={member.id} className="flex items-center gap-2 bg-slate-900/90 border border-white/15 px-3 py-1.5 rounded-xl shadow-xs">
+                      <span className="text-sm">{member.avatar || '👤'}</span>
+                      <span className="text-xs font-bold text-white">{member.name}</span>
+                      <span className={`w-2 h-2 rounded-full ${member.status === 'work' ? 'bg-rose-500 animate-pulse' : member.status === 'break' ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Quick Motivational Support Cheers */}
+                <div className="pt-2 border-t border-white/10 flex flex-wrap justify-center gap-1.5">
+                  {['💪 Harika Gidiyorsun!', '🔥 Odaklanmayı Bozma!', '☕ Hak Edilmiş Mola!'].map((cheer) => (
+                    <button
+                      key={cheer}
+                      type="button"
+                      onClick={() => handleSendGroupCheer(cheer)}
+                      className="bg-indigo-600/40 hover:bg-indigo-600/70 text-indigo-200 text-[11px] font-bold px-2.5 py-1 rounded-lg border border-indigo-400/30 transition-all active:scale-95 cursor-pointer"
+                    >
+                      {cheer}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ambient Lofi & White Noise Audio Generator */}
+            <div className="w-full max-w-md">
+              <LofiAudioWidget />
+            </div>
+          </div>
+
+          {/* Bottom Action Controls */}
+          <div className="w-full max-w-2xl mx-auto flex flex-wrap items-center justify-center gap-3 pt-4 border-t border-white/10">
+            {!isPomoRunning ? (
+              <button
+                type="button"
+                onClick={() => {
+                  playPomodoroBellSound('start');
+                  setIsPomoRunning(true);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-8 py-3.5 rounded-2xl flex items-center gap-2 text-base cursor-pointer shadow-lg shadow-emerald-600/30 transition-all hover:scale-105 active:scale-95"
+              >
+                <span className="material-symbols-outlined text-2xl">play_arrow</span>
+                <span>{pomoMode === 'work' ? 'Odaklanmayı Başlat' : 'Molayı Başlat'}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsPomoRunning(false)}
+                className="bg-amber-600 hover:bg-amber-500 text-white font-black px-8 py-3.5 rounded-2xl flex items-center gap-2 text-base cursor-pointer shadow-lg shadow-amber-600/30 transition-all hover:scale-105 active:scale-95"
+              >
+                <span className="material-symbols-outlined text-2xl">pause</span>
+                <span>Duraklat</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsPomoRunning(false);
+                setPomoTimeLeft(pomoMode === 'work' ? WORK_TIME : BREAK_TIME);
+              }}
+              className="bg-white/10 hover:bg-white/20 text-slate-200 font-bold px-5 py-3.5 rounded-2xl flex items-center gap-1.5 text-xs sm:text-sm cursor-pointer border border-white/15 transition-all active:scale-95"
+            >
+              <span className="material-symbols-outlined text-lg">restart_alt</span>
+              <span>Sıfırla</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const nextMode = pomoMode === 'work' ? 'break' : 'work';
+                setPomoMode(nextMode);
+                setPomoTimeLeft(nextMode === 'work' ? WORK_TIME : BREAK_TIME);
+              }}
+              className="bg-indigo-600/80 hover:bg-indigo-600 text-white font-bold px-5 py-3.5 rounded-2xl flex items-center gap-1.5 text-xs sm:text-sm cursor-pointer border border-indigo-400/30 transition-all active:scale-95"
+            >
+              <span className="material-symbols-outlined text-lg">swap_horiz</span>
+              <span>{pomoMode === 'work' ? '☕ Mola Moduna Geç' : '🍅 Çalışma Moduna Geç'}</span>
+            </button>
           </div>
         </div>
       )}
