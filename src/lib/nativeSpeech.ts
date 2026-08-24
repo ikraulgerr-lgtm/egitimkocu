@@ -20,44 +20,56 @@ export async function startNativeSpeechRecognition(
   onResult: (text: string) => void,
   onError?: (err: any) => void
 ): Promise<() => void> {
-  // If running on web browser, fallback to Web Speech API
+  // 1. Web Browser Fallback (Using HTML5 Web Speech API)
   if (!Capacitor.isNativePlatform()) {
     const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognitionClass) {
       if (onError) onError('Cihazınızda ses tanıma bulunamadı.');
       return () => {};
     }
-    const recognition = new SpeechRecognitionClass();
-    recognition.lang = 'tr-TR';
-    recognition.continuous = true;
-    recognition.interimResults = true;
 
-    recognition.onresult = (e: any) => {
-      let finalTrans = '';
-      let interimTrans = '';
-      for (let i = 0; i < e.results.length; ++i) {
-        const trans = e.results[i][0]?.transcript || '';
-        if (e.results[i].isFinal) {
-          finalTrans += trans + ' ';
-        } else {
-          interimTrans += trans;
+    try {
+      const recognition = new SpeechRecognitionClass();
+      recognition.lang = 'tr-TR';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (e: any) => {
+        let finalTrans = '';
+        let interimTrans = '';
+        for (let i = 0; i < e.results.length; ++i) {
+          const trans = e.results[i][0]?.transcript || '';
+          if (e.results[i].isFinal) {
+            finalTrans += trans + ' ';
+          } else {
+            interimTrans += trans;
+          }
         }
-      }
-      const full = (finalTrans + interimTrans).replace(/\s+/g, ' ').trim();
-      if (full) onResult(full);
-    };
+        const full = (finalTrans + interimTrans).replace(/\s+/g, ' ').trim();
+        if (full) {
+          onResult(full);
+        }
+      };
 
-    recognition.onerror = (err: any) => {
-      console.warn('Web speech recognition error:', err);
-    };
+      recognition.onerror = (err: any) => {
+        console.warn('Web speech recognition error:', err);
+      };
 
-    recognition.start();
-    return () => {
-      try { recognition.stop(); } catch (e) {}
-    };
+      recognition.start();
+      return () => {
+        try {
+          recognition.stop();
+          recognition.abort();
+        } catch (e) {}
+      };
+    } catch (err) {
+      console.warn('Web speech start failed:', err);
+      if (onError) onError(err);
+      return () => {};
+    }
   }
 
-  // Native Android & iOS Speech Recognition
+  // 2. Native Android & iOS Speech Recognition (Real-time partial results)
   try {
     const isAvailable = await SpeechRecognition.available();
     if (!isAvailable.available) {
@@ -71,10 +83,13 @@ export async function startNativeSpeechRecognition(
       return () => {};
     }
 
-    const listenerHandle = await SpeechRecognition.addListener('partialResults', (data: { matches: string[] }) => {
+    let lastDeliveredText = '';
+
+    const partialListener = await SpeechRecognition.addListener('partialResults', (data: { matches: string[] }) => {
       if (data && data.matches && data.matches.length > 0) {
-        const latestText = data.matches[0];
-        if (latestText) {
+        const latestText = data.matches[0]?.trim();
+        if (latestText && latestText !== lastDeliveredText) {
+          lastDeliveredText = latestText;
           onResult(latestText);
         }
       }
@@ -90,8 +105,8 @@ export async function startNativeSpeechRecognition(
 
     return async () => {
       try {
-        if (listenerHandle) {
-          await listenerHandle.remove();
+        if (partialListener) {
+          await partialListener.remove();
         }
         await SpeechRecognition.stop();
       } catch (e) {}

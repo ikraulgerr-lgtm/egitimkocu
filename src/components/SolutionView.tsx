@@ -150,11 +150,16 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
       setIsListeningForNote(false);
     } else {
       setSpeechError(null);
+      const baseNoteText = kisiselNot ? kisiselNot.trim() : '';
       try {
         setIsListeningForNote(true);
         const stopFn = await startNativeSpeechRecognition(
           (transcription) => {
-            if (transcription) setKisiselNot(transcription);
+            if (transcription) {
+              const cleanTrans = transcription.trim();
+              const fullText = baseNoteText ? `${baseNoteText} ${cleanTrans}` : cleanTrans;
+              setKisiselNot(fullText);
+            }
           },
           (err) => {
             console.warn('Voice note error:', err);
