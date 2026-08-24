@@ -49,6 +49,7 @@ import { InviteFriendsModal } from './components/InviteFriendsModal';
 import { LofiAudioWidget } from './components/LofiAudioWidget';
 import { ExamCountdownWidget } from './components/ExamCountdownWidget';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SplashScreen } from './components/SplashScreen';
 
 import { auth, db, handleFirestoreError, OperationType, logoutFirebase } from './lib/firebase';
 import { onAuthStateChanged, updateProfile } from 'firebase/auth';
@@ -65,6 +66,7 @@ export function App() {
   const [selectedQuestion, setSelectedQuestion] = useState<SoruKaydi | null>(questions[0] || null);
 
   const [theme, setThemeState] = useState<'light' | 'dark'>(getTheme());
+  const [isSplashActive, setIsSplashActive] = useState(true);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
   const [isNoCreditsModalOpen, setIsNoCreditsModalOpen] = useState(false);
@@ -120,6 +122,14 @@ export function App() {
       } catch (e) {}
     }
   };
+
+  // Hide splash screen after 1.8 seconds on initial app launch
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsSplashActive(false);
+    }, 1800);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Request notification permissions and initialize AdMob on app mount
   useEffect(() => {
@@ -1416,6 +1426,8 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-background text-text-main font-sans transition-colors duration-200">
+      {isSplashActive && <SplashScreen theme={theme} />}
+
       {/* Global Top Header */}
       <TopHeader
         user={user}

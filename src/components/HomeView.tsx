@@ -252,15 +252,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
           }
           const full = (finalTrans + interimTrans).replace(/\s+/g, ' ').trim();
           if (full) {
-            if (source === 'topVoice') {
-              setVoiceQuestionTranscript(full);
-            }
+            setVoiceQuestionTranscript(full);
             setTextPrompt(full);
           }
         };
 
         recognition.onerror = (e: any) => {
           console.warn('Speech recognition warning:', e);
+        };
+
+        recognition.onend = () => {
+          if (speechRecognitionRef.current === recognition) {
+            try {
+              recognition.start();
+            } catch (e) {}
+          }
         };
 
         speechRecognitionRef.current = recognition;

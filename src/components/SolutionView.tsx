@@ -199,7 +199,9 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
         };
 
         recognition.onend = () => {
-          setIsListeningForNote(false);
+          if (noteRecognitionRef.current === recognition) {
+            try { recognition.start(); } catch (e) {}
+          }
         };
 
         noteRecognitionRef.current = recognition;
@@ -262,11 +264,13 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
         };
 
         recognition.onerror = () => {
-          setIsListeningForChat(false);
+          console.warn('Chat speech recognition warning');
         };
 
         recognition.onend = () => {
-          setIsListeningForChat(false);
+          if (chatRecognitionRef.current === recognition) {
+            try { recognition.start(); } catch (e) {}
+          }
         };
 
         chatRecognitionRef.current = recognition;
