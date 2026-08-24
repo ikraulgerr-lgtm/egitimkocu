@@ -2392,9 +2392,15 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 <div className="flex flex-wrap justify-center gap-2">
                   {activeGroupRoom.members.map((member) => (
                     <div key={member.id} className="flex items-center gap-2 bg-slate-900/90 border border-white/15 px-3 py-1.5 rounded-xl shadow-xs">
-                      <span className="text-sm">{member.avatar || '👤'}</span>
+                      {member.avatar && member.avatar.startsWith('http') ? (
+                        <img src={member.avatar} alt={member.name} className="w-7 h-7 rounded-full border border-indigo-400/40 object-cover shrink-0" />
+                      ) : (
+                        <span className="w-7 h-7 rounded-full bg-indigo-900/80 border border-indigo-400/40 flex items-center justify-center text-xs shrink-0">
+                          {member.avatar || '👤'}
+                        </span>
+                      )}
                       <span className="text-xs font-bold text-white">{member.name}</span>
-                      <span className={`w-2 h-2 rounded-full ${member.status === 'work' ? 'bg-rose-500 animate-pulse' : member.status === 'break' ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${member.status === 'work' ? 'bg-rose-500 animate-pulse' : member.status === 'break' ? 'bg-emerald-400' : 'bg-slate-500'}`} />
                     </div>
                   ))}
                 </div>
