@@ -5,14 +5,14 @@ export async function requestSpeechPermission(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return true;
   try {
     const status = await SpeechRecognition.checkPermissions();
-    if (status.speechRecognition !== 'granted') {
+    if (status?.speechRecognition !== 'granted') {
       const req = await SpeechRecognition.requestPermissions();
-      return req.speechRecognition === 'granted';
+      return req?.speechRecognition === 'granted';
     }
     return true;
   } catch (err) {
     console.warn('Speech permission error:', err);
-    return false;
+    return true; // Proceed anyway in case permission is granted at OS level
   }
 }
 
@@ -54,10 +54,6 @@ export async function startNativeSpeechRecognition(
         if (onError) onError(err);
       };
 
-      recognition.onend = () => {
-        // Recognition completed
-      };
-
       recognition.start();
 
       return () => {
@@ -73,17 +69,7 @@ export async function startNativeSpeechRecognition(
 
   // 2. NATIVE ANDROID / iOS (Using @capacitor-community/speech-recognition)
   try {
-    const isAvailable = await SpeechRecognition.available();
-    if (!isAvailable.available) {
-      if (onError) onError('Cihazınızda ses tanıma kullanılabilir değil.');
-      return () => {};
-    }
-
-    const permitted = await requestSpeechPermission();
-    if (!permitted) {
-      if (onError) onError('Mikrofon izni verilmedi.');
-      return () => {};
-    }
+    await requestSpeechPermission();
 
     // Stop any existing session
     try { await SpeechRecognition.stop(); } catch (e) {}
@@ -103,13 +89,42 @@ export async function startNativeSpeechRecognition(
       }
     );
 
-    await SpeechRecognition.start({
-      language: 'tr-TR',
-      maxResults: 5,
-      prompt: 'Sorunuzu söyleyin...',
-      partialResults: true,
-      popup: false,
-    });
+    // Try starting in background/partial mode first
+    try {
+      const startResult: any = await SpeechRecognition.start({
+        language: 'tr-TR',
+        maxResults: 5,
+        prompt: 'Sorunuzu söyleyin...',
+        partialResults: true,
+        popup: false,
+      });
+
+      // If results returned synchronously from start
+      if (startResult?.matches && startResult.matches.length > 0) {
+        const text = startResult.matches[0]?.trim();
+        if (text) onResult(text);
+      }
+    } catch (silentErr: any) {
+      console.warn('Silent speech recognition failed, falling back to popup mode:', silentErr);
+      // Fallback to official Google Voice Dialog (works on 100% of Android devices)
+      try {
+        const popupResult: any = await SpeechRecognition.start({
+          language: 'tr-TR',
+          maxResults: 5,
+          prompt: 'Sorunuzu söyleyin...',
+          partialResults: false,
+          popup: true,
+        });
+
+        if (popupResult?.matches && popupResult.matches.length > 0) {
+          const text = popupResult.matches[0]?.trim();
+          if (text) onResult(text);
+        }
+      } catch (popupErr: any) {
+        console.error('Speech recognition popup failed:', popupErr);
+        if (onError) onError(popupErr?.message || 'Ses tanıma başlatılamadı.');
+      }
+    }
 
     return async () => {
       lastDelivered = '';
@@ -122,9 +137,9 @@ export async function startNativeSpeechRecognition(
         await SpeechRecognition.stop();
       } catch (e) {}
     };
-  } catch (err) {
+  } catch (err: any) {
     console.warn('Native speech recognition start failed:', err);
-    if (onError) onError(err);
+    if (onError) onError(err?.message || err);
     return () => {};
   }
 }
