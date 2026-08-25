@@ -190,7 +190,7 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
         const recognition = new SpeechRecognitionClass();
         recognition.lang = 'tr-TR';
         recognition.continuous = true;
-        recognition.interimResults = true;
+        recognition.interimResults = false;
 
         recognition.onstart = () => {
           setIsListeningForNote(true);
@@ -198,24 +198,12 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
         };
 
         recognition.onresult = (event: any) => {
-          let interimText = '';
           for (let i = event.resultIndex; i < event.results.length; ++i) {
             const piece = (event.results[i][0]?.transcript || '').trim();
-            if (event.results[i].isFinal) {
-              sessionFinalNoteRef.current += (sessionFinalNoteRef.current ? ' ' : '') + piece;
-            } else {
-              interimText += (interimText ? ' ' : '') + piece;
+            if (piece) {
+              setKisiselNot((prev) => (prev ? `${prev} ${piece}` : piece));
+              setVoiceTranscript((prev) => (prev ? `${prev} ${piece}` : piece));
             }
-          }
-          const combined = [baseNoteBeforeMicRef.current, sessionFinalNoteRef.current, interimText]
-            .filter(Boolean)
-            .join(' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          if (combined) {
-            setKisiselNot(combined);
-            setVoiceTranscript(combined);
           }
         };
 
@@ -233,12 +221,6 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
 
         recognition.onend = () => {
           if (isNoteListeningActiveRef.current) {
-            baseNoteBeforeMicRef.current = [baseNoteBeforeMicRef.current, sessionFinalNoteRef.current]
-              .filter(Boolean)
-              .join(' ')
-              .replace(/\s+/g, ' ')
-              .trim();
-            sessionFinalNoteRef.current = '';
             try {
               recognition.start();
             } catch (e) {}
@@ -276,38 +258,24 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
       setIsListeningForChat(false);
     } else {
       isChatListeningActiveRef.current = true;
-      baseChatBeforeMicRef.current = customQuestionInput.trim();
-      sessionFinalChatRef.current = '';
 
       try {
         const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognitionClass();
         recognition.lang = 'tr-TR';
         recognition.continuous = true;
-        recognition.interimResults = true;
+        recognition.interimResults = false;
 
         recognition.onstart = () => {
           setIsListeningForChat(true);
         };
 
         recognition.onresult = (event: any) => {
-          let interimText = '';
           for (let i = event.resultIndex; i < event.results.length; ++i) {
             const piece = (event.results[i][0]?.transcript || '').trim();
-            if (event.results[i].isFinal) {
-              sessionFinalChatRef.current += (sessionFinalChatRef.current ? ' ' : '') + piece;
-            } else {
-              interimText += (interimText ? ' ' : '') + piece;
+            if (piece) {
+              setCustomQuestionInput((prev) => (prev ? `${prev} ${piece}` : piece));
             }
-          }
-          const combined = [baseChatBeforeMicRef.current, sessionFinalChatRef.current, interimText]
-            .filter(Boolean)
-            .join(' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          if (combined) {
-            setCustomQuestionInput(combined);
           }
         };
 
@@ -320,12 +288,6 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
 
         recognition.onend = () => {
           if (isChatListeningActiveRef.current) {
-            baseChatBeforeMicRef.current = [baseChatBeforeMicRef.current, sessionFinalChatRef.current]
-              .filter(Boolean)
-              .join(' ')
-              .replace(/\s+/g, ' ')
-              .trim();
-            sessionFinalChatRef.current = '';
             try {
               recognition.start();
             } catch (e) {}

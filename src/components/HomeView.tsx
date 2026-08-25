@@ -159,7 +159,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
       const recognition = new SpeechRecognitionObj();
       recognition.lang = 'tr-TR';
       recognition.continuous = true;
-      recognition.interimResults = true;
+      recognition.interimResults = false;
 
       recognition.onstart = () => {
         setIsListeningVoiceQuestion(true);
@@ -167,25 +167,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
       };
 
       recognition.onresult = (e: any) => {
-        let interimText = '';
         for (let i = e.resultIndex; i < e.results.length; ++i) {
           const piece = (e.results[i][0]?.transcript || '').trim();
-          if (e.results[i].isFinal) {
-            sessionFinalTextRef.current += (sessionFinalTextRef.current ? ' ' : '') + piece;
-          } else {
-            interimText += (interimText ? ' ' : '') + piece;
+          if (piece) {
+            setVoiceQuestionTranscript((prev) => (prev ? `${prev} ${piece}` : piece));
+            setTextPrompt((prev) => (prev ? `${prev} ${piece}` : piece));
           }
-        }
-        
-        const combined = [baseTextBeforeMicRef.current, sessionFinalTextRef.current, interimText]
-          .filter(Boolean)
-          .join(' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-
-        if (combined) {
-          setVoiceQuestionTranscript(combined);
-          setTextPrompt(combined);
         }
       };
 
@@ -203,12 +190,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
       recognition.onend = () => {
         if (isVoiceListeningActiveRef.current) {
-          baseTextBeforeMicRef.current = [baseTextBeforeMicRef.current, sessionFinalTextRef.current]
-            .filter(Boolean)
-            .join(' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-          sessionFinalTextRef.current = '';
           try {
             recognition.start();
           } catch (e) {}
