@@ -74,11 +74,13 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
   const [isEditingOcr, setIsEditingOcr] = useState(false);
   const [isSpeakingOcr, setIsSpeakingOcr] = useState(false);
   const [isFlashcardModalOpen, setIsFlashcardModalOpen] = useState(false);
-
   const noteRecognitionRef = useRef<any>(null);
+  const isNoteListeningActiveRef = useRef(false);
+  const savedNoteFinalRef = useRef('');
+
   const chatRecognitionRef = useRef<any>(null);
-  const nativeNoteStopRef = useRef<(() => void) | null>(null);
-  const nativeChatStopRef = useRef<(() => void) | null>(null);
+  const isChatListeningActiveRef = useRef(false);
+  const savedChatFinalRef = useRef('');
 
   const isSpeechSupported =
     typeof window !== 'undefined' &&
@@ -110,13 +112,19 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [question?.id, isSaved, question?.sesliNot]);
+  }, [question?.id, isSaved, question?.sesliNot, question?.kisiselNot]);
 
   // Cleanup speech recognition on unmount
   useEffect(() => {
     return () => {
-      if (noteRecognitionRef.current) noteRecognitionRef.current.stop();
-      if (chatRecognitionRef.current) chatRecognitionRef.current.stop();
+      isNoteListeningActiveRef.current = false;
+      isChatListeningActiveRef.current = false;
+      if (noteRecognitionRef.current) {
+        try { noteRecognitionRef.current.abort(); } catch (e) {}
+      }
+      if (chatRecognitionRef.current) {
+        try { chatRecognitionRef.current.abort(); } catch (e) {}
+      }
     };
   }, []);
 
@@ -148,11 +156,14 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
     }
 
     if (isListeningForNote) {
+      isNoteListeningActiveRef.current = false;
       if (noteRecognitionRef.current) {
-        noteRecognitionRef.current.stop();
+        try { noteRecognitionRef.current.stop(); } catch (e) {}
       }
       setIsListeningForNote(false);
     } else {
+      isNoteListeningActiveRef.current = true;
+      savedNoteFinalRef.current = voiceTranscript.trim();
       try {
         const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognitionClass();
@@ -166,29 +177,49 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
         };
 
         recognition.onresult = (event: any) => {
-          let currentText = '';
+          let sessionFinal = '';
+          let sessionInterim = '';
           for (let i = 0; i < event.results.length; i++) {
-            currentText += event.results[i][0].transcript;
+            const piece = event.results[i][0]?.transcript || '';
+            if (event.results[i].isFinal) {
+              sessionFinal += piece + ' ';
+            } else {
+              sessionInterim += piece;
+            }
           }
-          setVoiceTranscript(currentText);
+          const combined = (savedNoteFinalRef.current + ' ' + sessionFinal + ' ' + sessionInterim).replace(/\s+/g, ' ').trim();
+          if (combined) {
+            setVoiceTranscript(combined);
+          }
         };
 
         recognition.onerror = (event: any) => {
           console.warn('Speech recognition error:', event);
-          if (event.error !== 'no-speech' && event.error !== 'aborted') {
+          if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+            setSpeechError('🔒 Mikrofon İzni Reddedildi.');
+            isNoteListeningActiveRef.current = false;
+            setIsListeningForNote(false);
+          } else if (event.error !== 'no-speech' && event.error !== 'aborted') {
             setSpeechError('Ses algılama uyarısı: ' + event.error);
           }
-          setIsListeningForNote(false);
         };
 
         recognition.onend = () => {
-          setIsListeningForNote(false);
+          if (isNoteListeningActiveRef.current) {
+            savedNoteFinalRef.current = voiceTranscript.trim();
+            try {
+              recognition.start();
+            } catch (e) {}
+          } else {
+            setIsListeningForNote(false);
+          }
         };
 
         noteRecognitionRef.current = recognition;
         recognition.start();
       } catch (err) {
         console.error(err);
+        isNoteListeningActiveRef.current = false;
         setSpeechError('Mikrofon erişimi başlatılamadı.');
         setIsListeningForNote(false);
       }
@@ -202,16 +233,19 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
     }
 
     if (isListeningForChat) {
+      isChatListeningActiveRef.current = false;
       if (chatRecognitionRef.current) {
-        chatRecognitionRef.current.stop();
+        try { chatRecognitionRef.current.stop(); } catch (e) {}
       }
       setIsListeningForChat(false);
     } else {
+      isChatListeningActiveRef.current = true;
+      savedChatFinalRef.current = customQuestionInput.trim();
       try {
         const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognitionClass();
         recognition.lang = 'tr-TR';
-        recognition.continuous = false;
+        recognition.continuous = true;
         recognition.interimResults = true;
 
         recognition.onstart = () => {
@@ -219,24 +253,44 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
         };
 
         recognition.onresult = (event: any) => {
-          let currentText = '';
+          let sessionFinal = '';
+          let sessionInterim = '';
           for (let i = 0; i < event.results.length; i++) {
-            currentText += event.results[i][0].transcript;
+            const piece = event.results[i][0]?.transcript || '';
+            if (event.results[i].isFinal) {
+              sessionFinal += piece + ' ';
+            } else {
+              sessionInterim += piece;
+            }
           }
-          setCustomQuestionInput(currentText);
+          const combined = (savedChatFinalRef.current + ' ' + sessionFinal + ' ' + sessionInterim).replace(/\s+/g, ' ').trim();
+          if (combined) {
+            setCustomQuestionInput(combined);
+          }
         };
 
-        recognition.onerror = () => {
-          setIsListeningForChat(false);
+        recognition.onerror = (event: any) => {
+          if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+            isChatListeningActiveRef.current = false;
+            setIsListeningForChat(false);
+          }
         };
 
         recognition.onend = () => {
-          setIsListeningForChat(false);
+          if (isChatListeningActiveRef.current) {
+            savedChatFinalRef.current = customQuestionInput.trim();
+            try {
+              recognition.start();
+            } catch (e) {}
+          } else {
+            setIsListeningForChat(false);
+          }
         };
 
         chatRecognitionRef.current = recognition;
         recognition.start();
       } catch (err) {
+        isChatListeningActiveRef.current = false;
         setIsListeningForChat(false);
       }
     }

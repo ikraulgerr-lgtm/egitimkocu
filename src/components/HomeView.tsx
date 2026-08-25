@@ -60,6 +60,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [micPermissionError, setMicPermissionError] = useState<string | null>(null);
 
   const speechRecognitionRef = useRef<any>(null);
+  const isVoiceListeningActiveRef = useRef(false);
+  const savedFinalTranscriptRef = useRef('');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const voiceTimerRef = useRef<any>(null);
@@ -75,6 +77,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      isVoiceListeningActiveRef.current = false;
       if (voiceTimerRef.current) clearInterval(voiceTimerRef.current);
       if (speechRecognitionRef.current) {
         try { speechRecognitionRef.current.abort(); } catch (e) {}
@@ -89,11 +92,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
   }, []);
 
   const stopVoiceQuestionListening = (submitOnStop: boolean = false) => {
+    isVoiceListeningActiveRef.current = false;
     const currentSource = activeVoiceSource;
     if (speechRecognitionRef.current) {
       try {
         speechRecognitionRef.current.stop();
+        speechRecognitionRef.current.abort();
       } catch (e) {}
+      speechRecognitionRef.current = null;
     }
     setIsListeningVoiceQuestion(false);
 
@@ -106,10 +112,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
   };
 
   const cancelVoiceQuestionListening = () => {
+    isVoiceListeningActiveRef.current = false;
+    savedFinalTranscriptRef.current = '';
     if (speechRecognitionRef.current) {
       try {
         speechRecognitionRef.current.stop();
+        speechRecognitionRef.current.abort();
       } catch (e) {}
+      speechRecognitionRef.current = null;
     }
     setIsListeningVoiceQuestion(false);
     setVoiceQuestionTranscript('');
@@ -119,6 +129,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const startVoiceQuestionListening = async (source: 'topVoice' | 'bottomInput' = 'topVoice') => {
     setMicPermissionError(null);
     setActiveVoiceSource(source);
+    isVoiceListeningActiveRef.current = true;
+    savedFinalTranscriptRef.current = '';
 
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -128,12 +140,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
     } catch (micErr: any) {
       console.warn('getUserMedia microphone permission denied or rejected:', micErr);
       setMicPermissionError('🔒 Mikrofon İzni Reddedildi veya Engellendi. Lütfen mikrofon erişimine izin verin.');
+      isVoiceListeningActiveRef.current = false;
       return;
     }
 
     const SpeechRecognitionObj = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognitionObj) {
       setMicPermissionError('Cihazınızda sesle soru sorma özelliği desteklenmiyor. Lütfen sorunuzu metin kutusuna yazarak iletin.');
+      isVoiceListeningActiveRef.current = false;
       return;
     }
 
@@ -145,38 +159,55 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
       recognition.onstart = () => {
         setIsListeningVoiceQuestion(true);
-        setVoiceQuestionTranscript('');
         setMicPermissionError(null);
       };
 
       recognition.onresult = (e: any) => {
-        let currentText = '';
+        let sessionFinal = '';
+        let sessionInterim = '';
         for (let i = 0; i < e.results.length; i++) {
-          currentText += e.results[i][0].transcript;
+          const piece = e.results[i][0]?.transcript || '';
+          if (e.results[i].isFinal) {
+            sessionFinal += piece + ' ';
+          } else {
+            sessionInterim += piece;
+          }
         }
-        setVoiceQuestionTranscript(currentText);
-        setTextPrompt(currentText);
+        const combined = (savedFinalTranscriptRef.current + ' ' + sessionFinal + ' ' + sessionInterim).replace(/\s+/g, ' ').trim();
+        if (combined) {
+          setVoiceQuestionTranscript(combined);
+          setTextPrompt(combined);
+        }
       };
 
       recognition.onerror = (e: any) => {
         console.warn('Speech recognition error:', e);
-        setIsListeningVoiceQuestion(false);
         const errType = e?.error || '';
         if (errType === 'not-allowed' || errType === 'permission-denied') {
           setMicPermissionError('🔒 Mikrofon İzni Reddedildi.');
+          isVoiceListeningActiveRef.current = false;
+          setIsListeningVoiceQuestion(false);
         } else if (errType !== 'no-speech' && errType !== 'aborted') {
-          setMicPermissionError(`⚠️ Mikrofon hatası: ${errType}`);
+          setMicPermissionError(`⚠️ Mikrofon uyarısı: ${errType}`);
         }
       };
 
       recognition.onend = () => {
-        setIsListeningVoiceQuestion(false);
+        if (isVoiceListeningActiveRef.current) {
+          savedFinalTranscriptRef.current = (voiceQuestionTranscript || textPrompt || '').trim();
+          try {
+            recognition.start();
+          } catch (e) {}
+        } else {
+          setIsListeningVoiceQuestion(false);
+        }
       };
 
       speechRecognitionRef.current = recognition;
       recognition.start();
     } catch (err: any) {
       console.error('Error starting speech recognition:', err);
+      isVoiceListeningActiveRef.current = false;
       setIsListeningVoiceQuestion(false);
       setMicPermissionError('🔒 Mikrofon başlatılamadı. Lütfen mikrofon iznini aktif edin.');
     }
