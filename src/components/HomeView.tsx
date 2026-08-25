@@ -62,7 +62,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   const speechRecognitionRef = useRef<any>(null);
   const isVoiceListeningActiveRef = useRef(false);
-  const savedFinalTranscriptRef = useRef('');
+  const baseTextBeforeMicRef = useRef('');
+  const sessionFinalTextRef = useRef('');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const voiceTimerRef = useRef<any>(null);
@@ -114,7 +115,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   const cancelVoiceQuestionListening = () => {
     isVoiceListeningActiveRef.current = false;
-    savedFinalTranscriptRef.current = '';
+    baseTextBeforeMicRef.current = '';
+    sessionFinalTextRef.current = '';
     if (speechRecognitionRef.current) {
       try {
         speechRecognitionRef.current.stop();
@@ -131,7 +133,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
     setMicPermissionError(null);
     setActiveVoiceSource(source);
     isVoiceListeningActiveRef.current = true;
-    savedFinalTranscriptRef.current = (source === 'bottomInput' ? textPrompt : voiceQuestionTranscript).trim();
+    baseTextBeforeMicRef.current = (source === 'bottomInput' ? textPrompt : voiceQuestionTranscript).trim();
+    sessionFinalTextRef.current = '';
 
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -164,17 +167,25 @@ export const HomeView: React.FC<HomeViewProps> = ({
       };
 
       recognition.onresult = (e: any) => {
-        let sessionText = '';
-        for (let i = 0; i < e.results.length; i++) {
+        let interimText = '';
+        for (let i = e.resultIndex; i < e.results.length; ++i) {
           const piece = (e.results[i][0]?.transcript || '').trim();
-          if (piece) {
-            sessionText += (sessionText ? ' ' : '') + piece;
+          if (e.results[i].isFinal) {
+            sessionFinalTextRef.current += (sessionFinalTextRef.current ? ' ' : '') + piece;
+          } else {
+            interimText += (interimText ? ' ' : '') + piece;
           }
         }
-        const merged = mergeTranscripts(savedFinalTranscriptRef.current, sessionText);
-        if (merged) {
-          setVoiceQuestionTranscript(merged);
-          setTextPrompt(merged);
+        
+        const combined = [baseTextBeforeMicRef.current, sessionFinalTextRef.current, interimText]
+          .filter(Boolean)
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (combined) {
+          setVoiceQuestionTranscript(combined);
+          setTextPrompt(combined);
         }
       };
 
@@ -192,7 +203,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
       recognition.onend = () => {
         if (isVoiceListeningActiveRef.current) {
-          savedFinalTranscriptRef.current = (voiceQuestionTranscript || textPrompt || '').trim();
+          baseTextBeforeMicRef.current = [baseTextBeforeMicRef.current, sessionFinalTextRef.current]
+            .filter(Boolean)
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          sessionFinalTextRef.current = '';
           try {
             recognition.start();
           } catch (e) {}

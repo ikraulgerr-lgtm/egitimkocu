@@ -77,11 +77,13 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
   const [isFlashcardModalOpen, setIsFlashcardModalOpen] = useState(false);
   const noteRecognitionRef = useRef<any>(null);
   const isNoteListeningActiveRef = useRef(false);
-  const savedNoteFinalRef = useRef('');
+  const baseNoteBeforeMicRef = useRef('');
+  const sessionFinalNoteRef = useRef('');
 
   const chatRecognitionRef = useRef<any>(null);
   const isChatListeningActiveRef = useRef(false);
-  const savedChatFinalRef = useRef('');
+  const baseChatBeforeMicRef = useRef('');
+  const sessionFinalChatRef = useRef('');
 
   const isSpeechSupported =
     typeof window !== 'undefined' &&
@@ -180,7 +182,8 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
       }
 
       isNoteListeningActiveRef.current = true;
-      savedNoteFinalRef.current = kisiselNot.trim();
+      baseNoteBeforeMicRef.current = kisiselNot.trim();
+      sessionFinalNoteRef.current = '';
 
       try {
         const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -195,17 +198,24 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
         };
 
         recognition.onresult = (event: any) => {
-          let sessionText = '';
-          for (let i = 0; i < event.results.length; i++) {
+          let interimText = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
             const piece = (event.results[i][0]?.transcript || '').trim();
-            if (piece) {
-              sessionText += (sessionText ? ' ' : '') + piece;
+            if (event.results[i].isFinal) {
+              sessionFinalNoteRef.current += (sessionFinalNoteRef.current ? ' ' : '') + piece;
+            } else {
+              interimText += (interimText ? ' ' : '') + piece;
             }
           }
-          const merged = mergeTranscripts(savedNoteFinalRef.current, sessionText);
-          if (merged) {
-            setKisiselNot(merged);
-            setVoiceTranscript(merged);
+          const combined = [baseNoteBeforeMicRef.current, sessionFinalNoteRef.current, interimText]
+            .filter(Boolean)
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          if (combined) {
+            setKisiselNot(combined);
+            setVoiceTranscript(combined);
           }
         };
 
@@ -223,7 +233,12 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
 
         recognition.onend = () => {
           if (isNoteListeningActiveRef.current) {
-            savedNoteFinalRef.current = kisiselNot.trim();
+            baseNoteBeforeMicRef.current = [baseNoteBeforeMicRef.current, sessionFinalNoteRef.current]
+              .filter(Boolean)
+              .join(' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+            sessionFinalNoteRef.current = '';
             try {
               recognition.start();
             } catch (e) {}
@@ -261,7 +276,8 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
       setIsListeningForChat(false);
     } else {
       isChatListeningActiveRef.current = true;
-      savedChatFinalRef.current = customQuestionInput.trim();
+      baseChatBeforeMicRef.current = customQuestionInput.trim();
+      sessionFinalChatRef.current = '';
 
       try {
         const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -275,16 +291,23 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
         };
 
         recognition.onresult = (event: any) => {
-          let sessionText = '';
-          for (let i = 0; i < event.results.length; i++) {
+          let interimText = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
             const piece = (event.results[i][0]?.transcript || '').trim();
-            if (piece) {
-              sessionText += (sessionText ? ' ' : '') + piece;
+            if (event.results[i].isFinal) {
+              sessionFinalChatRef.current += (sessionFinalChatRef.current ? ' ' : '') + piece;
+            } else {
+              interimText += (interimText ? ' ' : '') + piece;
             }
           }
-          const merged = mergeTranscripts(savedChatFinalRef.current, sessionText);
-          if (merged) {
-            setCustomQuestionInput(merged);
+          const combined = [baseChatBeforeMicRef.current, sessionFinalChatRef.current, interimText]
+            .filter(Boolean)
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          if (combined) {
+            setCustomQuestionInput(combined);
           }
         };
 
@@ -297,7 +320,12 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
 
         recognition.onend = () => {
           if (isChatListeningActiveRef.current) {
-            savedChatFinalRef.current = customQuestionInput.trim();
+            baseChatBeforeMicRef.current = [baseChatBeforeMicRef.current, sessionFinalChatRef.current]
+              .filter(Boolean)
+              .join(' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+            sessionFinalChatRef.current = '';
             try {
               recognition.start();
             } catch (e) {}
