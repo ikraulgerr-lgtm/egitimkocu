@@ -4,6 +4,8 @@ import { TodayRepetitionCard } from './TodayRepetitionCard';
 import { ExamCountdownWidget } from './ExamCountdownWidget';
 import { SavedNotesSection } from './SavedNotesSection';
 import { startNativeSpeechRecognition } from '../lib/nativeSpeech';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Capacitor } from '@capacitor/core';
 
 interface HomeViewProps {
   user: Kullanici;
@@ -246,21 +248,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
         nativeStopSpeechRef.current = null;
       }
 
-      let accumulatedText = '';
       const stopFn = await startNativeSpeechRecognition((transcription) => {
         if (!transcription) return;
-        // On native: partial results replace each other (motor says whole sentence so far)
-        // On web: we get deltas, accumulate them
-        if (isNative) {
-          accumulatedText = transcription;
-        } else {
-          // Append delta
-          accumulatedText = accumulatedText
-            ? accumulatedText + ' ' + transcription
-            : transcription;
-        }
-        setVoiceQuestionTranscript(accumulatedText);
-        setTextPrompt(accumulatedText);
+        const clean = transcription.trim();
+        setVoiceQuestionTranscript(clean);
+        setTextPrompt(clean);
+      }, (err) => {
+        console.warn('Native speech recognition error/notice:', err);
       });
       nativeStopSpeechRef.current = stopFn;
     } catch (err: any) {
@@ -567,6 +561,58 @@ export const HomeView: React.FC<HomeViewProps> = ({
       }
     }
     handleCapture();
+  };
+  // Direct Native Camera or HTML5 fallback capture
+  const handleTakePhoto = async () => {
+    setFlashOn(true);
+    setTimeout(() => setFlashOn(false), 300);
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const image = await Camera.getPhoto({
+          quality: 90,
+          allowEditing: false,
+          resultType: CameraResultType.DataUrl,
+          source: CameraSource.Camera,
+        });
+        if (image.dataUrl) {
+          handleCapture(image.dataUrl);
+          return;
+        }
+      } catch (camErr: any) {
+        console.warn('Native camera capture cancelled or failed:', camErr);
+        return;
+      }
+    }
+
+    if (isLiveCameraOn && videoRef.current) {
+      handleSnapFromLiveCamera();
+    } else {
+      cameraInputRef.current?.click();
+    }
+  };
+
+  // Direct Native Gallery or HTML5 fallback pick
+  const handleOpenGallery = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const image = await Camera.getPhoto({
+          quality: 90,
+          allowEditing: false,
+          resultType: CameraResultType.DataUrl,
+          source: CameraSource.Photos,
+        });
+        if (image.dataUrl) {
+          handleCapture(image.dataUrl);
+          return;
+        }
+      } catch (galErr: any) {
+        console.warn('Native gallery pick cancelled or failed:', galErr);
+        return;
+      }
+    }
+
+    galleryInputRef.current?.click();
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -892,7 +938,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               {/* Left Button: Gallery / Photo Library Upload Button */}
               <button
                 type="button"
-                onClick={() => galleryInputRef.current?.click()}
+                onClick={handleOpenGallery}
                 className="w-12 h-12 rounded-full bg-slate-900/80 backdrop-blur-md text-white border border-white/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer"
                 title="Fotoğraf Kitaplığından veya Dosyalardan Seç"
               >
@@ -921,15 +967,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               {/* Center Button: Camera Shutter */}
               <button
                 type="button"
-                onClick={() => {
-                  setFlashOn(true);
-                  setTimeout(() => setFlashOn(false), 300);
-                  if (isLiveCameraOn && videoRef.current) {
-                    handleSnapFromLiveCamera();
-                  } else {
-                    cameraInputRef.current?.click();
-                  }
-                }}
+                onClick={handleTakePhoto}
                 disabled={isScanning}
                 className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center p-1 group/shutter active:scale-90 transition-transform cursor-pointer shadow-xl relative"
                 title="Fotoğraf Çek ve Yapay Zeka İle Analiz Et"

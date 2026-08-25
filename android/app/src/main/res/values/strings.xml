@@ -4,4 +4,6 @@
     <string name="title_activity_main">Eğitim Koçum AI</string>
     <string name="package_name">com.egitimkocumai</string>
     <string name="custom_url_scheme">com.egitimkocumai</string>
+    <string name="default_web_client_id">576668557444-vkum7kn6aml5eoo07mi1a4o5ostpi3l9.apps.googleusercontent.com</string>
+    <string name="server_client_id">576668557444-vkum7kn6aml5eoo07mi1a4o5ostpi3l9.apps.googleusercontent.com</string>
 </resources>

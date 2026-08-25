@@ -76,15 +76,23 @@ export async function registerWithEmailFirebase(email: string, pass: string, nam
 }
 
 export async function loginWithGoogle() {
-  // NATIVE ANDROID/iOS: Use @capacitor-firebase/authentication (native Google Sign-In sheet)
-  // NEVER use signInWithPopup on native - it opens a browser and causes white screen
   if (Capacitor.isNativePlatform()) {
     try {
-      const result = await FirebaseAuthentication.signInWithGoogle({
-        scopes: ['email', 'profile'],
-      });
+      let result;
+      // Try with useCredentialManager: false first to avoid "No credentials available" error on Android
+      try {
+        result = await (FirebaseAuthentication as any).signInWithGoogle({
+          scopes: ['email', 'profile'],
+          useCredentialManager: false,
+        });
+      } catch (firstErr: any) {
+        console.warn('Google Sign-In with useCredentialManager=false failed, retrying with default:', firstErr);
+        result = await FirebaseAuthentication.signInWithGoogle({
+          scopes: ['email', 'profile'],
+        });
+      }
 
-      if (result.credential?.idToken) {
+      if (result?.credential?.idToken) {
         const credential = GoogleAuthProvider.credential(
           result.credential.idToken,
           result.credential.accessToken ?? undefined
@@ -93,7 +101,6 @@ export async function loginWithGoogle() {
         return userCred.user;
       }
 
-      // If no credential but user is already signed in via native layer, sync Firebase Web SDK
       if (auth.currentUser) {
         return auth.currentUser;
       }
@@ -105,7 +112,7 @@ export async function loginWithGoogle() {
     }
   }
 
-  // WEB BROWSER ONLY: Use popup
+  // WEB BROWSER ONLY
   try {
     googleProvider.setCustomParameters({ prompt: 'select_account' });
     const result = await signInWithPopup(auth, googleProvider);

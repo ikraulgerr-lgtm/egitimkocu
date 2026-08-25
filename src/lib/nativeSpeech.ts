@@ -20,7 +20,7 @@ export async function startNativeSpeechRecognition(
   onResult: (text: string) => void,
   onError?: (err: any) => void
 ): Promise<() => void> {
-  // 1. WEB BROWSER — use Web Speech API directly (no MediaRecorder interference)
+  // 1. WEB BROWSER FALLBACK (Using HTML5 Web Speech API)
   if (!Capacitor.isNativePlatform()) {
     const SpeechRecognitionClass =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -38,33 +38,29 @@ export async function startNativeSpeechRecognition(
       recognition.maxAlternatives = 1;
 
       recognition.onresult = (e: any) => {
-        // Always build text from the LAST event result only to avoid duplication
-        const resultIndex = e.resultIndex;
-        const results = e.results;
-        let live = '';
-        for (let i = resultIndex; i < results.length; i++) {
-          live += results[i][0]?.transcript || '';
+        let fullTranscript = '';
+        for (let i = 0; i < e.results.length; i++) {
+          fullTranscript += e.results[i][0]?.transcript || '';
         }
-        const trimmed = live.trim();
-        if (trimmed) {
-          onResult(trimmed);
+        const clean = fullTranscript.trim();
+        if (clean) {
+          onResult(clean);
         }
       };
 
       recognition.onerror = (err: any) => {
         if (err.error === 'no-speech' || err.error === 'aborted') return;
         console.warn('Web speech recognition error:', err.error);
+        if (onError) onError(err);
       };
 
       recognition.onend = () => {
-        // Auto-restart on end to keep continuous listening
-        try { recognition.start(); } catch (e) {}
+        // Recognition completed
       };
 
       recognition.start();
 
       return () => {
-        recognition.onend = null;
         try { recognition.stop(); } catch (e) {}
         try { recognition.abort(); } catch (e) {}
       };
@@ -75,7 +71,7 @@ export async function startNativeSpeechRecognition(
     }
   }
 
-  // 2. NATIVE ANDROID / iOS — use @capacitor-community/speech-recognition
+  // 2. NATIVE ANDROID / iOS (Using @capacitor-community/speech-recognition)
   try {
     const isAvailable = await SpeechRecognition.available();
     if (!isAvailable.available) {
@@ -89,7 +85,7 @@ export async function startNativeSpeechRecognition(
       return () => {};
     }
 
-    // Stop any existing recognition session first
+    // Stop any existing session
     try { await SpeechRecognition.stop(); } catch (e) {}
 
     let lastDelivered = '';
@@ -97,7 +93,7 @@ export async function startNativeSpeechRecognition(
     const partialListener = await SpeechRecognition.addListener(
       'partialResults',
       (data: { matches: string[] }) => {
-        if (data?.matches?.length > 0) {
+        if (data?.matches && data.matches.length > 0) {
           const latest = data.matches[0]?.trim() ?? '';
           if (latest && latest !== lastDelivered) {
             lastDelivered = latest;
@@ -109,7 +105,7 @@ export async function startNativeSpeechRecognition(
 
     await SpeechRecognition.start({
       language: 'tr-TR',
-      maxResults: 3,
+      maxResults: 5,
       prompt: 'Sorunuzu söyleyin...',
       partialResults: true,
       popup: false,
@@ -117,8 +113,14 @@ export async function startNativeSpeechRecognition(
 
     return async () => {
       lastDelivered = '';
-      try { if (partialListener) await partialListener.remove(); } catch (e) {}
-      try { await SpeechRecognition.stop(); } catch (e) {}
+      try {
+        if (partialListener) {
+          await partialListener.remove();
+        }
+      } catch (e) {}
+      try {
+        await SpeechRecognition.stop();
+      } catch (e) {}
     };
   } catch (err) {
     console.warn('Native speech recognition start failed:', err);
