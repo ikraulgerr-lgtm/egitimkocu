@@ -141,72 +141,102 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
     );
   }
 
-  const toggleVoiceNoteRecording = async () => {
+  const toggleVoiceNoteRecording = () => {
+    if (!isSpeechSupported) {
+      alert('Tarayıcınız ses tanıma özelliğini desteklemiyor. Metin alanına doğrudan yazabilirsiniz.');
+      return;
+    }
+
     if (isListeningForNote) {
-      if (nativeNoteStopRef.current) {
-        try { nativeNoteStopRef.current(); } catch (e) {}
-        nativeNoteStopRef.current = null;
+      if (noteRecognitionRef.current) {
+        noteRecognitionRef.current.stop();
       }
       setIsListeningForNote(false);
     } else {
-      setSpeechError(null);
-      // Snapshot the current note text before starting — new speech appends after it
-      const baseText = kisiselNot ? kisiselNot.trim() : '';
-      let lastPartial = '';
       try {
-        setIsListeningForNote(true);
-        const stopFn = await startNativeSpeechRecognition(
-          (transcription) => {
-            if (!transcription) return;
-            const clean = transcription.trim();
-            if (clean === lastPartial) return; // ignore repeated identical partial
-            lastPartial = clean;
-            // Build: original note + new speech (partial replaces previous partial)
-            const updated = baseText ? `${baseText} ${clean}` : clean;
-            setKisiselNot(updated);
-          },
-          (err) => {
-            console.warn('Voice note error:', err);
-            setIsListeningForNote(false);
+        const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognitionClass();
+        recognition.lang = 'tr-TR';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onstart = () => {
+          setIsListeningForNote(true);
+          setSpeechError(null);
+        };
+
+        recognition.onresult = (event: any) => {
+          let currentText = '';
+          for (let i = 0; i < event.results.length; i++) {
+            currentText += event.results[i][0].transcript;
           }
-        );
-        nativeNoteStopRef.current = stopFn;
+          setVoiceTranscript(currentText);
+        };
+
+        recognition.onerror = (event: any) => {
+          console.warn('Speech recognition error:', event);
+          if (event.error !== 'no-speech' && event.error !== 'aborted') {
+            setSpeechError('Ses algılama uyarısı: ' + event.error);
+          }
+          setIsListeningForNote(false);
+        };
+
+        recognition.onend = () => {
+          setIsListeningForNote(false);
+        };
+
+        noteRecognitionRef.current = recognition;
+        recognition.start();
       } catch (err) {
-        console.warn('Voice note start error:', err);
+        console.error(err);
+        setSpeechError('Mikrofon erişimi başlatılamadı.');
         setIsListeningForNote(false);
       }
     }
   };
 
-  const toggleChatVoiceInput = async () => {
+  const toggleChatVoiceInput = () => {
+    if (!isSpeechSupported) {
+      alert('Tarayıcınız ses tanıma özelliğini desteklemiyor.');
+      return;
+    }
+
     if (isListeningForChat) {
-      if (nativeChatStopRef.current) {
-        try { nativeChatStopRef.current(); } catch (e) {}
-        nativeChatStopRef.current = null;
+      if (chatRecognitionRef.current) {
+        chatRecognitionRef.current.stop();
       }
       setIsListeningForChat(false);
     } else {
-      setSpeechError(null);
-      let lastPartial = '';
       try {
-        setIsListeningForChat(true);
-        const stopFn = await startNativeSpeechRecognition(
-          (transcription) => {
-            if (!transcription) return;
-            const clean = transcription.trim();
-            if (clean === lastPartial) return;
-            lastPartial = clean;
-            // Replace the chat input with latest partial result (user sees live typing)
-            setCustomQuestionInput(clean);
-          },
-          (err) => {
-            console.warn('Chat speech error:', err);
-            setIsListeningForChat(false);
+        const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognitionClass();
+        recognition.lang = 'tr-TR';
+        recognition.continuous = false;
+        recognition.interimResults = true;
+
+        recognition.onstart = () => {
+          setIsListeningForChat(true);
+        };
+
+        recognition.onresult = (event: any) => {
+          let currentText = '';
+          for (let i = 0; i < event.results.length; i++) {
+            currentText += event.results[i][0].transcript;
           }
-        );
-        nativeChatStopRef.current = stopFn;
+          setCustomQuestionInput(currentText);
+        };
+
+        recognition.onerror = () => {
+          setIsListeningForChat(false);
+        };
+
+        recognition.onend = () => {
+          setIsListeningForChat(false);
+        };
+
+        chatRecognitionRef.current = recognition;
+        recognition.start();
       } catch (err) {
-        console.warn('Chat voice input start error:', err);
         setIsListeningForChat(false);
       }
     }

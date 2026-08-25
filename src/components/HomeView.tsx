@@ -90,169 +90,102 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   const stopVoiceQuestionListening = (submitOnStop: boolean = false) => {
     const currentSource = activeVoiceSource;
-    if (voiceTimerRef.current) {
-      clearInterval(voiceTimerRef.current);
-      voiceTimerRef.current = null;
-    }
-
     if (speechRecognitionRef.current) {
       try {
         speechRecognitionRef.current.stop();
-        speechRecognitionRef.current.abort();
       } catch (e) {}
-      speechRecognitionRef.current = null;
     }
-    if (nativeStopSpeechRef.current) {
-      try { nativeStopSpeechRef.current(); } catch (e) {}
-      nativeStopSpeechRef.current = null;
-    }
-
-    let audioPromise: Promise<string | null> = Promise.resolve(null);
-
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      audioPromise = new Promise((resolve) => {
-        if (!mediaRecorderRef.current) return resolve(null);
-        mediaRecorderRef.current.onstop = () => {
-          const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
-          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-          audioChunksRef.current = [];
-          if (audioBlob.size > 0) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              resolve(reader.result as string);
-            };
-            reader.onerror = () => resolve(null);
-            reader.readAsDataURL(audioBlob);
-          } else {
-            resolve(null);
-          }
-        };
-        try {
-          mediaRecorderRef.current.stop();
-        } catch (e) {
-          resolve(null);
-        }
-      });
-    }
-
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach((track) => track.stop());
-      micStreamRef.current = null;
-    }
-
     setIsListeningVoiceQuestion(false);
-    setActiveVoiceSource(null);
 
     if (submitOnStop) {
       const finalRecordedText = (currentSource === 'bottomInput' ? textPrompt : (voiceQuestionTranscript || textPrompt) || '').trim();
-      audioPromise.then((audioDataUrl) => {
-        if (finalRecordedText || audioDataUrl) {
-          handleVoiceSubmit(finalRecordedText, audioDataUrl || undefined);
-        }
-      });
+      if (finalRecordedText) {
+        handleVoiceSubmit(finalRecordedText);
+      }
     }
   };
 
   const cancelVoiceQuestionListening = () => {
-    if (voiceTimerRef.current) {
-      clearInterval(voiceTimerRef.current);
-      voiceTimerRef.current = null;
-    }
     if (speechRecognitionRef.current) {
       try {
         speechRecognitionRef.current.stop();
-        speechRecognitionRef.current.abort();
       } catch (e) {}
-      speechRecognitionRef.current = null;
     }
-    if (nativeStopSpeechRef.current) {
-      try { nativeStopSpeechRef.current(); } catch (e) {}
-      nativeStopSpeechRef.current = null;
-    }
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try { mediaRecorderRef.current.stop(); } catch (e) {}
-    }
-    if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach((track) => track.stop());
-      micStreamRef.current = null;
-    }
-    audioChunksRef.current = [];
     setIsListeningVoiceQuestion(false);
-    setActiveVoiceSource(null);
     setVoiceQuestionTranscript('');
-    setVoiceRecordingSeconds(0);
+    setTextPrompt('');
   };
 
   const startVoiceQuestionListening = async (source: 'topVoice' | 'bottomInput' = 'topVoice') => {
     setMicPermissionError(null);
-    setVoiceRecordingSeconds(0);
-    setVoiceQuestionTranscript('');
-    audioChunksRef.current = [];
     setActiveVoiceSource(source);
 
-    // 1. Capture microphone audio stream (granted automatically by BridgeWebChromeClient)
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        micStreamRef.current = stream;
-
-        if (typeof MediaRecorder !== 'undefined') {
-          let mimeType = 'audio/webm';
-          if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-            mimeType = 'audio/webm;codecs=opus';
-          } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-            mimeType = 'audio/mp4';
-          } else if (MediaRecorder.isTypeSupported('audio/aac')) {
-            mimeType = 'audio/aac';
-          }
-          const recorder = new MediaRecorder(stream, { mimeType });
-          recorder.ondataavailable = (e) => {
-            if (e.data && e.data.size > 0) {
-              audioChunksRef.current.push(e.data);
-            }
-          };
-          recorder.start(250);
-          mediaRecorderRef.current = recorder;
-        }
+        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStream.getTracks().forEach((track) => track.stop());
       }
     } catch (micErr: any) {
-      console.warn('Microphone stream warning:', micErr);
+      console.warn('getUserMedia microphone permission denied or rejected:', micErr);
+      setMicPermissionError('🔒 Mikrofon İzni Reddedildi veya Engellendi. Lütfen mikrofon erişimine izin verin.');
+      return;
     }
 
-    // 2. Start Live Timer
-    setIsListeningVoiceQuestion(true);
-    voiceTimerRef.current = setInterval(() => {
-      setVoiceRecordingSeconds((prev) => prev + 1);
-    }, 1000);
+    const SpeechRecognitionObj = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionObj) {
+      setMicPermissionError('Cihazınızda sesle soru sorma özelliği desteklenmiyor. Lütfen sorunuzu metin kutusuna yazarak iletin.');
+      return;
+    }
 
-    // Start Speech Recognition for real-time live transcription
     try {
-      if (nativeStopSpeechRef.current) {
-        try { nativeStopSpeechRef.current(); } catch (e) {}
-        nativeStopSpeechRef.current = null;
-      }
+      const recognition = new SpeechRecognitionObj();
+      recognition.lang = 'tr-TR';
+      recognition.continuous = true;
+      recognition.interimResults = true;
 
-      const stopFn = await startNativeSpeechRecognition((transcription) => {
-        if (!transcription) return;
-        const clean = transcription.trim();
-        setVoiceQuestionTranscript(clean);
-        setTextPrompt(clean);
-      }, (err) => {
-        console.warn('Native speech recognition error/notice:', err);
-      });
-      nativeStopSpeechRef.current = stopFn;
+      recognition.onstart = () => {
+        setIsListeningVoiceQuestion(true);
+        setVoiceQuestionTranscript('');
+        setMicPermissionError(null);
+      };
+
+      recognition.onresult = (e: any) => {
+        let currentText = '';
+        for (let i = 0; i < e.results.length; i++) {
+          currentText += e.results[i][0].transcript;
+        }
+        setVoiceQuestionTranscript(currentText);
+        setTextPrompt(currentText);
+      };
+
+      recognition.onerror = (e: any) => {
+        console.warn('Speech recognition error:', e);
+        setIsListeningVoiceQuestion(false);
+        const errType = e?.error || '';
+        if (errType === 'not-allowed' || errType === 'permission-denied') {
+          setMicPermissionError('🔒 Mikrofon İzni Reddedildi.');
+        } else if (errType !== 'no-speech' && errType !== 'aborted') {
+          setMicPermissionError(`⚠️ Mikrofon hatası: ${errType}`);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListeningVoiceQuestion(false);
+      };
+
+      speechRecognitionRef.current = recognition;
+      recognition.start();
     } catch (err: any) {
-      console.warn('Native speech recognition start warning:', err);
+      console.error('Error starting speech recognition:', err);
+      setIsListeningVoiceQuestion(false);
+      setMicPermissionError('🔒 Mikrofon başlatılamadı. Lütfen mikrofon iznini aktif edin.');
     }
   };
 
   const toggleVoiceQuestionListening = async (source: 'topVoice' | 'bottomInput' = 'topVoice') => {
-    if (isListeningVoiceQuestion && activeVoiceSource === source) {
+    if (isListeningVoiceQuestion) {
       stopVoiceQuestionListening(false);
     } else {
-      if (isListeningVoiceQuestion) {
-        cancelVoiceQuestionListening();
-      }
       startVoiceQuestionListening(source);
     }
   };
