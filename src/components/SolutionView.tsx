@@ -6,6 +6,7 @@ import { FormattedMathText } from './FormattedMathText';
 import { AudioVoiceRecorder } from './AudioVoiceRecorder';
 import { FlashcardPracticeModal } from './FlashcardPracticeModal';
 import { startNativeSpeechRecognition } from '../lib/nativeSpeech';
+import { mergeTranscripts } from '../lib/speechUtils';
 
 declare global {
   interface Window {
@@ -194,20 +195,14 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
         };
 
         recognition.onresult = (event: any) => {
-          let sessionFinal = '';
-          let sessionInterim = '';
+          let sessionText = '';
           for (let i = 0; i < event.results.length; i++) {
-            const piece = event.results[i][0]?.transcript || '';
-            if (event.results[i].isFinal) {
-              sessionFinal += piece + ' ';
-            } else {
-              sessionInterim += piece;
-            }
+            sessionText += event.results[i][0]?.transcript || '';
           }
-          const combined = (savedNoteFinalRef.current + ' ' + sessionFinal + ' ' + sessionInterim).replace(/\s+/g, ' ').trim();
-          if (combined) {
-            setKisiselNot(combined);
-            setVoiceTranscript(combined);
+          const merged = mergeTranscripts(savedNoteFinalRef.current, sessionText);
+          if (merged) {
+            setKisiselNot(merged);
+            setVoiceTranscript(merged);
           }
         };
 
@@ -277,19 +272,13 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
         };
 
         recognition.onresult = (event: any) => {
-          let sessionFinal = '';
-          let sessionInterim = '';
+          let sessionText = '';
           for (let i = 0; i < event.results.length; i++) {
-            const piece = event.results[i][0]?.transcript || '';
-            if (event.results[i].isFinal) {
-              sessionFinal += piece + ' ';
-            } else {
-              sessionInterim += piece;
-            }
+            sessionText += event.results[i][0]?.transcript || '';
           }
-          const combined = (savedChatFinalRef.current + ' ' + sessionFinal + ' ' + sessionInterim).replace(/\s+/g, ' ').trim();
-          if (combined) {
-            setCustomQuestionInput(combined);
+          const merged = mergeTranscripts(savedChatFinalRef.current, sessionText);
+          if (merged) {
+            setCustomQuestionInput(merged);
           }
         };
 

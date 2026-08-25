@@ -4,6 +4,7 @@ import { TodayRepetitionCard } from './TodayRepetitionCard';
 import { ExamCountdownWidget } from './ExamCountdownWidget';
 import { SavedNotesSection } from './SavedNotesSection';
 import { startNativeSpeechRecognition } from '../lib/nativeSpeech';
+import { mergeTranscripts } from '../lib/speechUtils';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
 
@@ -130,7 +131,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     setMicPermissionError(null);
     setActiveVoiceSource(source);
     isVoiceListeningActiveRef.current = true;
-    savedFinalTranscriptRef.current = '';
+    savedFinalTranscriptRef.current = (source === 'bottomInput' ? textPrompt : voiceQuestionTranscript).trim();
 
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -163,20 +164,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
       };
 
       recognition.onresult = (e: any) => {
-        let sessionFinal = '';
-        let sessionInterim = '';
+        let sessionText = '';
         for (let i = 0; i < e.results.length; i++) {
-          const piece = e.results[i][0]?.transcript || '';
-          if (e.results[i].isFinal) {
-            sessionFinal += piece + ' ';
-          } else {
-            sessionInterim += piece;
-          }
+          sessionText += e.results[i][0]?.transcript || '';
         }
-        const combined = (savedFinalTranscriptRef.current + ' ' + sessionFinal + ' ' + sessionInterim).replace(/\s+/g, ' ').trim();
-        if (combined) {
-          setVoiceQuestionTranscript(combined);
-          setTextPrompt(combined);
+        const merged = mergeTranscripts(savedFinalTranscriptRef.current, sessionText);
+        if (merged) {
+          setVoiceQuestionTranscript(merged);
+          setTextPrompt(merged);
         }
       };
 
