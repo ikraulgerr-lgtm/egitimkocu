@@ -190,52 +190,36 @@ export const HomeView: React.FC<HomeViewProps> = ({
     audioChunksRef.current = [];
     setActiveVoiceSource(source);
 
-    const isNative = typeof (window as any).__CAPACITOR_PLUGIN_NATIVE__ !== 'undefined' ||
-      /android|capacitor/i.test(navigator.userAgent) ||
-      (typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor?.isNativePlatform?.());
+    // 1. Capture microphone audio stream (granted automatically by BridgeWebChromeClient)
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStreamRef.current = stream;
 
-    // On native Android/iOS: DO NOT call getUserMedia - it conflicts with SpeechRecognition
-    // SpeechRecognition plugin handles mic access natively
-    if (!isNative) {
-      let stream: MediaStream | null = null;
-      try {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          micStreamRef.current = stream;
-        }
-      } catch (micErr: any) {
-        console.warn('getUserMedia microphone permission denied or rejected:', micErr);
-        setMicPermissionError('🔒 Mikrofon İzni Gerekli. Lütfen cihaz ayarlarınızdan uygulamanın mikrofon iznini aktif edin.');
-        setActiveVoiceSource(null);
-        return;
-      }
-
-      // Start MediaRecorder for audio backup on web
-      if (stream) {
-        try {
+        if (typeof MediaRecorder !== 'undefined') {
           let mimeType = 'audio/webm';
-          if (typeof MediaRecorder !== 'undefined') {
-            if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-              mimeType = 'audio/webm;codecs=opus';
-            } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-              mimeType = 'audio/mp4';
-            }
-            const recorder = new MediaRecorder(stream, { mimeType });
-            recorder.ondataavailable = (e) => {
-              if (e.data && e.data.size > 0) {
-                audioChunksRef.current.push(e.data);
-              }
-            };
-            recorder.start(250);
-            mediaRecorderRef.current = recorder;
+          if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+            mimeType = 'audio/webm;codecs=opus';
+          } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+            mimeType = 'audio/mp4';
+          } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+            mimeType = 'audio/aac';
           }
-        } catch (recErr) {
-          console.warn('MediaRecorder init fallback:', recErr);
+          const recorder = new MediaRecorder(stream, { mimeType });
+          recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+              audioChunksRef.current.push(e.data);
+            }
+          };
+          recorder.start(250);
+          mediaRecorderRef.current = recorder;
         }
       }
+    } catch (micErr: any) {
+      console.warn('Microphone stream warning:', micErr);
     }
 
-    // Start Live Timer
+    // 2. Start Live Timer
     setIsListeningVoiceQuestion(true);
     voiceTimerRef.current = setInterval(() => {
       setVoiceRecordingSeconds((prev) => prev + 1);
