@@ -149,7 +149,7 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
     );
   }
 
-  const toggleVoiceNoteRecording = () => {
+  const toggleVoiceNoteRecording = async () => {
     if (!isSpeechSupported) {
       alert('Tarayıcınız ses tanıma özelliğini desteklemiyor. Metin alanına doğrudan yazabilirsiniz.');
       return;
@@ -158,12 +158,29 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
     if (isListeningForNote) {
       isNoteListeningActiveRef.current = false;
       if (noteRecognitionRef.current) {
-        try { noteRecognitionRef.current.stop(); } catch (e) {}
+        try {
+          noteRecognitionRef.current.stop();
+          noteRecognitionRef.current.abort();
+        } catch (e) {}
+        noteRecognitionRef.current = null;
       }
       setIsListeningForNote(false);
     } else {
+      setSpeechError(null);
+
+      // Pre-warm mic permission
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((track) => track.stop());
+        }
+      } catch (e) {
+        console.warn('Mic permission check:', e);
+      }
+
       isNoteListeningActiveRef.current = true;
-      savedNoteFinalRef.current = voiceTranscript.trim();
+      savedNoteFinalRef.current = kisiselNot.trim();
+
       try {
         const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognitionClass();
@@ -189,24 +206,26 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
           }
           const combined = (savedNoteFinalRef.current + ' ' + sessionFinal + ' ' + sessionInterim).replace(/\s+/g, ' ').trim();
           if (combined) {
+            setKisiselNot(combined);
             setVoiceTranscript(combined);
           }
         };
 
         recognition.onerror = (event: any) => {
           console.warn('Speech recognition error:', event);
-          if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+          const errType = event?.error || '';
+          if (errType === 'not-allowed' || errType === 'permission-denied') {
             setSpeechError('🔒 Mikrofon İzni Reddedildi.');
             isNoteListeningActiveRef.current = false;
             setIsListeningForNote(false);
-          } else if (event.error !== 'no-speech' && event.error !== 'aborted') {
-            setSpeechError('Ses algılama uyarısı: ' + event.error);
+          } else if (errType !== 'no-speech' && errType !== 'aborted') {
+            setSpeechError('Ses algılama uyarısı: ' + errType);
           }
         };
 
         recognition.onend = () => {
           if (isNoteListeningActiveRef.current) {
-            savedNoteFinalRef.current = voiceTranscript.trim();
+            savedNoteFinalRef.current = kisiselNot.trim();
             try {
               recognition.start();
             } catch (e) {}
@@ -226,7 +245,7 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
     }
   };
 
-  const toggleChatVoiceInput = () => {
+  const toggleChatVoiceInput = async () => {
     if (!isSpeechSupported) {
       alert('Tarayıcınız ses tanıma özelliğini desteklemiyor.');
       return;
@@ -235,12 +254,17 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
     if (isListeningForChat) {
       isChatListeningActiveRef.current = false;
       if (chatRecognitionRef.current) {
-        try { chatRecognitionRef.current.stop(); } catch (e) {}
+        try {
+          chatRecognitionRef.current.stop();
+          chatRecognitionRef.current.abort();
+        } catch (e) {}
+        chatRecognitionRef.current = null;
       }
       setIsListeningForChat(false);
     } else {
       isChatListeningActiveRef.current = true;
       savedChatFinalRef.current = customQuestionInput.trim();
+
       try {
         const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognitionClass();
