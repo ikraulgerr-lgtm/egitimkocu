@@ -166,7 +166,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
       recognition.onresult = (e: any) => {
         let sessionText = '';
         for (let i = 0; i < e.results.length; i++) {
-          sessionText += e.results[i][0]?.transcript || '';
+          const piece = (e.results[i][0]?.transcript || '').trim();
+          if (piece) {
+            sessionText += (sessionText ? ' ' : '') + piece;
+          }
         }
         const merged = mergeTranscripts(savedFinalTranscriptRef.current, sessionText);
         if (merged) {

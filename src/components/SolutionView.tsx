@@ -197,7 +197,10 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
         recognition.onresult = (event: any) => {
           let sessionText = '';
           for (let i = 0; i < event.results.length; i++) {
-            sessionText += event.results[i][0]?.transcript || '';
+            const piece = (event.results[i][0]?.transcript || '').trim();
+            if (piece) {
+              sessionText += (sessionText ? ' ' : '') + piece;
+            }
           }
           const merged = mergeTranscripts(savedNoteFinalRef.current, sessionText);
           if (merged) {
@@ -274,7 +277,10 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
         recognition.onresult = (event: any) => {
           let sessionText = '';
           for (let i = 0; i < event.results.length; i++) {
-            sessionText += event.results[i][0]?.transcript || '';
+            const piece = (event.results[i][0]?.transcript || '').trim();
+            if (piece) {
+              sessionText += (sessionText ? ' ' : '') + piece;
+            }
           }
           const merged = mergeTranscripts(savedChatFinalRef.current, sessionText);
           if (merged) {
