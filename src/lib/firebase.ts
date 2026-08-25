@@ -3,9 +3,7 @@ import {
   getAuth, 
   GoogleAuthProvider, 
   signInWithPopup, 
-  signInWithRedirect,
   signInWithCredential,
-  getRedirectResult,
   signOut, 
   sendPasswordResetEmail, 
   onAuthStateChanged, 
@@ -78,44 +76,51 @@ export async function registerWithEmailFirebase(email: string, pass: string, nam
 }
 
 export async function loginWithGoogle() {
-  try {
-    if (Capacitor.isNativePlatform()) {
-      try {
-        // Native Google Sign-In on Android (opens native bottom sheet dialog)
-        const result = await FirebaseAuthentication.signInWithGoogle({
-          scopes: ['email', 'profile'],
-        });
-        if (result.credential?.idToken) {
-          const credential = GoogleAuthProvider.credential(result.credential.idToken);
-          const userCred = await signInWithCredential(auth, credential);
-          return userCred.user;
-        }
-      } catch (nativeErr: any) {
-        console.warn('Native Google Auth failed, trying web popup fallback:', nativeErr?.message || nativeErr);
+  // NATIVE ANDROID/iOS: Use @capacitor-firebase/authentication (native Google Sign-In sheet)
+  // NEVER use signInWithPopup on native - it opens a browser and causes white screen
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const result = await FirebaseAuthentication.signInWithGoogle({
+        scopes: ['email', 'profile'],
+      });
+
+      if (result.credential?.idToken) {
+        const credential = GoogleAuthProvider.credential(
+          result.credential.idToken,
+          result.credential.accessToken ?? undefined
+        );
+        const userCred = await signInWithCredential(auth, credential);
+        return userCred.user;
       }
 
-      // Web popup fallback if native Credential Manager returns 'No credentials available'
-      googleProvider.setCustomParameters({
-        prompt: 'select_account'
-      });
-      const result = await signInWithPopup(auth, googleProvider);
-      return result.user;
-    } else {
-      // Web browser popup for desktop web
-      googleProvider.setCustomParameters({
-        prompt: 'select_account'
-      });
-      const result = await signInWithPopup(auth, googleProvider);
-      return result.user;
+      // If no credential but user is already signed in via native layer, sync Firebase Web SDK
+      if (auth.currentUser) {
+        return auth.currentUser;
+      }
+
+      throw new Error('Google giriş kimliği alınamadı. Lütfen tekrar deneyin.');
+    } catch (err: any) {
+      console.error('Native Google Sign-In Error:', err?.message || err);
+      throw new Error(err?.message || 'Google ile giriş başarısız oldu.');
     }
+  }
+
+  // WEB BROWSER ONLY: Use popup
+  try {
+    googleProvider.setCustomParameters({ prompt: 'select_account' });
+    const result = await signInWithPopup(auth, googleProvider);
+    return result.user;
   } catch (error: any) {
-    console.error('Google Login Error:', error);
+    console.error('Google Popup Login Error:', error);
     throw error;
   }
 }
 
 export async function logoutFirebase() {
   try {
+    if (Capacitor.isNativePlatform()) {
+      try { await FirebaseAuthentication.signOut(); } catch (e) {}
+    }
     await signOut(auth);
   } catch (error) {
     console.error('Logout Error:', error);
@@ -177,14 +182,3 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   };
   console.warn('Firestore Operation Warning:', errInfo);
 }
-
-// Connection test as required by skill guidelines
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    // Non-blocking warning only
-    console.warn('Firebase test connection check info:', error);
-  }
-}
-testConnection();

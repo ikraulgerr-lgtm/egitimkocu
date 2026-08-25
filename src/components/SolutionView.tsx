@@ -150,16 +150,20 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
       setIsListeningForNote(false);
     } else {
       setSpeechError(null);
-      const baseNoteText = kisiselNot ? kisiselNot.trim() : '';
+      // Snapshot the current note text before starting — new speech appends after it
+      const baseText = kisiselNot ? kisiselNot.trim() : '';
+      let lastPartial = '';
       try {
         setIsListeningForNote(true);
         const stopFn = await startNativeSpeechRecognition(
           (transcription) => {
-            if (transcription) {
-              const cleanTrans = transcription.trim();
-              const fullText = baseNoteText ? `${baseNoteText} ${cleanTrans}` : cleanTrans;
-              setKisiselNot(fullText);
-            }
+            if (!transcription) return;
+            const clean = transcription.trim();
+            if (clean === lastPartial) return; // ignore repeated identical partial
+            lastPartial = clean;
+            // Build: original note + new speech (partial replaces previous partial)
+            const updated = baseText ? `${baseText} ${clean}` : clean;
+            setKisiselNot(updated);
           },
           (err) => {
             console.warn('Voice note error:', err);
@@ -183,11 +187,17 @@ export const SolutionView: React.FC<SolutionViewProps> = ({
       setIsListeningForChat(false);
     } else {
       setSpeechError(null);
+      let lastPartial = '';
       try {
         setIsListeningForChat(true);
         const stopFn = await startNativeSpeechRecognition(
           (transcription) => {
-            if (transcription) setCustomQuestionInput(transcription);
+            if (!transcription) return;
+            const clean = transcription.trim();
+            if (clean === lastPartial) return;
+            lastPartial = clean;
+            // Replace the chat input with latest partial result (user sees live typing)
+            setCustomQuestionInput(clean);
           },
           (err) => {
             console.warn('Chat speech error:', err);

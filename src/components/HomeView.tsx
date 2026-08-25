@@ -184,69 +184,83 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const startVoiceQuestionListening = async (source: 'topVoice' | 'bottomInput' = 'topVoice') => {
     setMicPermissionError(null);
     setVoiceRecordingSeconds(0);
+    setVoiceQuestionTranscript('');
     audioChunksRef.current = [];
     setActiveVoiceSource(source);
 
-    let stream: MediaStream | null = null;
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        micStreamRef.current = stream;
-      }
-    } catch (micErr: any) {
-      console.warn('getUserMedia microphone permission denied or rejected:', micErr);
-      setMicPermissionError('🔒 Mikrofon İzni Gerekli. Lütfen cihaz ayarlarınızdan uygulamanın mikrofon iznini aktif edin.');
-      setActiveVoiceSource(null);
-      return;
-    }
+    const isNative = typeof (window as any).__CAPACITOR_PLUGIN_NATIVE__ !== 'undefined' ||
+      /android|capacitor/i.test(navigator.userAgent) ||
+      (typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor?.isNativePlatform?.());
 
-    if (!stream) {
-      setMicPermissionError('⚠️ Mikrofon akışı başlatılamadı. Lütfen mikrofonunuzu kontrol edin.');
-      setActiveVoiceSource(null);
-      return;
-    }
-
-    // 1. Start MediaRecorder (universal audio capture on Android & iOS & Web)
-    try {
-      let mimeType = 'audio/webm';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-          mimeType = 'audio/webm;codecs=opus';
-        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-          mimeType = 'audio/mp4';
-        } else if (MediaRecorder.isTypeSupported('audio/aac')) {
-          mimeType = 'audio/aac';
+    // On native Android/iOS: DO NOT call getUserMedia - it conflicts with SpeechRecognition
+    // SpeechRecognition plugin handles mic access natively
+    if (!isNative) {
+      let stream: MediaStream | null = null;
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          micStreamRef.current = stream;
         }
-        const recorder = new MediaRecorder(stream, { mimeType });
-        recorder.ondataavailable = (e) => {
-          if (e.data && e.data.size > 0) {
-            audioChunksRef.current.push(e.data);
-          }
-        };
-        recorder.start(250);
-        mediaRecorderRef.current = recorder;
+      } catch (micErr: any) {
+        console.warn('getUserMedia microphone permission denied or rejected:', micErr);
+        setMicPermissionError('🔒 Mikrofon İzni Gerekli. Lütfen cihaz ayarlarınızdan uygulamanın mikrofon iznini aktif edin.');
+        setActiveVoiceSource(null);
+        return;
       }
-    } catch (recErr) {
-      console.warn('MediaRecorder init fallback:', recErr);
+
+      // Start MediaRecorder for audio backup on web
+      if (stream) {
+        try {
+          let mimeType = 'audio/webm';
+          if (typeof MediaRecorder !== 'undefined') {
+            if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+              mimeType = 'audio/webm;codecs=opus';
+            } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+              mimeType = 'audio/mp4';
+            }
+            const recorder = new MediaRecorder(stream, { mimeType });
+            recorder.ondataavailable = (e) => {
+              if (e.data && e.data.size > 0) {
+                audioChunksRef.current.push(e.data);
+              }
+            };
+            recorder.start(250);
+            mediaRecorderRef.current = recorder;
+          }
+        } catch (recErr) {
+          console.warn('MediaRecorder init fallback:', recErr);
+        }
+      }
     }
 
-    // 2. Start Live Timer
+    // Start Live Timer
     setIsListeningVoiceQuestion(true);
     voiceTimerRef.current = setInterval(() => {
       setVoiceRecordingSeconds((prev) => prev + 1);
     }, 1000);
 
-    // 3. Start Native / Web Speech Recognition for real-time live transcription
+    // Start Speech Recognition for real-time live transcription
     try {
       if (nativeStopSpeechRef.current) {
-        nativeStopSpeechRef.current();
+        try { nativeStopSpeechRef.current(); } catch (e) {}
         nativeStopSpeechRef.current = null;
       }
+
+      let accumulatedText = '';
       const stopFn = await startNativeSpeechRecognition((transcription) => {
-        if (transcription) {
-          setVoiceQuestionTranscript(transcription);
-          setTextPrompt(transcription);
+        if (!transcription) return;
+        // On native: partial results replace each other (motor says whole sentence so far)
+        // On web: we get deltas, accumulate them
+        if (isNative) {
+          accumulatedText = transcription;
+        } else {
+          // Append delta
+          accumulatedText = accumulatedText
+            ? accumulatedText + ' ' + transcription
+            : transcription;
         }
+        setVoiceQuestionTranscript(accumulatedText);
+        setTextPrompt(accumulatedText);
       });
       nativeStopSpeechRef.current = stopFn;
     } catch (err: any) {
@@ -885,7 +899,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 <span className="material-symbols-outlined">photo_library</span>
               </button>
 
-              {/* Hidden Input for Gallery / File Upload */}
+              {/* Hidden Input for Gallery / File Upload (NO capture attr = opens gallery/files picker) */}
               <input
                 type="file"
                 ref={galleryInputRef}
@@ -894,13 +908,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 className="hidden"
               />
 
-              {/* Hidden Input for Direct Camera Capture */}
+              {/* Hidden Input for Direct Camera Capture (capture="camera" forces camera-only on Android) */}
               <input
                 type="file"
                 ref={cameraInputRef}
                 onChange={handleFileChange}
                 accept="image/*"
-                capture="environment"
+                capture="camera"
                 className="hidden"
               />
 
