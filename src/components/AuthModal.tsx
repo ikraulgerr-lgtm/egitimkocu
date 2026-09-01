@@ -421,7 +421,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     } else if (err?.code === 'auth/popup-blocked') {
                       setErrorMsg('🔒 Giriş penceresi açılamadı. Lütfen tarayıcınızın açılır pencere (popup) engelleyicisini kapatıp tekrar deneyin.');
                     } else {
-                      setErrorMsg('Google ile giriş yapılamadı: ' + (err?.message || 'Lütfen tekrar deneyin.'));
+                      const runningSha1 = (typeof window !== 'undefined' && (window as any).__APP_SIGNATURE_SHA1__) ? `\n(Cihazdaki İmza: ${(window as any).__APP_SIGNATURE_SHA1__})` : '';
+                      const rawMsg = err?.message || 'Lütfen tekrar deneyin.';
+                      setErrorMsg(`Google ile giriş yapılamadı: ${rawMsg}${runningSha1}`);
                     }
                   } finally {
                     setLoading(false);
