@@ -79,17 +79,21 @@ export async function loginWithGoogle() {
   if (Capacitor.isNativePlatform()) {
     try {
       let result;
-      // Try with useCredentialManager: false first to avoid "No credentials available" error on Android
       try {
-        result = await (FirebaseAuthentication as any).signInWithGoogle({
-          scopes: ['email', 'profile'],
-          useCredentialManager: false,
-        });
-      } catch (firstErr: any) {
-        console.warn('Google Sign-In with useCredentialManager=false failed, retrying with default:', firstErr);
         result = await FirebaseAuthentication.signInWithGoogle({
           scopes: ['email', 'profile'],
         });
+      } catch (nativeErr: any) {
+        console.warn('Native Google Sign-In default failed, retrying with useCredentialManager=false:', nativeErr);
+        try {
+          result = await (FirebaseAuthentication as any).signInWithGoogle({
+            scopes: ['email', 'profile'],
+            useCredentialManager: false,
+          });
+        } catch (secondErr) {
+          console.warn('Google Sign-In with useCredentialManager=false also failed:', secondErr);
+          throw nativeErr;
+        }
       }
 
       if (result?.credential?.idToken) {
@@ -101,14 +105,26 @@ export async function loginWithGoogle() {
         return userCred.user;
       }
 
+      if (result?.user) {
+        return auth.currentUser || (result.user as any);
+      }
+
       if (auth.currentUser) {
         return auth.currentUser;
       }
-
-      throw new Error('Google giriş kimliği alınamadı. Lütfen tekrar deneyin.');
     } catch (err: any) {
-      console.error('Native Google Sign-In Error:', err?.message || err);
-      throw new Error(err?.message || 'Google ile giriş başarısız oldu.');
+      console.warn('Native Google sign-in failed, attempting browser popup fallback...', err);
+      // Ultimate fallback for any Android/Play Services error: Web popup authentication!
+      try {
+        googleProvider.setCustomParameters({ prompt: 'select_account' });
+        const webResult = await signInWithPopup(auth, googleProvider);
+        if (webResult?.user) {
+          return webResult.user;
+        }
+      } catch (popupErr: any) {
+        console.error('Popup fallback also failed:', popupErr);
+        throw new Error(err?.message || popupErr?.message || 'Google ile giriş yapılamadı.');
+      }
     }
   }
 
