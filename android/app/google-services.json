@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "576668557444-dnjahj496b1nbpenvgohhrube3bvlm72.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.egitimkocumai",
+            "certificate_hash": "67c2d021988148d5c9c83d4daa63c91fa3084217"
+          }
+        },
+        {
           "client_id": "576668557444-suljf649h05f9gfj4cmlrnd14enmai9n.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
