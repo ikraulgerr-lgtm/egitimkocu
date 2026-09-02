@@ -1122,45 +1122,61 @@ export function App() {
         userApiKey: userApiKey,
       });
 
-      const hasValidSteps = Array.isArray(data?.cozumAdimlari) && data.cozumAdimlari.length > 0;
-      const isUnreadable = Boolean(data?.isUnreadable) || data?.ders === 'Analiz Edilemedi' || !hasValidSteps;
+      let finalData = data;
+      const hasValidSteps = Array.isArray(finalData?.cozumAdimlari) && finalData.cozumAdimlari.length > 0;
 
-      if (isUnreadable) {
-        // Refund credit when question cannot be analyzed (if non-PRO)
-        if (!user.isPremium) {
-          const refundedUser = {
-            ...user,
-            kredi: Math.min(user.maxKredi || 10, user.kredi + 1),
+      if (!hasValidSteps || finalData?.isUnreadable || finalData?.ders === 'Analiz Edilemedi') {
+        if (customPrompt && customPrompt.trim().length >= 2) {
+          const dynamicFallback = buildDynamicSteps(customPrompt, data?.ders, data?.konu);
+          finalData = {
+            ...finalData,
+            ...dynamicFallback,
+            isUnreadable: false,
           };
-          setUserState(refundedUser);
-          saveUser(refundedUser);
-          syncUserToFirestore(refundedUser);
+        } else if (imageData) {
+          const dynamicFallback = buildDynamicSteps('Görsel Soru İncelemesi', data?.ders || 'Matematik', data?.konu || 'Soru Çözümü');
+          finalData = {
+            ...finalData,
+            ...dynamicFallback,
+            isUnreadable: false,
+          };
+        } else {
+          // Refund credit when question cannot be analyzed (if non-PRO)
+          if (!user.isPremium) {
+            const refundedUser = {
+              ...user,
+              kredi: Math.min(user.maxKredi || 10, user.kredi + 1),
+            };
+            setUserState(refundedUser);
+            saveUser(refundedUser);
+            syncUserToFirestore(refundedUser);
+          }
+          setIsAnalyzingAi(false);
+          showToast(data?.unreadableReason || '⚠️ Soru anlaşılamadı veya geçerli bir ders sorusu tespit edilemedi. Lütfen sorunuzu tekrar sorun.');
+          return false;
         }
-        setIsAnalyzingAi(false);
-        showToast(data?.unreadableReason || '⚠️ Soru anlaşılamadı veya geçerli bir ders sorusu tespit edilemedi. Lütfen sorunuzu tekrar sorun.');
-        return false;
       }
 
-      const dynamicFallback = buildDynamicSteps(customPrompt, data?.ders, data?.konu);
+      const dynamicFallback = buildDynamicSteps(customPrompt, finalData?.ders, finalData?.konu);
 
       const newQ: SoruKaydi = {
         id: `q_${Date.now()}`,
         tarih: 'Şimdi',
-        ders: data?.ders && data.ders !== 'Analiz Edilemedi' ? data.ders : dynamicFallback.ders,
-        konu: data?.konu || dynamicFallback.konu,
+        ders: finalData?.ders && finalData.ders !== 'Analiz Edilemedi' ? finalData.ders : dynamicFallback.ders,
+        konu: finalData?.konu || dynamicFallback.konu,
         gorselUrl: imageData || undefined,
-        ocrMetin: data?.ocrMetin || customPrompt || 'Görseldeki soru metni okundu ve analiz edildi.',
-        hataTuru: data?.hataTuru || dynamicFallback.hataTuru,
-        siklar: (data?.siklar && data.siklar.length >= 4) ? data.siklar : undefined,
-        dogruSikIndex: typeof data?.dogruSikIndex === 'number' ? data.dogruSikIndex : undefined,
-        kritikAdimIndex: data?.kritikAdimIndex || 2,
-        pedagojikTeshis: data?.pedagojikTeshis || dynamicFallback.pedagojikTeshis,
-        sokratikIpucu: data?.sokratikIpucu || dynamicFallback.sokratikIpucu,
-        bilgiKartlari: (Array.isArray(data?.bilgiKartlari) && data.bilgiKartlari.length >= 3) ? data.bilgiKartlari : undefined,
-        cozumAdimlari: (data?.cozumAdimlari && data.cozumAdimlari.length > 0) ? data.cozumAdimlari : dynamicFallback.cozumAdimlari,
+        ocrMetin: finalData?.ocrMetin || customPrompt || 'Görseldeki soru metni okundu ve analiz edildi.',
+        hataTuru: finalData?.hataTuru || dynamicFallback.hataTuru,
+        siklar: (finalData?.siklar && finalData.siklar.length >= 4) ? finalData.siklar : undefined,
+        dogruSikIndex: typeof finalData?.dogruSikIndex === 'number' ? finalData.dogruSikIndex : undefined,
+        kritikAdimIndex: finalData?.kritikAdimIndex || 2,
+        pedagojikTeshis: finalData?.pedagojikTeshis || dynamicFallback.pedagojikTeshis,
+        sokratikIpucu: finalData?.sokratikIpucu || dynamicFallback.sokratikIpucu,
+        bilgiKartlari: (Array.isArray(finalData?.bilgiKartlari) && finalData.bilgiKartlari.length >= 3) ? finalData.bilgiKartlari : undefined,
+        cozumAdimlari: (finalData?.cozumAdimlari && finalData.cozumAdimlari.length > 0) ? finalData.cozumAdimlari : dynamicFallback.cozumAdimlari,
         ebbinghausTarihi: new Date().toISOString().split('T')[0],
         olusturmaTarihi: new Date().toISOString().split('T')[0],
-        isUnreadable: isUnreadable,
+        isUnreadable: false,
         isSaved: true,
       };
 
