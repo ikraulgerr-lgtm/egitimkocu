@@ -140,7 +140,7 @@ function getAIClient(customKey?: string): GoogleGenAI | null {
 }
 
 async function callGeminiClientWithFallback(ai: GoogleGenAI, contents: any, isJson: boolean = true): Promise<string> {
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-flash'];
+  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
   let lastErr: any = null;
 
   for (const modelName of modelsToTry) {
@@ -357,8 +357,8 @@ Matematik sembollerini Türkçe unicode (x², √x, a/b, ≤, ≥, ±, ∈) olar
     }
   }
 
-  // If image or audio could not be analyzed, NEVER generate a fake placeholder!
-  if (imageData || audioData) {
+  // If image or raw audio binary was supplied without text and AI failed, prompt user to retry clearly
+  if (imageData || (audioData && !userPrompt)) {
     return {
       isUnreadable: true,
       unreadableReason: imageData
@@ -370,16 +370,21 @@ Matematik sembollerini Türkçe unicode (x², √x, a/b, ≤, ≥, ±, ∈) olar
     };
   }
 
-  // Strategy C: For text-only input, check if direct math arithmetic/equation
-  const mathSolved = trySolveMathExpression(userPrompt);
-  if (mathSolved) {
-    return sanitizeObjectMath(mathSolved);
+  // Strategy C: For text/voice-transcribed question, solve math or generate dynamic pedagogical analysis
+  if (userPrompt && userPrompt.trim().length >= 2) {
+    const mathSolved = trySolveMathExpression(userPrompt);
+    if (mathSolved) {
+      return sanitizeObjectMath(mathSolved);
+    }
+    const fallbackResult = generateClientFallback(userPrompt, ders, konu);
+    if (fallbackResult && !fallbackResult.isUnreadable) {
+      return sanitizeObjectMath(fallbackResult);
+    }
   }
 
-  // If text is not a math expression and AI failed, inform user to retry rather than returning fake steps
   return {
     isUnreadable: true,
-    unreadableReason: 'Soru analiz edilemedi veya geçerli bir soru cümlesi bulunamadı. Lütfen sorunuzu kontrol edip tekrar deneyin.',
+    unreadableReason: 'Soru anlaşılamadı veya geçerli bir soru cümlesi bulunamadı. Lütfen sorunuzu kontrol edip tekrar sorun.',
     ders: 'Analiz Edilemedi',
     konu: 'Soru Bulunamadı',
     cozumAdimlari: [],

@@ -10,7 +10,7 @@ interface AuthModalProps {
   onLoginSuccess: (user: Partial<Kullanici>) => void;
 }
 
-type AuthMode = 'login' | 'register' | 'forgot_email' | 'forgot_otp' | 'forgot_new_password' | 'forgot_success' | 'forgot_link_sent';
+type AuthMode = 'login' | 'register' | 'forgot_email' | 'forgot_otp' | 'forgot_new_password' | 'forgot_success' | 'forgot_link_sent' | 'google_exam_select';
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
@@ -30,6 +30,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [otpCode, setOtpCode] = useState<string>('');
   const [agreeTerms, setAgreeTerms] = useState<boolean>(true);
   const [selectedExam, setSelectedExam] = useState<'YKS' | 'LGS' | 'KPSS' | 'YDS' | 'Hazırlanmıyorum'>('YKS');
+  const [pendingGoogleUser, setPendingGoogleUser] = useState<{
+    uid: string;
+    displayName: string;
+    email: string;
+    photoURL: string;
+    username: string;
+  } | null>(null);
 
   // UI status states
   const [loading, setLoading] = useState<boolean>(false);
@@ -205,6 +212,68 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  // Google First-time User Onboarding: Save Selected Exam Target to Firestore
+  const handleGoogleExamSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingGoogleUser) return;
+    setLoading(true);
+    setErrorMsg(null);
+
+    try {
+      let examDate = '2027-06-19';
+      if (selectedExam === 'LGS') examDate = '2027-06-06';
+      else if (selectedExam === 'KPSS') examDate = '2027-07-18';
+      else if (selectedExam === 'YDS') examDate = '2027-04-11';
+      else if (selectedExam === 'Hazırlanmıyorum') examDate = '';
+
+      const sinifVal =
+        selectedExam === 'LGS'
+          ? '8. Sınıf (LGS)'
+          : selectedExam === 'YKS'
+          ? '12. Sınıf / Mezun (YKS)'
+          : 'YKS / LGS Hazırlık';
+
+      const cleanUserData = {
+        id: pendingGoogleUser.uid,
+        ad: pendingGoogleUser.displayName,
+        kullaniciAdi: pendingGoogleUser.username,
+        kullaniciAdi_lower: pendingGoogleUser.username.toLowerCase(),
+        email: pendingGoogleUser.email,
+        kredi: 10,
+        maxKredi: 10,
+        seri: 1,
+        xp: 0,
+        isPremium: false,
+        sinif: sinifVal,
+        avatarUrl: pendingGoogleUser.photoURL,
+        targetExam: selectedExam,
+        targetExamDate: examDate,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await setDoc(doc(db, 'users', pendingGoogleUser.uid), cleanUserData, { merge: true });
+
+      onLoginSuccess({
+        id: pendingGoogleUser.uid,
+        ad: pendingGoogleUser.displayName,
+        kullaniciAdi: pendingGoogleUser.username,
+        kullaniciAdi_lower: pendingGoogleUser.username.toLowerCase(),
+        email: pendingGoogleUser.email,
+        avatarUrl: pendingGoogleUser.photoURL,
+        targetExam: selectedExam,
+        targetExamDate: examDate,
+      });
+
+      onClose();
+    } catch (err: any) {
+      console.error('Google exam onboarding save error:', err);
+      setErrorMsg('Hedef sınav kaydedilirken bir sorun oluştu. Lütfen tekrar deneyin.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Step 1: Send Password Reset Link to Email (Firebase Auth)
   const handleSendResetCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -365,37 +434,59 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     const firebaseUser = await loginWithGoogle();
                     if (firebaseUser) {
                       let finalUsername = 'ogrenci';
+                      let targetExam = '';
+                      let targetExamDate = '';
+                      let userExistsInDb = false;
+
                       try {
                         const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
-                        if (userSnap.exists() && userSnap.data()?.kullaniciAdi) {
-                          finalUsername = userSnap.data().kullaniciAdi;
-                        } else {
-                          const base = (firebaseUser.email?.split('@')[0] || firebaseUser.displayName || 'ogrenci')
-                            .toLowerCase()
-                            .replace(/[^a-z0-9_]/g, '')
-                            .slice(0, 12);
-                          finalUsername = `${base || 'ogrenci'}_${Math.floor(100 + Math.random() * 900)}`;
-                          await setDoc(doc(db, 'users', firebaseUser.uid), {
-                            id: firebaseUser.uid,
-                            ad: firebaseUser.displayName || 'Öğrenci',
-                            kullaniciAdi: finalUsername,
-                            kullaniciAdi_lower: finalUsername.toLowerCase(),
-                            email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
-                            avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-                            updatedAt: new Date().toISOString(),
-                          }, { merge: true });
+                        if (userSnap.exists()) {
+                          userExistsInDb = true;
+                          const data = userSnap.data();
+                          finalUsername = data?.kullaniciAdi || 'ogrenci';
+                          targetExam = data?.targetExam || '';
+                          targetExamDate = data?.targetExamDate || '';
                         }
-                      } catch (e) {}
+                      } catch (e) {
+                        console.warn('User doc check warning:', e);
+                      }
 
-                      onLoginSuccess({
-                        id: firebaseUser.uid,
-                        ad: firebaseUser.displayName || 'Öğrenci',
-                        kullaniciAdi: finalUsername,
-                        kullaniciAdi_lower: finalUsername.toLowerCase(),
+                      // If user is already registered and targetExam is defined, proceed immediately!
+                      if (userExistsInDb && targetExam) {
+                        onLoginSuccess({
+                          id: firebaseUser.uid,
+                          ad: firebaseUser.displayName || 'Öğrenci',
+                          kullaniciAdi: finalUsername,
+                          kullaniciAdi_lower: finalUsername.toLowerCase(),
+                          email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
+                          avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                          targetExam: targetExam as any,
+                          targetExamDate: targetExamDate,
+                        });
+                        onClose();
+                        return;
+                      }
+
+                      // FIRST TIME GOOGLE USER OR MISSING TARGET EXAM:
+                      if (!userExistsInDb) {
+                        const base = (firebaseUser.email?.split('@')[0] || firebaseUser.displayName || 'ogrenci')
+                          .toLowerCase()
+                          .replace(/[^a-z0-9_]/g, '')
+                          .slice(0, 12);
+                        finalUsername = `${base || 'ogrenci'}_${Math.floor(100 + Math.random() * 900)}`;
+                      }
+
+                      setPendingGoogleUser({
+                        uid: firebaseUser.uid,
+                        displayName: firebaseUser.displayName || 'Öğrenci',
                         email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
-                        avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                        photoURL: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                        username: finalUsername,
                       });
-                      onClose();
+
+                      setMode('google_exam_select');
+                      setLoading(false);
+                      return;
                     }
                   } catch (err: any) {
                     console.warn('Google Auth Status:', err);
@@ -953,6 +1044,88 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <span className="material-symbols-outlined text-lg">login</span>
               <span>Giriş Ekranına Dön</span>
             </button>
+          </div>
+        )}
+
+        {/* ----------------- MODE 7: GOOGLE FIRST-TIME ONBOARDING - SELECT TARGET EXAM ----------------- */}
+        {mode === 'google_exam_select' && (
+          <div className="space-y-5 animate-fadeIn py-1">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl mx-auto flex items-center justify-center border border-primary/20 shadow-sm">
+                <span className="material-symbols-outlined text-3xl">school</span>
+              </div>
+              <h2 className="font-extrabold text-xl sm:text-2xl text-text-main">
+                Hoş Geldin, {pendingGoogleUser?.displayName?.split(' ')[0] || 'Öğrenci'}! 👋
+              </h2>
+              <p className="text-xs text-text-muted leading-relaxed px-2">
+                Hedeflediğin sınavı seç; yapay zeka çalışma planını, geri sayımını ve pedagojik analizlerini sana özel hazırlasın.
+              </p>
+            </div>
+
+            <form onSubmit={handleGoogleExamSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-text-muted mb-1 ml-1">
+                  🎯 Hazırlandığınız Sınavı Seçin:
+                </label>
+                
+                <div className="grid grid-cols-1 gap-2">
+                  {[
+                    { id: 'YKS', title: '🎓 YKS 2027 (TYT - AYT)', desc: 'Yükseköğretim Kurumları Sınavı (Üniversiteye Hazırlık)', date: '19 Haziran 2027' },
+                    { id: 'LGS', title: '📚 LGS 2027 (Lise Giriş)', desc: 'Liselere Geçiş Sistemi (8. Sınıf)', date: '6 Haziran 2027' },
+                    { id: 'KPSS', title: '💼 KPSS 2027 (Kamu Personeli)', desc: 'Kamu Personel Seçme Sınavı (Lisans / Önlisans)', date: '18 Temmuz 2027' },
+                    { id: 'YDS', title: '🌐 YÖKDİL / YDS 2027', desc: 'Yabancı Dil Bilgisi Seviye Tespit Sınavı', date: '11 Nisan 2027' },
+                    { id: 'Hazırlanmıyorum', title: '✨ Sınava Hazırlanmıyorum', desc: 'Genel Ders, Okul Yazılıları & Kişisel Gelişim', date: 'Süresiz Hedef' },
+                  ].map((item) => {
+                    const isSelected = selectedExam === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setSelectedExam(item.id as any)}
+                        className={`w-full p-3 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                          isSelected
+                            ? 'bg-primary/10 border-primary text-primary shadow-sm ring-1 ring-primary'
+                            : 'bg-surface-container-low border-card-border text-text-main hover:border-primary/40'
+                        }`}
+                      >
+                        <div className="space-y-0.5 min-w-0">
+                          <div className="font-extrabold text-xs flex items-center gap-1.5">
+                            <span>{item.title}</span>
+                          </div>
+                          <p className="text-[10px] text-text-muted truncate">{item.desc}</p>
+                        </div>
+                        <div className="shrink-0 flex items-center gap-1">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-primary text-white' : 'bg-surface-container-high text-text-muted'}`}>
+                            {item.date}
+                          </span>
+                          <span className="material-symbols-outlined text-base">
+                            {isSelected ? 'check_circle' : 'radio_button_unchecked'}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-primary text-white font-extrabold text-sm py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 mt-3"
+              >
+                {loading ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Hedef Kaydediliyor...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-lg">rocket_launch</span>
+                    <span>Başla ve Planımı Oluştur 🚀</span>
+                  </>
+                )}
+              </button>
+            </form>
           </div>
         )}
       </div>

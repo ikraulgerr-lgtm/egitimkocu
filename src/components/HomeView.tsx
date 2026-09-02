@@ -167,32 +167,46 @@ export const HomeView: React.FC<HomeViewProps> = ({
       };
 
       recognition.onresult = (e: any) => {
+        let newPiece = '';
         for (let i = e.resultIndex; i < e.results.length; ++i) {
           const piece = (e.results[i][0]?.transcript || '').trim();
           if (piece) {
-            setVoiceQuestionTranscript((prev) => (prev ? `${prev} ${piece}` : piece));
-            setTextPrompt((prev) => (prev ? `${prev} ${piece}` : piece));
+            newPiece = newPiece ? `${newPiece} ${piece}` : piece;
           }
+        }
+        if (newPiece) {
+          sessionFinalTextRef.current = sessionFinalTextRef.current
+            ? `${sessionFinalTextRef.current} ${newPiece}`
+            : newPiece;
+          const fullText = baseTextBeforeMicRef.current
+            ? `${baseTextBeforeMicRef.current} ${sessionFinalTextRef.current}`
+            : sessionFinalTextRef.current;
+          setVoiceQuestionTranscript(fullText);
+          setTextPrompt(fullText);
         }
       };
 
       recognition.onerror = (e: any) => {
-        console.warn('Speech recognition error:', e);
+        console.warn('Speech recognition warning/error:', e);
         const errType = e?.error || '';
         if (errType === 'not-allowed' || errType === 'permission-denied') {
           setMicPermissionError('🔒 Mikrofon İzni Reddedildi.');
           isVoiceListeningActiveRef.current = false;
           setIsListeningVoiceQuestion(false);
         } else if (errType !== 'no-speech' && errType !== 'aborted') {
-          setMicPermissionError(`⚠️ Mikrofon uyarısı: ${errType}`);
+          console.warn(`Speech recognition status: ${errType}`);
         }
       };
 
       recognition.onend = () => {
         if (isVoiceListeningActiveRef.current) {
-          try {
-            recognition.start();
-          } catch (e) {}
+          setTimeout(() => {
+            if (isVoiceListeningActiveRef.current && speechRecognitionRef.current) {
+              try {
+                speechRecognitionRef.current.start();
+              } catch (e) {}
+            }
+          }, 250);
         } else {
           setIsListeningVoiceQuestion(false);
         }
