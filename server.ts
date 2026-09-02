@@ -841,6 +841,38 @@ async function callGroqAIServer(
   return null;
 }
 
+// Raw OCR text noise pre-filter
+function cleanRawOcrText(raw: string): string {
+  if (!raw) return '';
+  let text = raw;
+
+  // Split into lines
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const cleanedLines: string[] = [];
+
+  for (const line of lines) {
+    // Filter out obvious watermark / scan noise / header metadata lines
+    if (/^(?:VT\s*\(|©|Lisans\s*\d+|SoruNo:\s*\d+|Test\s*No:|Sayfa\s*\d+|ÖSYM\s*\d+|[\d\s\w\.\,\-]{1,6}$)/i.test(line)) {
+      continue;
+    }
+    // Filter out random symbol-only lines like "| ® 7 i v3 ce l ® Wp"
+    if (/^[\|\®\©\(\)\+\=\*\/\-\_\s\d\w]{1,20}$/.test(line) && !/[a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}/.test(line)) {
+      continue;
+    }
+    cleanedLines.push(line);
+  }
+
+  let result = cleanedLines.join(' ').trim();
+  // Remove standalone watermark headers that might be inline
+  result = result.replace(/VT\s*\([^)]*\)/gi, '');
+  result = result.replace(/©\s*Lisans\s*\d+/gi, '');
+  result = result.replace(/SoruNo:\s*\d+/gi, '');
+  result = result.replace(/[|®©]/g, ' ');
+  result = result.replace(/\s+/g, ' ').trim();
+
+  return result || raw;
+}
+
 // Normalize analysis object to guarantee robust output fields
 function normalizeAnalysisResultServer(data: any, defaultText: string = '', dersInput?: string, konuInput?: string): any {
   if (!data || typeof data !== 'object') return null;
@@ -874,6 +906,10 @@ function normalizeAnalysisResultServer(data: any, defaultText: string = '', ders
 
   if (!res.ocrMetin && defaultText) {
     res.ocrMetin = defaultText;
+  }
+
+  if (res.ocrMetin) {
+    res.ocrMetin = cleanRawOcrText(res.ocrMetin);
   }
 
   // 3. Guarantee at least 3 pedagogical steps
@@ -963,7 +999,7 @@ GÖREVİN:
 Gönderilen soru görselindeki, ses kaydındaki veya soru metnindeki ders sorusunu dikkatlice inceleyip çözmek, doğru yanıtı açıklamak, öğrencinin takılabileceği kritik noktayı ve pedagojik adımları eksiksiz oluşturmaktır.
 
 ÖNEMLİ KURALLAR:
-1. Soru fotoğrafta, metinde veya ses kaydında kısmen okunsa dahi elindeki tüm ipuçlarını kullanarak soruyu mutlaka çöz ve analiz et.
+1. "ocrMetin": Görseldeki veya metindeki filigranları, sayfa/soru numarası etiketlerini (örn: 'VT (Bococ...', '9 2 x © Lisans 2024 Vv SoruNo: 11' gibi çöp/anlamsız yazıları), tarama gürültülerini KESİNLİKLE TEMİZLE. 'ocrMetin' alanına yalnızca sorunun gerçek, akıcı ve doğru Türkçe/Matematik soru metnini yaz.
 2. Soru çoktan seçmeli ise 'siklar' dizisine seçenekleri (A, B, C, D, E) yaz ve 'dogruSikIndex' (0, 1, 2, 3, 4) olarak doğru şıkkı belirt. Açık uçlu sorularda "siklar": [] bırakabilirsin.
 3. "cozumAdimlari" dizisinde en az 3 detaylı pedagojik çözüm adımı (isCorrect, hataliMetin, dogruMetin) oluştur.
 4. "bilgiKartlari" dizisinde soruyla ilgili en az 3 kritik kural/tanım/ipucu bilgi kartı ekle.
@@ -972,7 +1008,7 @@ Gönderilen soru görselindeki, ses kaydındaki veya soru metnindeki ders sorusu
 STRICT JSON OUTPUT FORMAT:
 {
   "isUnreadable": false,
-  "ocrMetin": "${(userPrompt || 'Soru Metni').replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"')}",
+  "ocrMetin": "Temizlenmiş, düzgün Türkçe soru metni buraya yazılacak",
   "ders": "Matematik",
   "konu": "Konu Başlığı",
   "hataTuru": "Kavram Yanılgısı",
@@ -1127,10 +1163,10 @@ STRICT JSON OUTPUT FORMAT:
     // Groq AI Solver on Server (Real Problem Solving)
     if (userPrompt && userPrompt.trim().length >= 2) {
       try {
-        const groqPrompt = `Soru Metni: "${userPrompt}"\nLütfen bu ders sorusunu tam olarak çöz, doğru şıkkı ve adımları belirle. STRICT JSON formatında döndür:
+        const groqPrompt = `Soru Metni: "${userPrompt}"\nLütfen bu ders sorusunu dikkatlice incele, tüm OCR çöplerini, filigranları ve soru numarası etiketlerini temizle, düzgün akıcı soru metnini yaz, doğru şıkkı ve adımları belirle. STRICT JSON formatında döndür:
 {
   "isUnreadable": false,
-  "ocrMetin": "${userPrompt.replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"')}",
+  "ocrMetin": "Temizlenmiş, kusursuz Türkçe soru metni buraya yazılacak",
   "ders": "Matematik",
   "konu": "Konu Başlığı",
   "hataTuru": "Kavram Yanılgısı",

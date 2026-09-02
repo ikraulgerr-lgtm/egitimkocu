@@ -128,6 +128,38 @@ export function safeParseJSON(inputStr: string): any {
   }
 }
 
+// Raw OCR text noise pre-filter
+export function cleanRawOcrText(raw: string): string {
+  if (!raw) return '';
+  let text = raw;
+
+  // Split into lines
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const cleanedLines: string[] = [];
+
+  for (const line of lines) {
+    // Filter out obvious watermark / scan noise / header metadata lines
+    if (/^(?:VT\s*\(|©|Lisans\s*\d+|SoruNo:\s*\d+|Test\s*No:|Sayfa\s*\d+|ÖSYM\s*\d+|[\d\s\w\.\,\-]{1,6}$)/i.test(line)) {
+      continue;
+    }
+    // Filter out random symbol-only lines like "| ® 7 i v3 ce l ® Wp"
+    if (/^[\|\®\©\(\)\+\=\*\/\-\_\s\d\w]{1,20}$/.test(line) && !/[a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}/.test(line)) {
+      continue;
+    }
+    cleanedLines.push(line);
+  }
+
+  let result = cleanedLines.join(' ').trim();
+  // Remove standalone watermark headers that might be inline
+  result = result.replace(/VT\s*\([^)]*\)/gi, '');
+  result = result.replace(/©\s*Lisans\s*\d+/gi, '');
+  result = result.replace(/SoruNo:\s*\d+/gi, '');
+  result = result.replace(/[|®©]/g, ' ');
+  result = result.replace(/\s+/g, ' ').trim();
+
+  return result || raw;
+}
+
 // Client-side OCR Text Extractor from Image
 export async function extractImageTextOCR(imageData: string): Promise<string> {
   if (!imageData) return '';
@@ -135,7 +167,8 @@ export async function extractImageTextOCR(imageData: string): Promise<string> {
     const result = await Tesseract.recognize(imageData, 'tur+eng', {
       logger: () => {},
     });
-    return result?.data?.text?.trim() || '';
+    const rawText = result?.data?.text?.trim() || '';
+    return cleanRawOcrText(rawText);
   } catch (err) {
     console.warn('OCR processing warning:', err);
     return '';
@@ -406,6 +439,10 @@ export function normalizeAnalysisResult(data: any, defaultText: string = ''): an
     res.ocrMetin = defaultText;
   }
 
+  if (res.ocrMetin) {
+    res.ocrMetin = cleanRawOcrText(res.ocrMetin);
+  }
+
   // 3. Guarantee at least 3 pedagogical steps
   if (!Array.isArray(res.cozumAdimlari) || res.cozumAdimlari.length === 0) {
     const ders = res.ders || 'Matematik';
@@ -533,7 +570,7 @@ export async function analyzeQuestionService(params: {
 GÖREVİN:
 Öğrencinin gönderdiği soru görselini, ses kaydını veya soru metnini dikkatle oku ve eksiksiz çöz.
 KRİTİK KURALLAR:
-1. Soru görseldeki testten, kitaptan, defterden veya metinden geliyorsa soruyu adım adım tam olarak çöz.
+1. "ocrMetin": OCR çıktısındaki veya görseldeki filigranları, sayfa/soru numarası etiketlerini (örn: 'VT (Bococ...', '9 2 x © Lisans 2024 Vv SoruNo: 11' gibi çöp/anlamsız yazıları), tarama gürültülerini KESİNLİKLE TEMİZLE. 'ocrMetin' alanına yalnızca sorunun gerçek, akıcı ve doğru Türkçe/Matematik soru metnini yaz.
 2. Soru çoktan seçmeli ise 'siklar' dizisine seçenekleri (A, B, C, D, E) yaz ve 'dogruSikIndex' (0, 1, 2, 3, 4) olarak doğru cevabı belirt. Açık uçlu ise siklar: [] bırak.
 3. Çözüm adımlarını en az 3 pedagojik adım ('cozumAdimlari') olarak detaylıca oluştur.
 4. Matematik sembollerini okunaklı Türkçe unicode (x², √x, a/b, ≤, ≥, ±, ∈, π, ∞) olarak yaz. LaTeX ($$) KULLANMA.`;
@@ -541,7 +578,7 @@ KRİTİK KURALLAR:
       const promptTemplate = `STRICT JSON OUTPUT FORMAT:
 {
   "isUnreadable": false,
-  "ocrMetin": "${(userPrompt || 'Soru Metni').replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"')}",
+  "ocrMetin": "Temizlenmiş, düzgün Türkçe soru metni buraya yazılacak",
   "ders": "Matematik",
   "konu": "Konu Başlığı",
   "hataTuru": "Kavram Yanılgısı",
@@ -601,15 +638,20 @@ KRİTİK KURALLAR:
       const groqSystemPrompt = `Sen MEB ve ÖSYM (YKS, LGS, KPSS, YDS, MSÜ) müfredatına tam hâkim uzman yapay zeka soru analiz öğretmenisin.
 GÖREVİN:
 Verilen ders sorusunu (fotoğraftan okunan veya yazılan soru metnini) matematiksel, mantıksal veya sözel olarak tam olarak çözmek, doğru şıkkı (A-E) veya cevabı hesaplamak, öğrencinin yapabileceği kritik hatayı ve pedagojik adımları eksiksiz üretmektir.
+
+ÇOK ÖNEMLİ KURALLAR:
+1. "ocrMetin": OCR çıktısındaki tüm filigranları, sayfa/soru numarası etiketlerini (örn: "VT (Bococ...", "9 2 x © Lisans 2024 Vv SoruNo: 11" gibi çöp yazıları), tarama gürültülerini ve harf hatalarını KESİNLİKLE TEMİZLE. 'ocrMetin' alanına yalnızca sorunun gerçek, akıcı ve doğru Türkçe/Matematik soru metnini yaz!
+2. Soru çoktan seçmeli ise 'siklar' dizisine seçenekleri (A, B, C, D, E) yaz ve 'dogruSikIndex' (0, 1, 2, 3, 4) olarak doğru cevabı belirt.
+3. Matematik sembollerini okunaklı unicode (x², sin²x, cos²x, cot x, √x, ≤, ≥) olarak yaz. LaTeX ($$) KULLANMA.
 Yanıtını MUTLAKA STRICT JSON formatında döndür.`;
 
       const groqUserPrompt = `Soru Metni:
 "${userPrompt}"
 
-Lütfen bu soruyu dikkatle incele, doğru çözümü hesapla ve STRICT JSON formatında döndür:
+Lütfen bu soruyu dikkatle incele, tüm OCR çöplerini temizleyip düzgün soru metnini oluştur, doğru çözümü hesapla ve STRICT JSON formatında döndür:
 {
   "isUnreadable": false,
-  "ocrMetin": "${userPrompt.replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"')}",
+  "ocrMetin": "Temizlenmiş, kusursuz Türkçe soru metni",
   "ders": "Matematik",
   "konu": "Konu Başlığı",
   "hataTuru": "Kavram Yanılgısı",
