@@ -55,6 +55,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   }, [isOpen, mode]);
 
+  // If user is authenticated via Google/Firebase but has not chosen targetExam, ensure google_exam_select mode is active
+  useEffect(() => {
+    if (isOpen && auth.currentUser && mode !== 'google_exam_select') {
+      const checkExamTarget = async () => {
+        try {
+          const userSnap = await getDoc(doc(db, 'users', auth.currentUser!.uid));
+          if (!userSnap.exists() || !userSnap.data()?.targetExam) {
+            const base = (auth.currentUser!.email?.split('@')[0] || auth.currentUser!.displayName || 'ogrenci')
+              .toLowerCase()
+              .replace(/[^a-z0-9_]/g, '')
+              .slice(0, 12);
+            const finalUsername = userSnap.data()?.kullaniciAdi || `${base || 'ogrenci'}_${Math.floor(100 + Math.random() * 900)}`;
+
+            setPendingGoogleUser({
+              uid: auth.currentUser!.uid,
+              displayName: auth.currentUser!.displayName || 'Öğrenci',
+              email: auth.currentUser!.email || 'ogrenci@egitimkocum.ai',
+              photoURL: auth.currentUser!.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+              username: finalUsername,
+            });
+            setMode('google_exam_select');
+          }
+        } catch (e) {
+          console.warn('AuthModal checkExamTarget error:', e);
+        }
+      };
+      checkExamTarget();
+    }
+  }, [isOpen, auth.currentUser?.uid, mode]);
+
   // Reset loading state if tab changes or user returns to window
   useEffect(() => {
     const handleTabFocus = () => {
@@ -491,14 +521,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   } catch (err: any) {
                     console.warn('Google Auth Status:', err);
                     if (auth.currentUser) {
-                      onLoginSuccess({
-                        id: auth.currentUser.uid,
-                        ad: auth.currentUser.displayName || 'Öğrenci',
-                        email: auth.currentUser.email || 'ogrenci@egitimkocum.ai',
-                        avatarUrl: auth.currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-                      });
-                      onClose();
-                      return;
+                      try {
+                        const userSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+                        if (userSnap.exists() && userSnap.data()?.targetExam) {
+                          const data = userSnap.data();
+                          onLoginSuccess({
+                            id: auth.currentUser.uid,
+                            ad: data.ad || auth.currentUser.displayName || 'Öğrenci',
+                            kullaniciAdi: data.kullaniciAdi || 'ogrenci',
+                            kullaniciAdi_lower: (data.kullaniciAdi || 'ogrenci').toLowerCase(),
+                            email: auth.currentUser.email || 'ogrenci@egitimkocum.ai',
+                            avatarUrl: auth.currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                            targetExam: data.targetExam,
+                            targetExamDate: data.targetExamDate,
+                          });
+                          onClose();
+                          return;
+                        } else {
+                          const base = (auth.currentUser.email?.split('@')[0] || auth.currentUser.displayName || 'ogrenci')
+                            .toLowerCase()
+                            .replace(/[^a-z0-9_]/g, '')
+                            .slice(0, 12);
+                          setPendingGoogleUser({
+                            uid: auth.currentUser.uid,
+                            displayName: auth.currentUser.displayName || 'Öğrenci',
+                            email: auth.currentUser.email || 'ogrenci@egitimkocum.ai',
+                            photoURL: auth.currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                            username: `${base || 'ogrenci'}_${Math.floor(100 + Math.random() * 900)}`,
+                          });
+                          setMode('google_exam_select');
+                          return;
+                        }
+                      } catch (dbErr) {
+                        console.warn('Error checking db in catch:', dbErr);
+                      }
                     }
 
                     if (err?.code === 'auth/cancelled-popup-request') {

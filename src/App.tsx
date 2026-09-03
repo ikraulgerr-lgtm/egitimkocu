@@ -340,11 +340,96 @@ export function App() {
             };
             setUserState(userData);
             saveUser(userData, uid);
+
+            // Fetch user questions EXCLUSIVELY for this user
+            let userQuestions: SoruKaydi[] = [];
+            try {
+              const qColRef = collection(db, 'users', uid, 'questions');
+              const qSnap = await getDocs(qColRef);
+              if (!qSnap.empty) {
+                userQuestions = qSnap.docs.map((doc) => doc.data() as SoruKaydi);
+              } else {
+                userQuestions = getQuestions(uid);
+              }
+            } catch (qErr) {
+              userQuestions = getQuestions(uid);
+            }
+            setQuestionsState(userQuestions);
+            saveQuestions(userQuestions, uid);
+
+            // Fetch user schedule EXCLUSIVELY for this user
+            let userSchedule: ProgramOgesi[] = [];
+            try {
+              const sColRef = collection(db, 'users', uid, 'schedule');
+              const sSnap = await getDocs(sColRef);
+              if (!sSnap.empty) {
+                userSchedule = sSnap.docs.map((doc) => doc.data() as ProgramOgesi);
+              } else {
+                userSchedule = getSchedule(uid);
+              }
+            } catch (err) {
+              userSchedule = getSchedule(uid);
+            }
+            setScheduleState(userSchedule);
+            saveSchedule(userSchedule, uid);
+
+            // Fetch user friends EXCLUSIVELY for this user
+            let userFriends: Arkadas[] = [];
+            try {
+              const fColRef = collection(db, 'users', uid, 'friends');
+              const fSnap = await getDocs(fColRef);
+              if (!fSnap.empty) {
+                userFriends = fSnap.docs.map((doc) => doc.data() as Arkadas);
+              } else {
+                userFriends = getFriends(uid);
+              }
+            } catch (err) {
+              userFriends = getFriends(uid);
+            }
+            setFriendsState(userFriends);
+            saveFriends(userFriends, uid);
+
+            // Fetch user denemeler EXCLUSIVELY for this user
+            let userDenemeler: DenemeRecord[] = [];
+            try {
+              const dColRef = collection(db, 'users', uid, 'denemeler');
+              const dSnap = await getDocs(dColRef);
+              if (!dSnap.empty) {
+                userDenemeler = dSnap.docs.map((doc) => doc.data() as DenemeRecord);
+              } else {
+                userDenemeler = getDenemeler(uid);
+              }
+            } catch (err) {
+              userDenemeler = getDenemeler(uid);
+            }
+            saveDenemelerLocally(userDenemeler, uid);
+
+            // Fetch community posts from Firestore
+            try {
+              const cColRef = collection(db, 'community');
+              const cSnap = await getDocs(cColRef);
+              if (!cSnap.empty) {
+                const loadedPosts: ToplulukSoru[] = cSnap.docs.map((doc) => doc.data() as ToplulukSoru);
+                setPostsState(loadedPosts);
+                savePosts(loadedPosts);
+              }
+            } catch (cErr) {
+              console.warn('Community posts load warning:', cErr);
+            }
+
+            // Only close auth modal if user already has a configured targetExam!
+            if (data.targetExam) {
+              setIsAuthModalOpen(false);
+            } else {
+              setIsAuthModalOpen(true);
+            }
           } else {
+            // First time user: doc does not exist yet!
+            // Keep AuthModal OPEN so they can select target exam in AuthModal
             const initialName = firebaseUser.displayName || 'Öğrenci';
             currentUsername = (firebaseUser.email?.split('@')[0] || 'ogrenci').toLowerCase().replace(/[^a-z0-9_]/g, '') + `_${Math.floor(100 + Math.random() * 900)}`;
             const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
-            const newUserData: Kullanici = {
+            const tempUserData: Kullanici = {
               id: uid,
               ad: initialName,
               kullaniciAdi: currentUsername,
@@ -355,104 +440,15 @@ export function App() {
               seri: 1,
               xp: 0,
               isPremium: false,
-              sinif: 'YKS / LGS Hazırlık',
               avatarUrl: DEFAULT_AVATAR,
               flashcardPractices: 0,
               nightOwlUnlocked: false,
               invitedCount: 0,
               lastResetDate: todayTr,
             };
-            await setDoc(userDocRef, newUserData, { merge: true });
-            setUserState(newUserData);
-            saveUser(newUserData, uid);
+            setUserState(tempUserData);
+            setIsAuthModalOpen(true);
           }
-
-          // Fetch user questions EXCLUSIVELY for this user
-          let userQuestions: SoruKaydi[] = [];
-          try {
-            const qColRef = collection(db, 'users', uid, 'questions');
-            const qSnap = await getDocs(qColRef);
-            if (!qSnap.empty) {
-              userQuestions = qSnap.docs.map((doc) => doc.data() as SoruKaydi);
-            } else {
-              // Fallback to this user's scoped local storage
-              userQuestions = getQuestions(uid);
-            }
-          } catch (err) {
-            console.warn('Could not fetch questions from Firestore, using user local scoped storage:', err);
-            userQuestions = getQuestions(uid);
-          }
-
-          setQuestionsState(userQuestions);
-          saveQuestions(userQuestions, uid);
-          if (userQuestions.length > 0) {
-            setSelectedQuestion(userQuestions[0]);
-          } else {
-            setSelectedQuestion(null);
-          }
-
-          // Fetch user schedule EXCLUSIVELY for this user
-          let userSchedule: ProgramOgesi[] = [];
-          try {
-            const sColRef = collection(db, 'users', uid, 'schedule');
-            const sSnap = await getDocs(sColRef);
-            if (!sSnap.empty) {
-              userSchedule = sSnap.docs.map((doc) => doc.data() as ProgramOgesi);
-            } else {
-              userSchedule = getSchedule(uid);
-            }
-          } catch (err) {
-            userSchedule = getSchedule(uid);
-          }
-          setScheduleState(userSchedule);
-          saveSchedule(userSchedule, uid);
-
-          // Fetch user friends EXCLUSIVELY for this user
-          let userFriends: Arkadas[] = [];
-          try {
-            const fColRef = collection(db, 'users', uid, 'friends');
-            const fSnap = await getDocs(fColRef);
-            if (!fSnap.empty) {
-              userFriends = fSnap.docs.map((doc) => doc.data() as Arkadas);
-            } else {
-              userFriends = getFriends(uid);
-            }
-          } catch (err) {
-            userFriends = getFriends(uid);
-          }
-          setFriendsState(userFriends);
-          saveFriends(userFriends, uid);
-
-          // Fetch user denemeler EXCLUSIVELY for this user
-          let userDenemeler: DenemeRecord[] = [];
-          try {
-            const dColRef = collection(db, 'users', uid, 'denemeler');
-            const dSnap = await getDocs(dColRef);
-            if (!dSnap.empty) {
-              userDenemeler = dSnap.docs.map((doc) => doc.data() as DenemeRecord);
-            } else {
-              userDenemeler = getDenemeler(uid);
-            }
-          } catch (err) {
-            userDenemeler = getDenemeler(uid);
-          }
-          saveDenemelerLocally(userDenemeler, uid);
-
-          // Fetch community posts from Firestore
-          try {
-            const cColRef = collection(db, 'community');
-            const cSnap = await getDocs(cColRef);
-            if (!cSnap.empty) {
-              const loadedPosts: ToplulukSoru[] = cSnap.docs.map((doc) => doc.data() as ToplulukSoru);
-              setPostsState(loadedPosts);
-              savePosts(loadedPosts);
-            }
-          } catch (cErr) {
-            console.warn('Community posts load warning:', cErr);
-          }
-
-          // Automatically close login modal once authentication is established
-          setIsAuthModalOpen(false);
         } catch (err) {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
         }
