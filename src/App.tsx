@@ -66,7 +66,6 @@ export function App() {
   const [selectedQuestion, setSelectedQuestion] = useState<SoruKaydi | null>(questions[0] || null);
 
   const [theme, setThemeState] = useState<'light' | 'dark'>(getTheme());
-  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [isSplashActive, setIsSplashActive] = useState(true);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
@@ -342,81 +341,45 @@ export function App() {
             setUserState(userData);
             saveUser(userData, uid);
 
-            // Fetch user questions EXCLUSIVELY for this user
-            let userQuestions: SoruKaydi[] = [];
-            try {
-              const qColRef = collection(db, 'users', uid, 'questions');
-              const qSnap = await getDocs(qColRef);
+            // Fetch user subcollections asynchronously in the background
+            getDocs(collection(db, 'users', uid, 'questions')).then((qSnap) => {
               if (!qSnap.empty) {
-                userQuestions = qSnap.docs.map((doc) => doc.data() as SoruKaydi);
-              } else {
-                userQuestions = getQuestions(uid);
+                const userQuestions = qSnap.docs.map((doc) => doc.data() as SoruKaydi);
+                setQuestionsState(userQuestions);
+                saveQuestions(userQuestions, uid);
               }
-            } catch (qErr) {
-              userQuestions = getQuestions(uid);
-            }
-            setQuestionsState(userQuestions);
-            saveQuestions(userQuestions, uid);
+            }).catch(() => {});
 
-            // Fetch user schedule EXCLUSIVELY for this user
-            let userSchedule: ProgramOgesi[] = [];
-            try {
-              const sColRef = collection(db, 'users', uid, 'schedule');
-              const sSnap = await getDocs(sColRef);
+            getDocs(collection(db, 'users', uid, 'schedule')).then((sSnap) => {
               if (!sSnap.empty) {
-                userSchedule = sSnap.docs.map((doc) => doc.data() as ProgramOgesi);
-              } else {
-                userSchedule = getSchedule(uid);
+                const userSchedule = sSnap.docs.map((doc) => doc.data() as ProgramOgesi);
+                setScheduleState(userSchedule);
+                saveSchedule(userSchedule, uid);
               }
-            } catch (err) {
-              userSchedule = getSchedule(uid);
-            }
-            setScheduleState(userSchedule);
-            saveSchedule(userSchedule, uid);
+            }).catch(() => {});
 
-            // Fetch user friends EXCLUSIVELY for this user
-            let userFriends: Arkadas[] = [];
-            try {
-              const fColRef = collection(db, 'users', uid, 'friends');
-              const fSnap = await getDocs(fColRef);
+            getDocs(collection(db, 'users', uid, 'friends')).then((fSnap) => {
               if (!fSnap.empty) {
-                userFriends = fSnap.docs.map((doc) => doc.data() as Arkadas);
-              } else {
-                userFriends = getFriends(uid);
+                const userFriends = fSnap.docs.map((doc) => doc.data() as Arkadas);
+                setFriendsState(userFriends);
+                saveFriends(userFriends, uid);
               }
-            } catch (err) {
-              userFriends = getFriends(uid);
-            }
-            setFriendsState(userFriends);
-            saveFriends(userFriends, uid);
+            }).catch(() => {});
 
-            // Fetch user denemeler EXCLUSIVELY for this user
-            let userDenemeler: DenemeRecord[] = [];
-            try {
-              const dColRef = collection(db, 'users', uid, 'denemeler');
-              const dSnap = await getDocs(dColRef);
+            getDocs(collection(db, 'users', uid, 'denemeler')).then((dSnap) => {
               if (!dSnap.empty) {
-                userDenemeler = dSnap.docs.map((doc) => doc.data() as DenemeRecord);
-              } else {
-                userDenemeler = getDenemeler(uid);
+                const userDenemeler = dSnap.docs.map((doc) => doc.data() as DenemeRecord);
+                saveDenemelerLocally(userDenemeler, uid);
               }
-            } catch (err) {
-              userDenemeler = getDenemeler(uid);
-            }
-            saveDenemelerLocally(userDenemeler, uid);
+            }).catch(() => {});
 
-            // Fetch community posts from Firestore
-            try {
-              const cColRef = collection(db, 'community');
-              const cSnap = await getDocs(cColRef);
+            getDocs(collection(db, 'community')).then((cSnap) => {
               if (!cSnap.empty) {
-                const loadedPosts: ToplulukSoru[] = cSnap.docs.map((doc) => doc.data() as ToplulukSoru);
+                const loadedPosts = cSnap.docs.map((doc) => doc.data() as ToplulukSoru);
                 setPostsState(loadedPosts);
                 savePosts(loadedPosts);
               }
-            } catch (cErr) {
-              console.warn('Community posts load warning:', cErr);
-            }
+            }).catch(() => {});
 
             // Only close auth modal if user already has a configured targetExam!
             if (data.targetExam) {
@@ -426,7 +389,6 @@ export function App() {
             }
           } else {
             // First time user: doc does not exist yet!
-            // Keep AuthModal OPEN so they can select target exam in AuthModal
             const initialName = firebaseUser.displayName || 'Öğrenci';
             currentUsername = (firebaseUser.email?.split('@')[0] || 'ogrenci').toLowerCase().replace(/[^a-z0-9_]/g, '') + `_${Math.floor(100 + Math.random() * 900)}`;
             const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
@@ -452,8 +414,6 @@ export function App() {
           }
         } catch (err) {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
-        } finally {
-          setIsAuthChecking(false);
         }
       } else {
         // Logged-out state: clean all in-memory user data so next login starts isolated
@@ -464,7 +424,6 @@ export function App() {
         setNotifications([]);
         setSelectedQuestion(null);
         setIsAuthModalOpen(true);
-        setIsAuthChecking(false);
       }
     });
 
@@ -1440,25 +1399,10 @@ export function App() {
     showToast(`👋 Hoş geldiniz, ${updated.ad}!`);
   };
 
-  if (isAuthChecking) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white space-y-4">
-        <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-primary to-indigo-500 p-0.5 shadow-2xl animate-pulse flex items-center justify-center">
-          <div className="w-full h-full bg-slate-950 rounded-[22px] flex items-center justify-center">
-            <span className="text-3xl">🧠</span>
-          </div>
-        </div>
-        <div className="text-center space-y-1">
-          <h1 className="text-xl font-black tracking-tight text-white">Eğitim Koçum AI</h1>
-          <p className="text-xs text-indigo-300 animate-pulse font-medium">Yükleniyor...</p>
-        </div>
-      </div>
-    );
-  }
-
   if (!auth.currentUser) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        {isSplashActive && <SplashScreen theme={theme} />}
         <AuthModal
           isOpen={true}
           onClose={() => {}}
