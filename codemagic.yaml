@@ -8,6 +8,13 @@ workflows:
     environment:
       node: 22
       xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.egitimkocumai
+      vars:
+        XCODE_PROJECT: "ios/App/App.xcodeproj"
+        XCODE_SCHEME: "App"
+        BUNDLE_ID: "com.egitimkocumai"
     scripts:
       - name: Install dependencies
         script: |
@@ -21,18 +28,16 @@ workflows:
       - name: Set up code signing (fetch or create certificates and profiles)
         script: |
           keychain initialize
-          app-store-connect fetch-signing-files "com.egitimkocumai" \
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
           keychain add-certificates
-          xcode-project use-profiles
+          xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Build and Package IPA for App Store
         script: |
-          cd ios/App
           xcode-project build-ipa \
-            --project App.xcodeproj \
-            --scheme App \
-            --clean
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
       - /Users/builder/export/*.ipa
