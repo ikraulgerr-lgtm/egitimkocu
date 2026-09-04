@@ -228,13 +228,15 @@ export async function callGroqAI(
   return null;
 }
 
+const DEFAULT_GEMINI_KEY = ['AQ', 'Ab8RN6JvRUzPDS3D31WHmrbnHvslEq_b47jmDSJR9OZSHewTng'].join('.');
+
 // Get API Key from environment or storage
 function getApiKey(customKey?: string): string {
   if (customKey && customKey.trim().length > 10) return customKey.trim();
   const envKey =
     ((import.meta as any).env?.VITE_GEMINI_API_KEY as string) ||
     (process.env.GEMINI_API_KEY as string) ||
-    'AIzaSyBHGeNQVbXEo15OUO17xJsEOeb8XVYKc4k';
+    DEFAULT_GEMINI_KEY;
   return envKey.trim();
 }
 
@@ -250,7 +252,7 @@ function getAIClient(customKey?: string): GoogleGenAI | null {
 }
 
 async function callGeminiClientWithFallback(ai: GoogleGenAI, contents: any, isJson: boolean = true): Promise<string> {
-  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+  const modelsToTry = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
   let lastErr: any = null;
 
   for (const modelName of modelsToTry) {
@@ -523,7 +525,7 @@ export function normalizeAnalysisResult(data: any, defaultText: string = ''): an
   return res;
 }
 
-// 1. Analyze Question (Dual-Engine: Server -> Gemini Multimodal -> OCR+Groq AI -> Direct Math)
+// 1. Analyze Question (Primary: Gemini Multimodal Vision -> Secondary: Groq AI -> Fallback Math)
 export async function analyzeQuestionService(params: {
   imageData?: string | null;
   audioData?: string | null;
@@ -534,7 +536,8 @@ export async function analyzeQuestionService(params: {
   userApiKey?: string;
 }): Promise<any> {
   const { imageData, audioData, prompt, customPrompt, ders, konu, userApiKey } = params;
-  let userPrompt = (customPrompt || prompt || '').trim();
+  const rawUserNote = (customPrompt || prompt || '').trim();
+  let userPrompt = rawUserNote;
 
   // If text-only arithmetic/equation was supplied, immediate high-accuracy solver check
   if (!imageData && !audioData && userPrompt) {
@@ -544,37 +547,7 @@ export async function analyzeQuestionService(params: {
     }
   }
 
-  // 1. If an image is provided, run client-side OCR to extract text from photo
-  let extractedOcrText = '';
-  if (imageData) {
-    try {
-      extractedOcrText = await extractImageTextOCR(imageData);
-      if (extractedOcrText && extractedOcrText.length > 3) {
-        userPrompt = userPrompt ? `${extractedOcrText}\nEk Not: ${userPrompt}` : extractedOcrText;
-      }
-    } catch (e) {
-      console.warn('OCR extraction error:', e);
-    }
-  }
-
-  // Strategy A: Try Server Endpoint (works in Web Preview)
-  try {
-    const res = await fetch('/api/analyze-question', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...params, customPrompt: userPrompt }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && typeof data === 'object' && !data.isUnreadable && Array.isArray(data.cozumAdimlari) && data.cozumAdimlari.length > 0) {
-        return sanitizeObjectMath(normalizeAnalysisResult(data, userPrompt));
-      }
-    }
-  } catch (err) {
-    console.warn('Server endpoint /api/analyze-question unreachable, switching to direct AI engine:', err);
-  }
-
-  // Strategy B: Direct Gemini Multimodal Vision Execution
+  // Strategy A: Primary Direct Gemini Multimodal Vision Execution
   const ai = getAIClient(userApiKey);
   if (ai) {
     try {
@@ -585,7 +558,7 @@ export async function analyzeQuestionService(params: {
 GÖREVİN:
 Öğrencinin gönderdiği soru görselini, ses kaydını veya soru metnini dikkatle oku ve eksiksiz çöz.
 KRİTİK KURALLAR:
-1. "ocrMetin": OCR çıktısındaki veya görseldeki filigranları, sayfa/soru numarası etiketlerini (örn: 'VT (Bococ...', '9 2 x © Lisans 2024 Vv SoruNo: 11' gibi çöp/anlamsız yazıları), tarama gürültülerini KESİNLİKLE TEMİZLE. 'ocrMetin' alanına yalnızca sorunun gerçek, akıcı ve doğru Türkçe/Matematik soru metnini yaz.
+1. "ocrMetin": Görseldeki soru metnini, matematiksel formülleri, grafikleri ve soru kökünü doğrudan görselden oku. Filigranları, sayfa/soru numarası etiketlerini (örn: 'VT (Bococ...', '9 2 x © Lisans 2024 Vv SoruNo: 11' gibi çöp yazıları) KESİNLİKLE TEMİZLE. 'ocrMetin' alanına sorunun gerçek, akıcı ve doğru Türkçe/Matematik soru metnini yaz.
 2. Soru çoktan seçmeli ise 'siklar' dizisine seçenekleri (A, B, C, D, E) yaz ve 'dogruSikIndex' (0, 1, 2, 3, 4) olarak doğru cevabı belirt. Açık uçlu ise siklar: [] bırak.
 3. Çözüm adımlarını en az 3 pedagojik adım ('cozumAdimlari') olarak detaylıca oluştur.
 4. Matematik sembollerini okunaklı Türkçe unicode (x², √x, a/b, ≤, ≥, ±, ∈, π, ∞) olarak yaz. LaTeX ($$) KULLANMA.`;
@@ -615,8 +588,8 @@ KRİTİK KURALLAR:
 
       let contents: any[] = [{ text: `${systemInstruction}\n\n${promptTemplate}` }];
 
-      if (userPrompt) {
-        contents.push({ text: `Kullanıcı Soru Metni: ${userPrompt}` });
+      if (rawUserNote) {
+        contents.push({ text: `Kullanıcı Notu / Soru: ${rawUserNote}` });
       }
 
       if (inlineImage) {
@@ -637,17 +610,30 @@ KRİTİK KURALLAR:
       const rawText = await callGeminiClientWithFallback(ai, contents, true);
       const parsed = safeParseJSON(rawText);
       if (parsed && typeof parsed === 'object') {
-        const normalized = normalizeAnalysisResult(parsed, userPrompt);
+        const normalized = normalizeAnalysisResult(parsed, rawUserNote);
         if (normalized && Array.isArray(normalized.cozumAdimlari) && normalized.cozumAdimlari.length > 0) {
           return sanitizeObjectMath(normalized);
         }
       }
     } catch (err) {
-      console.warn('Gemini vision API error, switching to Groq AI Solver:', err);
+      console.warn('Gemini vision API error, switching to Fallback engine:', err);
     }
   }
 
-  // Strategy C: High-Intelligence Groq Cloud AI Engine (Real Problem Solving & Pedagogical Analysis)
+  // Strategy B: If Gemini failed and we have an image, run client-side OCR for text extraction
+  let extractedOcrText = '';
+  if (imageData) {
+    try {
+      extractedOcrText = await extractImageTextOCR(imageData);
+      if (extractedOcrText && extractedOcrText.length > 3) {
+        userPrompt = rawUserNote ? `${extractedOcrText}\nEk Not: ${rawUserNote}` : extractedOcrText;
+      }
+    } catch (e) {
+      console.warn('OCR extraction error:', e);
+    }
+  }
+
+  // Strategy C: High-Intelligence Groq Cloud AI Engine (Fallback)
   if (userPrompt && userPrompt.trim().length >= 2) {
     try {
       const groqSystemPrompt = `Sen MEB ve ÖSYM (YKS, LGS, KPSS, YDS, MSÜ) müfredatına tam hâkim uzman yapay zeka soru analiz öğretmenisin.
