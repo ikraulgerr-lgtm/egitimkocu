@@ -22,21 +22,19 @@ workflows:
       - name: Sync iOS Platform
         script: |
           npx cap sync ios
-      - name: Set up code signing and fetch certificates
+      - name: Set up code signing
         script: |
           keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create \
-            --verbose
-          keychain add-certificates
-          xcode-project use-profiles --project "$XCODE_PROJECT" --verbose
+          keychain add-certificates --certificate ios/App/ios_distribution.p12 --certificate-password 123456 || \
+            security import ios/App/ios_distribution.p12 -P "123456" -A
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp ios/App/egitimkocu.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/"
+          xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Build and Package IPA for App Store
         script: |
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME" \
-            --verbose
+            --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
       - /Users/builder/export/*.ipa
