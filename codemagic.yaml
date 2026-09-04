@@ -30,6 +30,18 @@ workflows:
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp ios/App/egitimkocu.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/"
           xcode-project use-profiles --project "$XCODE_PROJECT"
+      - name: Increment build number
+        script: |
+          cd ios/App
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
+          echo "Latest TestFlight build number: $LATEST_BUILD_NUMBER"
+          if [ "$LATEST_BUILD_NUMBER" -gt 0 ]; then
+            NEW_BUILD_NUMBER=$(($LATEST_BUILD_NUMBER + 1))
+          else
+            NEW_BUILD_NUMBER=4
+          fi
+          echo "Setting new build number to: $NEW_BUILD_NUMBER"
+          agvtool new-version -all $NEW_BUILD_NUMBER
       - name: Build and Package IPA for App Store
         script: |
           xcode-project build-ipa \
