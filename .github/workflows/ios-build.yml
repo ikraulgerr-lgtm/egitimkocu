@@ -1,0 +1,53 @@
+﻿name: Build iOS App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build iOS Application (macOS Cloud)
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install NPM Dependencies
+        run: npm ci
+
+      - name: Build Web Assets
+        run: npm run build
+
+      - name: Sync iOS Platform
+        run: npx cap sync ios
+
+      - name: Build iOS App
+        run: |
+          cd ios/App
+          xcodebuild clean build \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -r ~/Library/Developer/Xcode/DerivedData/*/Build/Products/Release-iphoneos/App.app Payload/
+          zip -r EgitimKocumAI-iOS.ipa Payload
+
+      - name: Upload iOS App Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EgitimKocumAI-iOS-IPA
+          path: EgitimKocumAI-iOS.ipa
+          retention-days: 14
