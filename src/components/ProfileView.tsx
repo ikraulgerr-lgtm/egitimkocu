@@ -301,7 +301,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
             {/* Username Badge */}
             <p className="text-xs font-mono text-indigo-200 mt-0.5">
-              @{user.kullaniciAdi || 'ogrenci'}
+              {auth.currentUser ? `@${user.kullaniciAdi || 'ogrenci'}` : 'Misafir Hesabı (Giriş Yapılmadı)'}
             </p>
 
             <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
@@ -315,21 +315,32 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 bg-white/20 text-white px-2.5 py-0.5 rounded-full text-[10px] font-bold">
-                  Standart Plan
+                  {auth.currentUser ? 'Standart Plan' : 'Misafir Modu'}
                 </span>
               )}
             </div>
 
-            {/* Logout / Switch Account Button directly under Profile Info */}
-            <div className="pt-2 flex justify-center">
-              <button
-                type="button"
-                onClick={onLogout || onOpenAuth}
-                className="inline-flex items-center gap-1.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-300/40 text-rose-100 text-xs font-extrabold px-4 py-1.5 rounded-full transition-all cursor-pointer backdrop-blur-md active:scale-95 shadow-sm"
-              >
-                <span className="material-symbols-outlined text-base">logout</span>
-                <span>Çıkış Yap / Hesap Değiştir</span>
-              </button>
+            {/* Login or Logout Button based on authentication state */}
+            <div className="pt-3 flex justify-center">
+              {auth.currentUser ? (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="inline-flex items-center gap-1.5 bg-rose-500/30 hover:bg-rose-500/40 border border-rose-300/50 text-rose-100 text-xs font-extrabold px-5 py-2 rounded-full transition-all cursor-pointer backdrop-blur-md active:scale-95 shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-base">logout</span>
+                  <span>Çıkış Yap</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onOpenAuth}
+                  className="inline-flex items-center gap-1.5 bg-gradient-to-r from-primary to-indigo-500 hover:from-primary/90 hover:to-indigo-600 text-white text-xs font-black px-6 py-2.5 rounded-full transition-all cursor-pointer shadow-md active:scale-95 border border-indigo-400/40"
+                >
+                  <span className="material-symbols-outlined text-base">login</span>
+                  <span>Giriş Yap / Hesap Aç</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

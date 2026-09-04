@@ -142,7 +142,7 @@ export function cleanRawOcrText(raw: string): string {
     if (/^(?:VT\s*\(|©|Lisans\s*\d+|SoruNo:\s*\d+|Test\s*No:|Sayfa\s*\d+|ÖSYM\s*\d+|[\d\s\w\.\,\-]{1,6}$)/i.test(line)) {
       continue;
     }
-    // Filter out random symbol-only lines like "| ® 7 i v3 ce l ® Wp"
+    // Filter out random symbol-only lines
     if (/^[\|\®\©\(\)\+\=\*\/\-\_\s\d\w]{1,20}$/.test(line) && !/[a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}/.test(line)) {
       continue;
     }
@@ -150,13 +150,28 @@ export function cleanRawOcrText(raw: string): string {
   }
 
   let result = cleanedLines.join(' ').trim();
-  // Remove standalone watermark headers that might be inline
+  // Remove standalone watermark headers
   result = result.replace(/VT\s*\([^)]*\)/gi, '');
   result = result.replace(/©\s*Lisans\s*\d+/gi, '');
   result = result.replace(/SoruNo:\s*\d+/gi, '');
   result = result.replace(/[|®©]/g, ' ');
-  result = result.replace(/\s+/g, ' ').trim();
 
+  // Filter out extreme OCR noise (repeated single/two letter noise e.g., 'Hi Hi lid 0 O Hi Hl i Hi Wi')
+  const words = result.split(/\s+/);
+  if (words.length > 8) {
+    const shortWords = words.filter(w => w.length <= 2);
+    if (shortWords.length / words.length > 0.55) {
+      // High noise OCR detected — filter out standalone single character gibberish and repeating tokens
+      const filtered = words.filter((w, i) => {
+        if (w.length <= 2 && /^[a-zA-Z0-9]$/.test(w)) return false;
+        if (i > 0 && w.toLowerCase() === words[i - 1].toLowerCase()) return false;
+        return true;
+      });
+      result = filtered.join(' ');
+    }
+  }
+
+  result = result.replace(/\s+/g, ' ').trim();
   return result || raw;
 }
 
@@ -181,7 +196,7 @@ export async function callGroqAI(
   systemPrompt: string = 'Sen MEB ve ÖSYM müfredatına tam hâkim uzman yapay zeka soru analiz öğretmenisin.',
   isJson: boolean = true
 ): Promise<string | null> {
-  const models = ['openai/gpt-oss-120b', 'qwen/qwen3.6-27b', 'openai/gpt-oss-20b'];
+  const models = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'groq/compound', 'qwen/qwen3.6-27b', 'openai/gpt-oss-20b'];
   for (const model of models) {
     try {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
