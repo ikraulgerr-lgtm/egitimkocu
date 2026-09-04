@@ -66,6 +66,7 @@ export function App() {
   const [selectedQuestion, setSelectedQuestion] = useState<SoruKaydi | null>(questions[0] || null);
 
   const [theme, setThemeState] = useState<'light' | 'dark'>(getTheme());
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [isSplashActive, setIsSplashActive] = useState(true);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
@@ -451,6 +452,8 @@ export function App() {
           }
         } catch (err) {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
+        } finally {
+          setIsAuthChecking(false);
         }
       } else {
         // Logged-out state: clean all in-memory user data so next login starts isolated
@@ -461,6 +464,7 @@ export function App() {
         setNotifications([]);
         setSelectedQuestion(null);
         setIsAuthModalOpen(true);
+        setIsAuthChecking(false);
       }
     });
 
@@ -1435,6 +1439,34 @@ export function App() {
     setActiveTab('home');
     showToast(`👋 Hoş geldiniz, ${updated.ad}!`);
   };
+
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white space-y-4">
+        <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-primary to-indigo-500 p-0.5 shadow-2xl animate-pulse flex items-center justify-center">
+          <div className="w-full h-full bg-slate-950 rounded-[22px] flex items-center justify-center">
+            <span className="text-3xl">🧠</span>
+          </div>
+        </div>
+        <div className="text-center space-y-1">
+          <h1 className="text-xl font-black tracking-tight text-white">Eğitim Koçum AI</h1>
+          <p className="text-xs text-indigo-300 animate-pulse font-medium">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!auth.currentUser) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <AuthModal
+          isOpen={true}
+          onClose={() => {}}
+          onLoginSuccess={handleLoginSuccess}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-text-main font-sans transition-colors duration-200">
