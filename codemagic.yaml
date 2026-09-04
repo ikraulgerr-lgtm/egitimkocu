@@ -37,6 +37,7 @@ workflows:
       - build/ios/ipa/*.ipa
       - /Users/builder/export/*.ipa
       - "*.ipa"
+      - "**/*.ipa"
     publishing:
       app_store_connect:
         auth: integration
