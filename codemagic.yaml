@@ -12,7 +12,6 @@ workflows:
         XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
         BUNDLE_ID: "com.egitimkocumai"
-        APPLE_TEAM_ID: "MZV9JU52M9"
     scripts:
       - name: Install dependencies
         script: |
@@ -23,58 +22,21 @@ workflows:
       - name: Sync iOS Platform
         script: |
           npx cap sync ios
-      - name: Configure Apple API Credentials
+      - name: Set up code signing and fetch certificates
         script: |
-          mkdir -p ~/.appstoreconnect/private_keys ~/.private_keys ~/private_keys
-          echo "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8
-          echo "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/.private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8
-          echo "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8
-          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8
-      - name: Build Archive and Export IPA (Apple Native Sign)
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create \
+            --verbose
+          keychain add-certificates
+          xcode-project use-profiles --project "$XCODE_PROJECT" --verbose
+      - name: Build and Package IPA for App Store
         script: |
-          mkdir -p build/ios/xcarchive build/ios/ipa
-          
-          # Create ExportOptions.plist
-          cat << 'EOF' > ExportOptions.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>destination</key>
-              <string>export</string>
-              <key>method</key>
-              <string>app-store</string>
-              <key>signingStyle</key>
-              <string>automatic</string>
-              <key>teamID</key>
-              <string>MZV9JU52M9</string>
-              <key>stripSwiftSymbols</key>
-              <true/>
-          </dict>
-          </plist>
-          EOF
-
-          # Archive using Xcode with native App Store Connect authentication
-          xcodebuild archive \
-            -project "$XCODE_PROJECT" \
-            -scheme "$XCODE_SCHEME" \
-            -configuration Release \
-            -destination "generic/platform=iOS" \
-            -archivePath "build/ios/xcarchive/App.xcarchive" \
-            -authenticationKeyPath "$HOME/.private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8" \
-            -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
-            -allowProvisioningUpdates
-
-          # Export IPA using Xcode with native App Store Connect authentication
-          xcodebuild -exportArchive \
-            -archivePath "build/ios/xcarchive/App.xcarchive" \
-            -exportOptionsPlist ExportOptions.plist \
-            -exportPath "build/ios/ipa" \
-            -authenticationKeyPath "$HOME/.private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8" \
-            -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID" \
-            -allowProvisioningUpdates
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME" \
+            --verbose
     artifacts:
       - build/ios/ipa/*.ipa
       - /Users/builder/export/*.ipa
