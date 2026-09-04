@@ -1,10 +1,10 @@
-﻿workflows:
+workflows:
   ios-release:
     name: iOS Build (Egitim Kocum AI)
     instance_type: mac_mini_m1
     max_build_duration: 30
     environment:
-      node: 20
+      node: 22
       xcode: latest
     scripts:
       - name: Install dependencies
