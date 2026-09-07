@@ -49,18 +49,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [devCode, setDevCode] = useState<string | null>(null);
   const [resendCountdown, setResendCountdown] = useState<number>(0);
 
-  // Auto clean form inputs when modal opens or switches mode
+  // Auto clean form inputs when switching mode
   useEffect(() => {
-    if (isOpen) {
-      setErrorMsg(null);
-      setPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setOtpCode('');
-      setIsGoogleLoading(false);
-      setIsEmailLoading(false);
-    }
-  }, [isOpen, mode]);
+    setErrorMsg(null);
+    setIsGoogleLoading(false);
+    setIsEmailLoading(false);
+  }, [mode]);
 
   // Real-time reactive auth state listener ONLY for Google SSO flow
   useEffect(() => {
@@ -151,8 +145,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           return;
         }
 
-        // Validate username format
-        const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+        // Validate username format with Turkish character transliteration
+        const cleanUsername = username
+          .trim()
+          .replace(/İ/g, 'i')
+          .replace(/I/g, 'i')
+          .replace(/ı/g, 'i')
+          .replace(/ş/g, 's')
+          .replace(/Ş/g, 's')
+          .replace(/ğ/g, 'g')
+          .replace(/Ğ/g, 'g')
+          .replace(/ü/g, 'u')
+          .replace(/Ü/g, 'u')
+          .replace(/ö/g, 'o')
+          .replace(/Ö/g, 'o')
+          .replace(/ç/g, 'c')
+          .replace(/Ç/g, 'c')
+          .toLowerCase()
+          .replace(/[^a-z0-9_]/g, '');
         if (!cleanUsername || cleanUsername.length < 3 || cleanUsername.length > 20) {
           setErrorMsg('Kullanıcı adı en az 3, en fazla 20 karakter olmalı ve yalnızca küçük harf, rakam ve alt tire (_) içermelidir.');
           setIsEmailLoading(false);
@@ -647,6 +657,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Adınız Soyadınız"
+                        autoCapitalize="words"
+                        autoCorrect="off"
+                        spellCheck={false}
                         className="w-full bg-surface-container-low border border-card-border rounded-xl py-3 pl-10 pr-4 text-xs text-text-main focus:outline-none focus:ring-2 focus:ring-primary"
                         required
                       />
@@ -663,11 +676,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <input
                         type="text"
                         value={username}
-                        onChange={(e) => {
-                          const val = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
-                          setUsername(val);
-                        }}
+                        onChange={(e) => setUsername(e.target.value)}
                         placeholder="kullanici_adi (Örn: ahmet_yks)"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         className="w-full bg-surface-container-low border border-card-border rounded-xl py-3 pl-10 pr-4 text-xs text-text-main focus:outline-none focus:ring-2 focus:ring-primary font-mono"
                         required
                       />
@@ -714,6 +727,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="ornek@edu.com"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     className="w-full bg-surface-container-low border border-card-border rounded-xl py-3 pl-10 pr-4 text-xs text-text-main focus:outline-none focus:ring-2 focus:ring-primary"
                     required
                   />
@@ -745,6 +761,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     className="w-full bg-surface-container-low border border-card-border rounded-xl py-3 pl-10 pr-10 text-xs text-text-main focus:outline-none focus:ring-2 focus:ring-primary"
                     required
                   />
@@ -852,6 +871,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="ornek@edu.com"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     className="w-full bg-surface-container-low border border-card-border rounded-xl py-3.5 pl-10 pr-4 text-xs text-text-main focus:outline-none focus:ring-2 focus:ring-primary"
                     required
                   />
@@ -936,6 +958,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <input
                   type="text"
                   maxLength={6}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                   placeholder="123456"
@@ -1017,6 +1041,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     className="w-full bg-surface-container-low border border-card-border rounded-xl py-3 pl-10 pr-10 text-xs text-text-main focus:outline-none focus:ring-2 focus:ring-primary"
                     required
                   />
@@ -1043,6 +1070,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     className="w-full bg-surface-container-low border border-card-border rounded-xl py-3 pl-10 pr-4 text-xs text-text-main focus:outline-none focus:ring-2 focus:ring-primary"
                     required
                   />

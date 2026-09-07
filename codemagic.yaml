@@ -22,6 +22,7 @@ workflows:
       - name: Sync iOS Platform
         script: |
           npx cap sync ios
+          node scripts/patch-speech.js
       - name: Set up code signing
         script: |
           keychain initialize
