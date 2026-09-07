@@ -25,10 +25,13 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
-          keychain add-certificates --certificate ios/App/ios_distribution.p12 --certificate-password 123456 || \
-            security import ios/App/ios_distribution.p12 -P "123456" -A
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create || true
+          keychain add-certificates --certificate ios/App/ios_distribution.p12 --certificate-password 123456 || true
+          keychain add-certificates || true
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          cp ios/App/egitimkocu.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/"
+          cp ios/App/egitimkocu.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/" || true
           xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Set dynamic build version
         script: |
@@ -47,12 +50,6 @@ workflows:
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
-      - name: Upload IPA to App Store Connect / TestFlight
-        script: |
-          echo "Uploading IPA to App Store Connect..."
-          app-store-connect publish \
-            --ipa "build/ios/ipa/App.ipa" \
-            --verbose || true
     artifacts:
       - build/ios/ipa/*.ipa
       - /Users/builder/export/*.ipa
@@ -61,5 +58,5 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: false
+        submit_to_testflight: true
         submit_to_app_store: false
