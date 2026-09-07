@@ -33,20 +33,21 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
 
 export async function loginWithEmailFirebase(email: string, pass: string) {
   const cleanEmail = email.trim();
+  let resolvedUser: any = null;
+
   if (Capacitor.isNativePlatform()) {
     try {
       const nativeRes = await FirebaseAuthentication.signInWithEmailAndPassword({
         email: cleanEmail,
         password: pass,
       });
-      const user = nativeRes.user;
-      if (user) {
-        return {
-          uid: user.uid,
-          email: user.email || cleanEmail,
-          displayName: user.displayName || 'Öğrenci',
-          photoURL: user.photoUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-        } as any;
+      if (nativeRes?.user) {
+        resolvedUser = {
+          uid: nativeRes.user.uid,
+          email: nativeRes.user.email || cleanEmail,
+          displayName: nativeRes.user.displayName || 'Öğrenci',
+          photoURL: nativeRes.user.photoUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+        };
       }
     } catch (nativeErr: any) {
       console.warn('Native signInWithEmailAndPassword error, trying JS SDK...', nativeErr);
@@ -61,6 +62,9 @@ export async function loginWithEmailFirebase(email: string, pass: string) {
     const result = await signInWithEmailAndPassword(auth, cleanEmail, pass);
     return result.user;
   } catch (error) {
+    if (resolvedUser) {
+      return resolvedUser;
+    }
     console.error('Firebase Login Error:', error);
     throw error;
   }
@@ -112,14 +116,24 @@ export async function registerWithEmailFirebase(
     }
   }
 
-  if (!resolvedUser) {
-    try {
+  // Also authenticate on the JS SDK side so auth.currentUser is synchronized
+  try {
+    if (resolvedUser) {
+      try {
+        const jsCred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+        resolvedUser = jsCred.user;
+      } catch (jsErr) {
+        console.warn('Syncing JS SDK auth after native registration:', jsErr);
+      }
+    } else {
       const result = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
       try {
         await updateProfile(result.user, { displayName: cleanName });
       } catch (e) {}
       resolvedUser = result.user;
-    } catch (error) {
+    }
+  } catch (error) {
+    if (!resolvedUser) {
       console.error('Firebase Register Error:', error);
       throw error;
     }

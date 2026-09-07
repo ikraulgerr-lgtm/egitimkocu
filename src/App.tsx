@@ -71,7 +71,11 @@ export function App() {
   const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
   const [isNoCreditsModalOpen, setIsNoCreditsModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(!auth.currentUser);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => {
+    if (auth.currentUser) return false;
+    const savedUser = getUser();
+    return !(savedUser && savedUser.id && savedUser.id !== 'student' && savedUser.targetExam);
+  });
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isExamModalOpen, setIsExamModalOpen] = useState(false);
   const [quizQuestion, setQuizQuestion] = useState<SoruKaydi | null>(null);
@@ -1387,9 +1391,15 @@ export function App() {
 
   // Auth update user
   const handleLoginSuccess = (partial: Partial<Kullanici>) => {
-    const updated = { ...user, ...partial };
+    const updated: Kullanici = {
+      ...user,
+      ...partial,
+      id: partial.id || user.id || auth.currentUser?.uid || 'user_' + Date.now(),
+      ad: partial.ad || user.ad || 'Öğrenci',
+      email: partial.email || user.email || 'ogrenci@egitimkocum.ai',
+    };
     setUserState(updated);
-    saveUser(updated);
+    saveUser(updated, updated.id);
     syncUserToFirestore(updated);
     setIsAuthModalOpen(false);
     setActiveTab('home');
@@ -1709,11 +1719,9 @@ export function App() {
       />
 
       <AuthModal
-        isOpen={isAuthModalOpen || !auth.currentUser}
+        isOpen={isAuthModalOpen}
         onClose={() => {
-          if (auth.currentUser) {
-            setIsAuthModalOpen(false);
-          }
+          setIsAuthModalOpen(false);
         }}
         onLoginSuccess={handleLoginSuccess}
       />
