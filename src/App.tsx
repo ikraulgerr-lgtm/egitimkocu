@@ -71,7 +71,7 @@ export function App() {
   const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
   const [isNoCreditsModalOpen, setIsNoCreditsModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(!auth.currentUser);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isExamModalOpen, setIsExamModalOpen] = useState(false);
   const [quizQuestion, setQuizQuestion] = useState<SoruKaydi | null>(null);
@@ -301,11 +301,14 @@ export function App() {
         const uid = firebaseUser.uid;
         const userDocRef = doc(db, 'users', uid);
         try {
-          const userSnap = await getDoc(userDocRef);
+          const userSnap = await Promise.race([
+            getDoc(userDocRef),
+            new Promise<null>((r) => setTimeout(() => r(null), 3500)),
+          ]);
           const todayTr = getTurkeyDateString();
           let currentUsername = 'ogrenci';
 
-          if (userSnap.exists()) {
+          if (userSnap && userSnap.exists()) {
             const data = userSnap.data() as Kullanici;
             let userKredi = data.kredi ?? 10;
             let userResetDate = data.lastResetDate || todayTr;
@@ -381,36 +384,30 @@ export function App() {
               }
             }).catch(() => {});
 
-            // Only close auth modal if user already has a configured targetExam!
+            // If user has targetExam configured, close auth modal
             if (data.targetExam) {
               setIsAuthModalOpen(false);
-            } else {
-              setIsAuthModalOpen(true);
             }
           } else {
-            // First time user: doc does not exist yet!
-            const initialName = firebaseUser.displayName || 'Öğrenci';
-            currentUsername = (firebaseUser.email?.split('@')[0] || 'ogrenci').toLowerCase().replace(/[^a-z0-9_]/g, '') + `_${Math.floor(100 + Math.random() * 900)}`;
-            const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
-            const tempUserData: Kullanici = {
-              id: uid,
-              ad: initialName,
-              kullaniciAdi: currentUsername,
-              kullaniciAdi_lower: currentUsername.toLowerCase(),
-              email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
-              kredi: 10,
-              maxKredi: 10,
-              seri: 1,
-              xp: 0,
-              isPremium: false,
-              avatarUrl: DEFAULT_AVATAR,
-              flashcardPractices: 0,
-              nightOwlUnlocked: false,
-              invitedCount: 0,
-              lastResetDate: todayTr,
-            };
-            setUserState(tempUserData);
-            setIsAuthModalOpen(true);
+            // First time or pending user: preserve any existing in-memory profile
+            setUserState((prevUser) => {
+              if (prevUser.id === uid && prevUser.targetExam) {
+                return prevUser;
+              }
+              const initialName = firebaseUser.displayName || 'Öğrenci';
+              currentUsername = (firebaseUser.email?.split('@')[0] || 'ogrenci').toLowerCase().replace(/[^a-z0-9_]/g, '') + `_${Math.floor(100 + Math.random() * 900)}`;
+              const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
+              return {
+                ...prevUser,
+                id: uid,
+                ad: initialName,
+                kullaniciAdi: currentUsername,
+                kullaniciAdi_lower: currentUsername.toLowerCase(),
+                email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
+                avatarUrl: DEFAULT_AVATAR,
+                lastResetDate: todayTr,
+              };
+            });
           }
         } catch (err) {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
@@ -1399,19 +1396,6 @@ export function App() {
     showToast(`👋 Hoş geldiniz, ${updated.ad}!`);
   };
 
-  if (!auth.currentUser) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-        {isSplashActive && <SplashScreen theme={theme} />}
-        <AuthModal
-          isOpen={true}
-          onClose={() => {}}
-          onLoginSuccess={handleLoginSuccess}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background text-text-main font-sans transition-colors duration-200">
       {isSplashActive && <SplashScreen theme={theme} />}
@@ -1725,8 +1709,12 @@ export function App() {
       />
 
       <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
+        isOpen={isAuthModalOpen || !auth.currentUser}
+        onClose={() => {
+          if (auth.currentUser) {
+            setIsAuthModalOpen(false);
+          }
+        }}
         onLoginSuccess={handleLoginSuccess}
       />
 

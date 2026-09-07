@@ -67,7 +67,7 @@ export async function registerWithEmailFirebase(
 
       try {
         const userDocRef = doc(db, 'users', result.user.uid);
-        await setDoc(userDocRef, {
+        const initialDocData = {
           id: result.user.uid,
           ad: cleanName,
           kullaniciAdi: cleanUsername,
@@ -84,7 +84,11 @@ export async function registerWithEmailFirebase(
           targetExamDate: targetExamDate,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-        }, { merge: true });
+        };
+        await Promise.race([
+          setDoc(userDocRef, initialDocData, { merge: true }),
+          new Promise((r) => setTimeout(r, 4000)),
+        ]);
       } catch (err) {
         console.warn('Firestore initial user setDoc warning:', err);
       }

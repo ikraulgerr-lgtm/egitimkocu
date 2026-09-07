@@ -75,8 +75,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (!isGoogleProvider) return;
 
       try {
-        const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
-        if (userSnap.exists() && userSnap.data()?.targetExam) {
+        const userSnap = await Promise.race([
+          getDoc(doc(db, 'users', currentUser.uid)),
+          new Promise<null>((r) => setTimeout(() => r(null), 3500)),
+        ]);
+
+        if (userSnap && userSnap.exists() && userSnap.data()?.targetExam) {
           const data = userSnap.data();
           const finalUsername = data.kullaniciAdi || 'ogrenci';
           setIsGoogleLoading(false);
@@ -87,7 +91,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             kullaniciAdi: finalUsername,
             kullaniciAdi_lower: (data.kullaniciAdi_lower || finalUsername).toLowerCase(),
             email: currentUser.email || 'ogrenci@egitimkocum.ai',
-            avatarUrl: currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+            avatarUrl: data.avatarUrl || currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
             targetExam: data.targetExam,
             targetExamDate: data.targetExamDate,
           });
@@ -97,7 +101,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             .toLowerCase()
             .replace(/[^a-z0-9_]/g, '')
             .slice(0, 12);
-          const finalUsername = (userSnap.exists() && userSnap.data()?.kullaniciAdi)
+          const finalUsername = (userSnap && userSnap.exists() && userSnap.data()?.kullaniciAdi)
             ? userSnap.data().kullaniciAdi
             : `${base || 'ogrenci'}_${Math.floor(100 + Math.random() * 900)}`;
 
@@ -203,21 +207,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         let userKullaniciAdi = 'ogrenci';
         let userTargetExam = 'YKS';
         let userTargetExamDate = '2027-06-19';
+        let userDisplayName = fbUser.displayName || name.trim() || 'Öğrenci';
+        let userAvatar = fbUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
         try {
-          const userDocSnap = await getDoc(doc(db, 'users', fbUser.uid));
-          if (userDocSnap.exists()) {
+          const userDocSnap = await Promise.race([
+            getDoc(doc(db, 'users', fbUser.uid)),
+            new Promise<null>((r) => setTimeout(() => r(null), 3500)),
+          ]);
+          if (userDocSnap && userDocSnap.exists()) {
             const d = userDocSnap.data();
+            if (d?.ad) userDisplayName = d.ad;
             if (d?.kullaniciAdi) userKullaniciAdi = d.kullaniciAdi;
             if (d?.targetExam) userTargetExam = d.targetExam;
             if (d?.targetExamDate) userTargetExamDate = d.targetExamDate;
+            if (d?.avatarUrl) userAvatar = d.avatarUrl;
           }
         } catch (e) {}
 
         onLoginSuccess({
           id: fbUser.uid,
-          ad: fbUser.displayName || name.trim() || 'Öğrenci',
+          ad: userDisplayName,
           kullaniciAdi: userKullaniciAdi,
-          email: fbUser.email || email,
+          kullaniciAdi_lower: userKullaniciAdi.toLowerCase(),
+          email: fbUser.email || email.trim(),
+          avatarUrl: userAvatar,
           targetExam: userTargetExam as any,
           targetExamDate: userTargetExamDate,
         });
@@ -286,7 +299,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         updatedAt: new Date().toISOString(),
       };
 
-      await setDoc(doc(db, 'users', pendingGoogleUser.uid), cleanUserData, { merge: true });
+      try {
+        await Promise.race([
+          setDoc(doc(db, 'users', pendingGoogleUser.uid), cleanUserData, { merge: true }),
+          new Promise((r) => setTimeout(r, 4000)),
+        ]);
+      } catch (docErr) {
+        console.warn('Google exam submit setDoc warning:', docErr);
+      }
 
       onLoginSuccess({
         id: pendingGoogleUser.uid,
@@ -471,15 +491,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       let targetExam = '';
                       let targetExamDate = '';
                       let userExistsInDb = false;
+                      let userDisplayName = firebaseUser.displayName || 'Öğrenci';
+                      let userAvatar = firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
 
                       try {
-                        const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
-                        if (userSnap.exists()) {
+                        const userSnap = await Promise.race([
+                          getDoc(doc(db, 'users', firebaseUser.uid)),
+                          new Promise<null>((r) => setTimeout(() => r(null), 3500)),
+                        ]);
+
+                        if (userSnap && userSnap.exists()) {
                           userExistsInDb = true;
                           const data = userSnap.data();
+                          if (data?.ad) userDisplayName = data.ad;
                           finalUsername = data?.kullaniciAdi || 'ogrenci';
                           targetExam = data?.targetExam || '';
                           targetExamDate = data?.targetExamDate || '';
+                          if (data?.avatarUrl) userAvatar = data.avatarUrl;
                         }
                       } catch (e) {
                         console.warn('User doc check warning:', e);
@@ -489,11 +517,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       if (userExistsInDb && targetExam) {
                         onLoginSuccess({
                           id: firebaseUser.uid,
-                          ad: firebaseUser.displayName || 'Öğrenci',
+                          ad: userDisplayName,
                           kullaniciAdi: finalUsername,
                           kullaniciAdi_lower: finalUsername.toLowerCase(),
                           email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
-                          avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                          avatarUrl: userAvatar,
                           targetExam: targetExam as any,
                           targetExamDate: targetExamDate,
                         });
@@ -512,9 +540,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                       setPendingGoogleUser({
                         uid: firebaseUser.uid,
-                        displayName: firebaseUser.displayName || 'Öğrenci',
+                        displayName: userDisplayName,
                         email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
-                        photoURL: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                        photoURL: userAvatar,
                         username: finalUsername,
                       });
 
@@ -526,8 +554,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     console.warn('Google Auth Status:', err);
                     if (auth.currentUser) {
                       try {
-                        const userSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
-                        if (userSnap.exists() && userSnap.data()?.targetExam) {
+                        const userSnap = await Promise.race([
+                          getDoc(doc(db, 'users', auth.currentUser.uid)),
+                          new Promise<null>((r) => setTimeout(() => r(null), 3500)),
+                        ]);
+                        if (userSnap && userSnap.exists() && userSnap.data()?.targetExam) {
                           const data = userSnap.data();
                           onLoginSuccess({
                             id: auth.currentUser.uid,
@@ -535,7 +566,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             kullaniciAdi: data.kullaniciAdi || 'ogrenci',
                             kullaniciAdi_lower: (data.kullaniciAdi || 'ogrenci').toLowerCase(),
                             email: auth.currentUser.email || 'ogrenci@egitimkocum.ai',
-                            avatarUrl: auth.currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                            avatarUrl: data.avatarUrl || auth.currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
                             targetExam: data.targetExam,
                             targetExamDate: data.targetExamDate,
                           });
@@ -572,9 +603,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     } else if (err?.code === 'auth/popup-blocked') {
                       setErrorMsg('🔒 Giriş penceresi açılamadı. Lütfen tarayıcınızın açılır pencere (popup) engelleyicisini kapatıp tekrar deneyin.');
                     } else {
-                      const runningSha1 = (typeof window !== 'undefined' && (window as any).__APP_SIGNATURE_SHA1__) ? `\n(Cihazdaki İmza: ${(window as any).__APP_SIGNATURE_SHA1__})` : '';
-                      const rawMsg = err?.message || 'Lütfen tekrar deneyin.';
-                      setErrorMsg(`Google ile giriş yapılamadı: ${rawMsg}${runningSha1}`);
+                      const msg = err?.message || 'Lütfen tekrar deneyin.';
+                      if (msg.includes('iptal') || msg.includes('cancel')) {
+                        // User cancelled
+                      } else {
+                        setErrorMsg(`Google ile giriş yapılamadı: ${msg}`);
+                      }
                     }
                   } finally {
                     setIsGoogleLoading(false);
