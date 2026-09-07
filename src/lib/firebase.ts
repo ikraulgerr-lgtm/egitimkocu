@@ -32,8 +32,33 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
 });
 
 export async function loginWithEmailFirebase(email: string, pass: string) {
+  const cleanEmail = email.trim();
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const nativeRes = await FirebaseAuthentication.signInWithEmailAndPassword({
+        email: cleanEmail,
+        password: pass,
+      });
+      const user = nativeRes.user;
+      if (user) {
+        return {
+          uid: user.uid,
+          email: user.email || cleanEmail,
+          displayName: user.displayName || 'Öğrenci',
+          photoURL: user.photoUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+        } as any;
+      }
+    } catch (nativeErr: any) {
+      console.warn('Native signInWithEmailAndPassword error, trying JS SDK...', nativeErr);
+      const msg = (nativeErr?.message || '').toLowerCase();
+      if (msg.includes('invalid') || msg.includes('wrong') || msg.includes('not-found') || msg.includes('user_not_found')) {
+        throw nativeErr;
+      }
+    }
+  }
+
   try {
-    const result = await signInWithEmailAndPassword(auth, email, pass);
+    const result = await signInWithEmailAndPassword(auth, cleanEmail, pass);
     return result.user;
   } catch (error) {
     console.error('Firebase Login Error:', error);
@@ -52,52 +77,84 @@ export async function registerWithEmailFirebase(
     sinif?: string;
   }
 ) {
-  try {
-    const result = await createUserWithEmailAndPassword(auth, email.trim(), pass);
-    if (result.user) {
-      const cleanName = name ? name.trim() : 'Öğrenci';
-      const cleanUsername = (extraData?.username || email.split('@')[0] || 'ogrenci').toLowerCase().replace(/[^a-z0-9_]/g, '');
-      const targetExam = extraData?.targetExam || 'YKS';
-      const targetExamDate = extraData?.targetExamDate || '2027-06-19';
-      const sinifVal = extraData?.sinif || (targetExam === 'LGS' ? '8. Sınıf (LGS)' : targetExam === 'YKS' ? '12. Sınıf / Mezun (YKS)' : 'YKS / LGS Hazırlık');
+  const cleanEmail = email.trim();
+  const cleanName = name ? name.trim() : 'Öğrenci';
+  const cleanUsername = (extraData?.username || cleanEmail.split('@')[0] || 'ogrenci').toLowerCase().replace(/[^a-z0-9_]/g, '');
+  const targetExam = extraData?.targetExam || 'YKS';
+  const targetExamDate = extraData?.targetExamDate || '2027-06-19';
+  const sinifVal = extraData?.sinif || (targetExam === 'LGS' ? '8. Sınıf (LGS)' : targetExam === 'YKS' ? '12. Sınıf / Mezun (YKS)' : 'YKS / LGS Hazırlık');
 
+  let resolvedUser: any = null;
+
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const nativeRes = await FirebaseAuthentication.createUserWithEmailAndPassword({
+        email: cleanEmail,
+        password: pass,
+      });
+      try {
+        await FirebaseAuthentication.updateProfile({ displayName: cleanName });
+      } catch (e) {}
+      if (nativeRes?.user) {
+        resolvedUser = {
+          uid: nativeRes.user.uid,
+          email: nativeRes.user.email || cleanEmail,
+          displayName: cleanName,
+          photoURL: nativeRes.user.photoUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+        };
+      }
+    } catch (nativeErr: any) {
+      console.warn('Native createUserWithEmailAndPassword error, trying JS SDK fallback...', nativeErr);
+      const msg = (nativeErr?.message || '').toLowerCase();
+      if (msg.includes('already') || msg.includes('weak') || msg.includes('invalid')) {
+        throw nativeErr;
+      }
+    }
+  }
+
+  if (!resolvedUser) {
+    try {
+      const result = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
       try {
         await updateProfile(result.user, { displayName: cleanName });
       } catch (e) {}
-
-      try {
-        const userDocRef = doc(db, 'users', result.user.uid);
-        const initialDocData = {
-          id: result.user.uid,
-          ad: cleanName,
-          kullaniciAdi: cleanUsername,
-          kullaniciAdi_lower: cleanUsername,
-          email: email.trim(),
-          kredi: 10,
-          maxKredi: 10,
-          seri: 1,
-          xp: 0,
-          isPremium: false,
-          sinif: sinifVal,
-          avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-          targetExam: targetExam,
-          targetExamDate: targetExamDate,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        await Promise.race([
-          setDoc(userDocRef, initialDocData, { merge: true }),
-          new Promise((r) => setTimeout(r, 4000)),
-        ]);
-      } catch (err) {
-        console.warn('Firestore initial user setDoc warning:', err);
-      }
+      resolvedUser = result.user;
+    } catch (error) {
+      console.error('Firebase Register Error:', error);
+      throw error;
     }
-    return result.user;
-  } catch (error) {
-    console.error('Firebase Register Error:', error);
-    throw error;
   }
+
+  // Write initial user profile to Firestore (with non-blocking timeout safety)
+  try {
+    const userDocRef = doc(db, 'users', resolvedUser.uid);
+    const initialDocData = {
+      id: resolvedUser.uid,
+      ad: cleanName,
+      kullaniciAdi: cleanUsername,
+      kullaniciAdi_lower: cleanUsername,
+      email: cleanEmail,
+      kredi: 10,
+      maxKredi: 10,
+      seri: 1,
+      xp: 0,
+      isPremium: false,
+      sinif: sinifVal,
+      avatarUrl: resolvedUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+      targetExam: targetExam,
+      targetExamDate: targetExamDate,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await Promise.race([
+      setDoc(userDocRef, initialDocData, { merge: true }),
+      new Promise((r) => setTimeout(r, 4000)),
+    ]);
+  } catch (err) {
+    console.warn('Firestore initial user setDoc warning:', err);
+  }
+
+  return resolvedUser;
 }
 
 export async function loginWithGoogle() {
@@ -105,14 +162,7 @@ export async function loginWithGoogle() {
     try {
       let result: any;
       const nativeSignInPromise = async () => {
-        try {
-          return await FirebaseAuthentication.signInWithGoogle();
-        } catch (firstErr: any) {
-          console.warn('Native Google Sign-In (default) failed, retrying...', firstErr);
-          return await (FirebaseAuthentication as any).signInWithGoogle({
-            useCredentialManager: false,
-          });
-        }
+        return await FirebaseAuthentication.signInWithGoogle();
       };
 
       // 45-second timeout safety to guarantee UI never hangs indefinitely
@@ -143,25 +193,13 @@ export async function loginWithGoogle() {
         }
       }
 
-      // Check if Firebase JS SDK already received auth state
-      if (auth.currentUser) {
-        return auth.currentUser;
-      }
-
-      // Fallback: try to fetch ID token from native plugin
-      try {
-        const tokenRes = await FirebaseAuthentication.getIdToken();
-        if (tokenRes?.token) {
-          const credential = GoogleAuthProvider.credential(tokenRes.token);
-          const userCred = await signInWithCredential(auth, credential);
-          return userCred.user;
-        }
-      } catch (tokenErr) {
-        console.warn('getIdToken fallback warning:', tokenErr);
-      }
-
       if (result?.user) {
-        return result.user as any;
+        return {
+          uid: result.user.uid,
+          displayName: result.user.displayName || 'Öğrenci',
+          email: result.user.email || 'ogrenci@egitimkocum.ai',
+          photoURL: result.user.photoUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+        } as any;
       }
 
       if (auth.currentUser) {
@@ -202,8 +240,17 @@ export async function logoutFirebase() {
 }
 
 export async function resetPasswordFirebase(email: string) {
+  const cleanEmail = email.trim();
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await FirebaseAuthentication.sendPasswordResetEmail({ email: cleanEmail });
+      return true;
+    } catch (nativeErr) {
+      console.warn('Native sendPasswordResetEmail error, trying JS SDK...', nativeErr);
+    }
+  }
   try {
-    await sendPasswordResetEmail(auth, email);
+    await sendPasswordResetEmail(auth, cleanEmail);
     return true;
   } catch (error) {
     console.error('Firebase Password Reset Error:', error);
