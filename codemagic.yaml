@@ -25,26 +25,19 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create || true
-          keychain add-certificates --certificate ios/App/ios_distribution.p12 --certificate-password 123456 || true
-          keychain add-certificates || true
+          keychain add-certificates --certificate ios/App/ios_distribution.p12 --certificate-password 123456 || \
+            security import ios/App/ios_distribution.p12 -P "123456" -A
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          cp ios/App/egitimkocu.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/" || true
+          cp ios/App/egitimkocu.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/"
           xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Set dynamic build version
         script: |
-          LATEST_BUILD_NUM=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
-          if [ -z "$LATEST_BUILD_NUM" ] || [ "$LATEST_BUILD_NUM" = "0" ] 2>/dev/null; then
-            BUILD_NUM=$((${BUILD_NUMBER:-1} + 100))
-          else
-            BUILD_NUM=$((LATEST_BUILD_NUM + 1))
-          fi
+          BUILD_NUM=$((${BUILD_NUMBER:-1} + 100))
           echo "Setting dynamic build number to: $BUILD_NUM and marketing version to: 1.0.3"
-          sed -i '' "s/CURRENT_PROJECT_VERSION = .*;/CURRENT_PROJECT_VERSION = $BUILD_NUM;/g" ios/App/App.xcodeproj/project.pbxproj
-          sed -i '' "s/MARKETING_VERSION = .*;/MARKETING_VERSION = 1.0.3;/g" ios/App/App.xcodeproj/project.pbxproj
-          cd ios/App && agvtool new-version -all $BUILD_NUM && agvtool new-marketing-version "1.0.3" && cd ../.. || true
+          cd ios/App
+          agvtool new-version -all $BUILD_NUM
+          agvtool new-marketing-version "1.0.3" || true
+          cd ../..
       - name: Build and Package IPA for App Store
         script: |
           xcode-project build-ipa \
@@ -60,3 +53,4 @@ workflows:
         auth: integration
         submit_to_testflight: true
         submit_to_app_store: false
+
