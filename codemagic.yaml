@@ -32,11 +32,16 @@ workflows:
           xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Set dynamic build version
         script: |
-          BUILD_NUM=$((${BUILD_NUMBER:-1} + 10))
+          LATEST_BUILD_NUM=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
+          if [ -z "$LATEST_BUILD_NUM" ] || [ "$LATEST_BUILD_NUM" = "0" ] 2>/dev/null; then
+            BUILD_NUM=$((${BUILD_NUMBER:-1} + 30))
+          else
+            BUILD_NUM=$((LATEST_BUILD_NUM + 1))
+          fi
           echo "Setting dynamic build number to: $BUILD_NUM"
           cd ios/App
           agvtool new-version -all $BUILD_NUM
-          agvtool new-marketing-version "1.0.1" || true
+          agvtool new-marketing-version "1.0.2" || true
           cd ../..
       - name: Build and Package IPA for App Store
         script: |
