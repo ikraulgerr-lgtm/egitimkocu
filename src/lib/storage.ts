@@ -17,23 +17,25 @@ export function getScopedKey(baseKey: string, userId?: string): string {
   return `${baseKey}_${uid}`;
 }
 
-export const INITIAL_USER: Kullanici = {
-  id: 'usr_new',
-  ad: 'Yeni Öğrenci',
-  kullaniciAdi: 'ogrenci',
-  kullaniciAdi_lower: 'ogrenci',
-  email: 'ogrenci@egitimkocum.ai',
+export const EMPTY_USER: Kullanici = {
+  id: '',
+  ad: '',
+  kullaniciAdi: '',
+  kullaniciAdi_lower: '',
+  email: '',
   kredi: 10,
   maxKredi: 10,
   seri: 1,
   xp: 0,
   isPremium: false,
-  sinif: 'YKS / LGS Hazırlık',
+  sinif: '',
   avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-  targetExam: 'YKS',
-  targetExamDate: '2027-06-19',
+  targetExam: '' as any,
+  targetExamDate: '',
   customExamName: '',
 };
+
+export const INITIAL_USER: Kullanici = EMPTY_USER;
 
 export const INITIAL_FRIENDS: Arkadas[] = [];
 export const INITIAL_QUESTIONS: SoruKaydi[] = [];
@@ -76,12 +78,15 @@ export function resetToCleanState(userId?: string): Kullanici {
   const fKey = getScopedKey(BASE_FRIENDS_KEY, userId);
   const dKey = getScopedKey(BASE_DENEME_KEY, userId);
 
-  localStorage.setItem(userKey, JSON.stringify(INITIAL_USER));
-  localStorage.setItem(qKey, JSON.stringify(INITIAL_QUESTIONS));
-  localStorage.setItem(sKey, JSON.stringify(INITIAL_SCHEDULE));
-  localStorage.setItem(fKey, JSON.stringify(INITIAL_FRIENDS));
-  localStorage.setItem(dKey, JSON.stringify(INITIAL_DENEMELER));
-  return { ...INITIAL_USER };
+  localStorage.removeItem(userKey);
+  localStorage.removeItem(BASE_USER_KEY);
+  localStorage.removeItem(qKey);
+  localStorage.removeItem(sKey);
+  localStorage.removeItem(fKey);
+  localStorage.removeItem(dKey);
+  localStorage.removeItem('active_pomo_group_room');
+  localStorage.removeItem('completed_pomodoros_count');
+  return { ...EMPTY_USER };
 }
 
 export function getFriends(userId?: string): Arkadas[] {
@@ -160,20 +165,21 @@ export function getUser(userId?: string): Kullanici {
   const todayTr = getTurkeyDateString();
 
   if (!data) {
-    const initialUserWithReset = { ...INITIAL_USER, lastResetDate: todayTr };
-    localStorage.setItem(key, JSON.stringify(initialUserWithReset));
-    return initialUserWithReset;
+    return { ...EMPTY_USER, lastResetDate: todayTr };
   }
   try {
     const parsed = JSON.parse(data);
+    if (!parsed || !parsed.id || !parsed.email || parsed.id === 'usr_new' || parsed.id === 'student') {
+      return { ...EMPTY_USER, lastResetDate: todayTr };
+    }
     const user: Kullanici = {
-      ...INITIAL_USER,
+      ...EMPTY_USER,
       ...parsed,
-      ad: parsed.ad && parsed.ad !== 'Selin Yılmaz' ? parsed.ad : 'Öğrenci',
-      kullaniciAdi: parsed.kullaniciAdi || 'ogrenci',
-      kullaniciAdi_lower: (parsed.kullaniciAdi || 'ogrenci').toLowerCase(),
-      targetExam: parsed.targetExam || 'YKS',
-      targetExamDate: parsed.targetExamDate || '2027-06-19',
+      ad: parsed.ad || '',
+      kullaniciAdi: parsed.kullaniciAdi || '',
+      kullaniciAdi_lower: (parsed.kullaniciAdi || '').toLowerCase(),
+      targetExam: parsed.targetExam || '',
+      targetExamDate: parsed.targetExamDate || '',
       customExamName: parsed.customExamName || '',
       lastResetDate: parsed.lastResetDate || todayTr,
     };
@@ -190,7 +196,7 @@ export function getUser(userId?: string): Kullanici {
     }
     return user;
   } catch {
-    return { ...INITIAL_USER, lastResetDate: todayTr };
+    return { ...EMPTY_USER, lastResetDate: todayTr };
   }
 }
 

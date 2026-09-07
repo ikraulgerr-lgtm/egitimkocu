@@ -74,7 +74,7 @@ export function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => {
     if (auth.currentUser) return false;
     const savedUser = getUser();
-    return !(savedUser && savedUser.id && savedUser.id !== 'student' && savedUser.targetExam);
+    return !(savedUser && savedUser.id && savedUser.id !== '' && savedUser.id !== 'student' && savedUser.id !== 'usr_new' && savedUser.email && savedUser.targetExam);
   });
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isExamModalOpen, setIsExamModalOpen] = useState(false);
