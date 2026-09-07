@@ -41,11 +41,26 @@ export async function loginWithEmailFirebase(email: string, pass: string) {
   }
 }
 
-export async function registerWithEmailFirebase(email: string, pass: string, name: string) {
+export async function registerWithEmailFirebase(
+  email: string,
+  pass: string,
+  name: string,
+  extraData?: {
+    username?: string;
+    targetExam?: string;
+    targetExamDate?: string;
+    sinif?: string;
+  }
+) {
   try {
-    const result = await createUserWithEmailAndPassword(auth, email, pass);
+    const result = await createUserWithEmailAndPassword(auth, email.trim(), pass);
     if (result.user) {
       const cleanName = name ? name.trim() : 'Öğrenci';
+      const cleanUsername = (extraData?.username || email.split('@')[0] || 'ogrenci').toLowerCase().replace(/[^a-z0-9_]/g, '');
+      const targetExam = extraData?.targetExam || 'YKS';
+      const targetExamDate = extraData?.targetExamDate || '2027-06-19';
+      const sinifVal = extraData?.sinif || (targetExam === 'LGS' ? '8. Sınıf (LGS)' : targetExam === 'YKS' ? '12. Sınıf / Mezun (YKS)' : 'YKS / LGS Hazırlık');
+
       try {
         await updateProfile(result.user, { displayName: cleanName });
       } catch (e) {}
@@ -55,14 +70,20 @@ export async function registerWithEmailFirebase(email: string, pass: string, nam
         await setDoc(userDocRef, {
           id: result.user.uid,
           ad: cleanName,
-          email: email,
+          kullaniciAdi: cleanUsername,
+          kullaniciAdi_lower: cleanUsername,
+          email: email.trim(),
           kredi: 10,
           maxKredi: 10,
           seri: 1,
           xp: 0,
           isPremium: false,
-          sinif: 'YKS / LGS Hazırlık',
+          sinif: sinifVal,
           avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+          targetExam: targetExam,
+          targetExamDate: targetExamDate,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         }, { merge: true });
       } catch (err) {
         console.warn('Firestore initial user setDoc warning:', err);

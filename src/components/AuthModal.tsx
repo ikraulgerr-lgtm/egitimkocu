@@ -62,13 +62,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   }, [isOpen, mode]);
 
-  // Real-time reactive auth state listener when modal is open
+  // Real-time reactive auth state listener ONLY for Google SSO flow
   useEffect(() => {
     if (!isOpen) return;
 
     const unsub = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) return;
       if (mode === 'google_exam_select') return;
+
+      // Only handle Google provider logins reactively so email registration is never disrupted
+      const isGoogleProvider = currentUser.providerData.some((p) => p.providerId === 'google.com');
+      if (!isGoogleProvider) return;
 
       try {
         const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
@@ -151,20 +155,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           return;
         }
 
-        // Check if username is already taken in Firestore
-        try {
-          const usersRef = collection(db, 'users');
-          const q = query(usersRef, where('kullaniciAdi_lower', '==', cleanUsername));
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            setErrorMsg(`"@${cleanUsername}" kullanıcı adı zaten başkası tarafından alınmış. Lütfen başka bir kullanıcı adı seçin.`);
-            setIsEmailLoading(false);
-            return;
-          }
-        } catch (e) {
-          console.warn('Username uniqueness check warning:', e);
-        }
-
         if (password.length < 8) {
           setErrorMsg('Şifreniz en az 8 karakter olmalıdır.');
           setIsEmailLoading(false);
@@ -183,34 +173,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         else if (selectedExam === 'YDS') examDate = '2027-04-11';
         else if (selectedExam === 'Hazırlanmıyorum') examDate = '';
 
+        const sinifVal =
+          selectedExam === 'LGS'
+            ? '8. Sınıf (LGS)'
+            : selectedExam === 'YKS'
+            ? '12. Sınıf / Mezun (YKS)'
+            : 'YKS / LGS Hazırlık';
+
         const cleanName = name.trim() || 'Öğrenci';
-        const fbUser = await registerWithEmailFirebase(email.trim(), password, cleanName);
-        try {
-          await setDoc(doc(db, 'users', fbUser.uid), {
-            id: fbUser.uid,
-            ad: cleanName,
-            kullaniciAdi: cleanUsername,
-            kullaniciAdi_lower: cleanUsername,
-            email: fbUser.email || email.trim(),
-            kredi: 10,
-            maxKredi: 10,
-            seri: 1,
-            xp: 0,
-            isPremium: false,
-            sinif: 'YKS / LGS Hazırlık',
-            avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-            targetExam: selectedExam,
-            targetExamDate: examDate,
-            createdAt: new Date().toISOString(),
-          }, { merge: true });
-        } catch (e) {}
+        const fbUser = await registerWithEmailFirebase(email.trim(), password, cleanName, {
+          username: cleanUsername,
+          targetExam: selectedExam,
+          targetExamDate: examDate,
+          sinif: sinifVal,
+        });
 
         onLoginSuccess({
           id: fbUser.uid,
           ad: cleanName,
           kullaniciAdi: cleanUsername,
           kullaniciAdi_lower: cleanUsername,
-          email: fbUser.email || email,
+          email: fbUser.email || email.trim(),
           targetExam: selectedExam,
           targetExamDate: examDate,
         });
@@ -218,10 +201,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       } else {
         const fbUser = await loginWithEmailFirebase(email.trim(), password);
         let userKullaniciAdi = 'ogrenci';
+        let userTargetExam = 'YKS';
+        let userTargetExamDate = '2027-06-19';
         try {
           const userDocSnap = await getDoc(doc(db, 'users', fbUser.uid));
-          if (userDocSnap.exists() && userDocSnap.data()?.kullaniciAdi) {
-            userKullaniciAdi = userDocSnap.data().kullaniciAdi;
+          if (userDocSnap.exists()) {
+            const d = userDocSnap.data();
+            if (d?.kullaniciAdi) userKullaniciAdi = d.kullaniciAdi;
+            if (d?.targetExam) userTargetExam = d.targetExam;
+            if (d?.targetExamDate) userTargetExamDate = d.targetExamDate;
           }
         } catch (e) {}
 
@@ -230,6 +218,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           ad: fbUser.displayName || name.trim() || 'Öğrenci',
           kullaniciAdi: userKullaniciAdi,
           email: fbUser.email || email,
+          targetExam: userTargetExam as any,
+          targetExamDate: userTargetExamDate,
         });
         onClose();
       }
