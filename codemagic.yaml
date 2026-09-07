@@ -34,19 +34,25 @@ workflows:
         script: |
           LATEST_BUILD_NUM=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
           if [ -z "$LATEST_BUILD_NUM" ] || [ "$LATEST_BUILD_NUM" = "0" ] 2>/dev/null; then
-            BUILD_NUM=$((${BUILD_NUMBER:-1} + 50))
+            BUILD_NUM=$((${BUILD_NUMBER:-1} + 100))
           else
             BUILD_NUM=$((LATEST_BUILD_NUM + 1))
           fi
-          echo "Setting dynamic build number to: $BUILD_NUM and marketing version to: 1.0.2"
+          echo "Setting dynamic build number to: $BUILD_NUM and marketing version to: 1.0.3"
           sed -i '' "s/CURRENT_PROJECT_VERSION = .*;/CURRENT_PROJECT_VERSION = $BUILD_NUM;/g" ios/App/App.xcodeproj/project.pbxproj
-          sed -i '' "s/MARKETING_VERSION = .*;/MARKETING_VERSION = 1.0.2;/g" ios/App/App.xcodeproj/project.pbxproj
-          cd ios/App && agvtool new-version -all $BUILD_NUM && cd ../.. || true
+          sed -i '' "s/MARKETING_VERSION = .*;/MARKETING_VERSION = 1.0.3;/g" ios/App/App.xcodeproj/project.pbxproj
+          cd ios/App && agvtool new-version -all $BUILD_NUM && agvtool new-marketing-version "1.0.3" && cd ../.. || true
       - name: Build and Package IPA for App Store
         script: |
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
+      - name: Upload IPA to App Store Connect / TestFlight
+        script: |
+          echo "Uploading IPA to App Store Connect..."
+          app-store-connect publish \
+            --ipa "build/ios/ipa/App.ipa" \
+            --verbose || true
     artifacts:
       - build/ios/ipa/*.ipa
       - /Users/builder/export/*.ipa
