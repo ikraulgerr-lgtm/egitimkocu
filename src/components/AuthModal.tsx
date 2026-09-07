@@ -39,7 +39,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   } | null>(null);
 
   // UI status states
-  const [loading, setLoading] = useState<boolean>(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
+  const [isEmailLoading, setIsEmailLoading] = useState<boolean>(false);
+  const [isGoogleExamLoading, setIsGoogleExamLoading] = useState<boolean>(false);
+  const [isResetLoading, setIsResetLoading] = useState<boolean>(false);
+  const [isVerifyOtpLoading, setIsVerifyOtpLoading] = useState<boolean>(false);
+  const [isSetNewPassLoading, setIsSetNewPassLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [resendCountdown, setResendCountdown] = useState<number>(0);
@@ -52,6 +57,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setNewPassword('');
       setConfirmPassword('');
       setOtpCode('');
+      setIsGoogleLoading(false);
+      setIsEmailLoading(false);
     }
   }, [isOpen, mode]);
 
@@ -85,23 +92,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   }, [isOpen, auth.currentUser?.uid, mode]);
 
-  // Reset loading state if tab changes or user returns to window
-  useEffect(() => {
-    const handleTabFocus = () => {
-      if (loading) {
-        setTimeout(() => setLoading(false), 1500);
-      }
-    };
-
-    window.addEventListener('focus', handleTabFocus);
-    document.addEventListener('visibilitychange', handleTabFocus);
-
-    return () => {
-      window.removeEventListener('focus', handleTabFocus);
-      document.removeEventListener('visibilitychange', handleTabFocus);
-    };
-  }, [loading]);
-
   // Countdown timer effect
   useEffect(() => {
     let timer: any;
@@ -119,13 +109,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-    setLoading(true);
+    setIsEmailLoading(true);
 
     try {
       if (mode === 'register') {
         if (!agreeTerms) {
           setErrorMsg('Lütfen kullanıcı sözleşmesini ve şartları kabul edin.');
-          setLoading(false);
+          setIsEmailLoading(false);
           return;
         }
 
@@ -133,7 +123,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
         if (!cleanUsername || cleanUsername.length < 3 || cleanUsername.length > 20) {
           setErrorMsg('Kullanıcı adı en az 3, en fazla 20 karakter olmalı ve yalnızca küçük harf, rakam ve alt tire (_) içermelidir.');
-          setLoading(false);
+          setIsEmailLoading(false);
           return;
         }
 
@@ -144,7 +134,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           const snap = await getDocs(q);
           if (!snap.empty) {
             setErrorMsg(`"@${cleanUsername}" kullanıcı adı zaten başkası tarafından alınmış. Lütfen başka bir kullanıcı adı seçin.`);
-            setLoading(false);
+            setIsEmailLoading(false);
             return;
           }
         } catch (e) {
@@ -153,13 +143,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         if (password.length < 8) {
           setErrorMsg('Şifreniz en az 8 karakter olmalıdır.');
-          setLoading(false);
+          setIsEmailLoading(false);
           return;
         }
         const hasUpperLower = /[A-Z]/.test(password) && /[a-z]/.test(password);
         if (!hasUpperLower) {
           setErrorMsg('Şifreniz en az bir büyük ve bir küçük harf içermelidir.');
-          setLoading(false);
+          setIsEmailLoading(false);
           return;
         }
 
@@ -238,7 +228,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setErrorMsg(err?.message || 'Giriş / Kayıt işlemi gerçekleştirilemedi. Lütfen bilgilerinizi kontrol edin.');
       }
     } finally {
-      setLoading(false);
+      setIsEmailLoading(false);
     }
   };
 
@@ -246,7 +236,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleGoogleExamSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pendingGoogleUser) return;
-    setLoading(true);
+    setIsGoogleExamLoading(true);
     setErrorMsg(null);
 
     try {
@@ -300,7 +290,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       console.error('Google exam onboarding save error:', err);
       setErrorMsg('Hedef sınav kaydedilirken bir sorun oluştu. Lütfen tekrar deneyin.');
     } finally {
-      setLoading(false);
+      setIsGoogleExamLoading(false);
     }
   };
 
@@ -313,7 +303,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    setLoading(true);
+    setIsResetLoading(true);
     setErrorMsg(null);
 
     try {
@@ -334,7 +324,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setErrorMsg('Şifre sıfırlama e-postası gönderilemedi: ' + (err?.message || 'Lütfen bilgilerinizi kontrol edin.'));
       }
     } finally {
-      setLoading(false);
+      setIsResetLoading(false);
     }
   };
 
@@ -346,7 +336,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    setLoading(true);
+    setIsVerifyOtpLoading(true);
     setErrorMsg(null);
 
     try {
@@ -365,7 +355,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } catch (err) {
       setErrorMsg('Sunucuya bağlanılamadı.');
     } finally {
-      setLoading(false);
+      setIsVerifyOtpLoading(false);
     }
   };
 
@@ -381,7 +371,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    setLoading(true);
+    setIsSetNewPassLoading(true);
     setErrorMsg(null);
 
     try {
@@ -401,7 +391,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } catch (err) {
       setErrorMsg('Şifre sıfırlama işlemi sırasında hata oluştu.');
     } finally {
-      setLoading(false);
+      setIsSetNewPassLoading(false);
     }
   };
 
@@ -456,10 +446,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <div className="space-y-2">
               <button
                 type="button"
-                disabled={loading}
+                disabled={isGoogleLoading || isEmailLoading}
                 onClick={async () => {
                   setErrorMsg(null);
-                  setLoading(true);
+                  setIsGoogleLoading(true);
                   try {
                     const firebaseUser = await loginWithGoogle();
                     if (firebaseUser) {
@@ -515,7 +505,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       });
 
                       setMode('google_exam_select');
-                      setLoading(false);
+                      setIsGoogleLoading(false);
                       return;
                     }
                   } catch (err: any) {
@@ -573,7 +563,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       setErrorMsg(`Google ile giriş yapılamadı: ${rawMsg}${runningSha1}`);
                     }
                   } finally {
-                    setLoading(false);
+                    setIsGoogleLoading(false);
                   }
                 }}
                 className="w-full flex items-center justify-center gap-2 bg-surface-container-low border border-card-border py-3 px-4 rounded-xl text-xs font-bold text-text-main hover:border-primary/50 active:scale-98 transition-all cursor-pointer disabled:opacity-50"
@@ -584,7 +574,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                 </svg>
-                <span>{loading ? 'Google ile Bağlanılıyor...' : 'Google ile Devam Et'}</span>
+                <span>{isGoogleLoading ? 'Google ile Bağlanılıyor...' : 'Google ile Devam Et'}</span>
               </button>
             </div>
 
@@ -754,9 +744,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <button
                 type="submit"
-                className="w-full bg-primary text-white font-extrabold text-sm py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer mt-2"
+                disabled={isEmailLoading || isGoogleLoading}
+                className="w-full bg-primary text-white font-extrabold text-sm py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer mt-2 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {mode === 'register' ? 'Hesabımı Oluştur' : 'Giriş Yap'}
+                {isEmailLoading ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>{mode === 'register' ? 'Hesap Oluşturuluyor...' : 'Giriş Yapılıyor...'}</span>
+                  </>
+                ) : (
+                  <span>{mode === 'register' ? 'Hesabımı Oluştur' : 'Giriş Yap'}</span>
+                )}
               </button>
             </form>
 
@@ -814,10 +812,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={isResetLoading}
                 className="w-full bg-primary text-white font-extrabold text-sm py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                {loading ? (
+                {isResetLoading ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>Bağlantı Gönderiliyor...</span>
@@ -900,10 +898,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <button
                 type="submit"
-                disabled={loading || otpCode.length !== 6}
+                disabled={isVerifyOtpLoading || otpCode.length !== 6}
                 className="w-full bg-primary text-white font-extrabold text-sm py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                {loading ? (
+                {isVerifyOtpLoading ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>Kod Kontrol Ediliyor...</span>
@@ -932,7 +930,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <button
                 type="button"
-                disabled={resendCountdown > 0 || loading}
+                disabled={resendCountdown > 0 || isResetLoading}
                 onClick={handleSendResetCode}
                 className="font-bold text-primary hover:underline cursor-pointer disabled:opacity-50 disabled:no-underline"
               >
@@ -1021,10 +1019,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <button
                 type="submit"
-                disabled={loading || !has8Chars || newPassword !== confirmPassword}
+                disabled={isSetNewPassLoading || !has8Chars || newPassword !== confirmPassword}
                 className="w-full bg-primary text-white font-extrabold text-sm py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
               >
-                {loading ? (
+                {isSetNewPassLoading ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>Şifre Kaydediliyor...</span>
@@ -1166,10 +1164,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={isGoogleExamLoading}
                 className="w-full bg-primary text-white font-extrabold text-sm py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 mt-3"
               >
-                {loading ? (
+                {isGoogleExamLoading ? (
                   <>
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>Hedef Kaydediliyor...</span>

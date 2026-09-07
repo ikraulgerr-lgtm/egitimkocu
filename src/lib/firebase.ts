@@ -78,29 +78,56 @@ export async function registerWithEmailFirebase(email: string, pass: string, nam
 export async function loginWithGoogle() {
   if (Capacitor.isNativePlatform()) {
     try {
-      let result;
-      // Do NOT pass scopes here: Google ID Token already includes email and profile.
-      // Passing scopes causes the plugin to trigger extra Identity.getAuthorizationClient which causes "No credentials available" / API exceptions.
+      let result: any;
       try {
         result = await FirebaseAuthentication.signInWithGoogle();
       } catch (firstErr: any) {
-        console.warn('Native Google Sign-In (CredentialManager) failed, retrying with useCredentialManager: false...', firstErr);
+        console.warn('Native Google Sign-In (default) failed, retrying with useCredentialManager: false...', firstErr);
         result = await (FirebaseAuthentication as any).signInWithGoogle({
           useCredentialManager: false,
         });
       }
 
-      if (result?.credential?.idToken) {
-        const credential = GoogleAuthProvider.credential(
-          result.credential.idToken,
-          result.credential.accessToken ?? undefined
-        );
-        const userCred = await signInWithCredential(auth, credential);
-        return userCred.user;
+      console.log('FirebaseAuthentication.signInWithGoogle result:', result);
+
+      const idToken =
+        result?.credential?.idToken ||
+        result?.idToken ||
+        result?.credential?.token ||
+        (result?.user as any)?.idToken;
+      const accessToken =
+        result?.credential?.accessToken ||
+        result?.accessToken;
+
+      if (idToken) {
+        try {
+          const credential = GoogleAuthProvider.credential(idToken, accessToken || undefined);
+          const userCred = await signInWithCredential(auth, credential);
+          return userCred.user;
+        } catch (credErr: any) {
+          console.warn('signInWithCredential with idToken error:', credErr);
+        }
+      }
+
+      // Check if Firebase JS SDK already received auth state
+      if (auth.currentUser) {
+        return auth.currentUser;
+      }
+
+      // Fallback: try to fetch ID token from native plugin
+      try {
+        const tokenRes = await FirebaseAuthentication.getIdToken();
+        if (tokenRes?.token) {
+          const credential = GoogleAuthProvider.credential(tokenRes.token);
+          const userCred = await signInWithCredential(auth, credential);
+          return userCred.user;
+        }
+      } catch (tokenErr) {
+        console.warn('getIdToken fallback warning:', tokenErr);
       }
 
       if (result?.user) {
-        return auth.currentUser || (result.user as any);
+        return result.user as any;
       }
 
       if (auth.currentUser) {
@@ -111,14 +138,14 @@ export async function loginWithGoogle() {
     } catch (err: any) {
       console.error('Native Google Sign-In Error:', err);
       const msg = err?.message || '';
-      if (msg.includes('cancel') || msg.includes('Canceled') || msg.includes('16')) {
+      if (msg.includes('cancel') || msg.includes('Canceled') || msg.includes('16') || msg.includes('cancelled')) {
         throw new Error('Giriş işlemi iptal edildi.');
       }
       throw new Error(msg || 'Google ile giriş başarısız oldu.');
     }
   }
 
-  // WEB BROWSER ONLY (Not reached on Android)
+  // WEB BROWSER ONLY (Not reached on Native)
   try {
     googleProvider.setCustomParameters({ prompt: 'select_account' });
     const result = await signInWithPopup(auth, googleProvider);
