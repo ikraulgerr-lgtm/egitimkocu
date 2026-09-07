@@ -79,14 +79,23 @@ export async function loginWithGoogle() {
   if (Capacitor.isNativePlatform()) {
     try {
       let result: any;
-      try {
-        result = await FirebaseAuthentication.signInWithGoogle();
-      } catch (firstErr: any) {
-        console.warn('Native Google Sign-In (default) failed, retrying with useCredentialManager: false...', firstErr);
-        result = await (FirebaseAuthentication as any).signInWithGoogle({
-          useCredentialManager: false,
-        });
-      }
+      const nativeSignInPromise = async () => {
+        try {
+          return await FirebaseAuthentication.signInWithGoogle();
+        } catch (firstErr: any) {
+          console.warn('Native Google Sign-In (default) failed, retrying...', firstErr);
+          return await (FirebaseAuthentication as any).signInWithGoogle({
+            useCredentialManager: false,
+          });
+        }
+      };
+
+      // 45-second timeout safety to guarantee UI never hangs indefinitely
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Google ile giriş zaman aşımına uğradı. Lütfen tekrar deneyin.')), 45000)
+      );
+
+      result = await Promise.race([nativeSignInPromise(), timeoutPromise]);
 
       console.log('FirebaseAuthentication.signInWithGoogle result:', result);
 

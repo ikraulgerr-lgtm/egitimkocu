@@ -62,35 +62,59 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   }, [isOpen, mode]);
 
-  // If user is authenticated via Google/Firebase but has not chosen targetExam, ensure google_exam_select mode is active
+  // Real-time reactive auth state listener when modal is open
   useEffect(() => {
-    if (isOpen && auth.currentUser && mode !== 'google_exam_select') {
-      const checkExamTarget = async () => {
-        try {
-          const userSnap = await getDoc(doc(db, 'users', auth.currentUser!.uid));
-          if (!userSnap.exists() || !userSnap.data()?.targetExam) {
-            const base = (auth.currentUser!.email?.split('@')[0] || auth.currentUser!.displayName || 'ogrenci')
-              .toLowerCase()
-              .replace(/[^a-z0-9_]/g, '')
-              .slice(0, 12);
-            const finalUsername = userSnap.data()?.kullaniciAdi || `${base || 'ogrenci'}_${Math.floor(100 + Math.random() * 900)}`;
+    if (!isOpen) return;
 
-            setPendingGoogleUser({
-              uid: auth.currentUser!.uid,
-              displayName: auth.currentUser!.displayName || 'Öğrenci',
-              email: auth.currentUser!.email || 'ogrenci@egitimkocum.ai',
-              photoURL: auth.currentUser!.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-              username: finalUsername,
-            });
-            setMode('google_exam_select');
-          }
-        } catch (e) {
-          console.warn('AuthModal checkExamTarget error:', e);
+    const unsub = onAuthStateChanged(auth, async (currentUser) => {
+      if (!currentUser) return;
+      if (mode === 'google_exam_select') return;
+
+      try {
+        const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userSnap.exists() && userSnap.data()?.targetExam) {
+          const data = userSnap.data();
+          const finalUsername = data.kullaniciAdi || 'ogrenci';
+          setIsGoogleLoading(false);
+          setIsEmailLoading(false);
+          onLoginSuccess({
+            id: currentUser.uid,
+            ad: data.ad || currentUser.displayName || 'Öğrenci',
+            kullaniciAdi: finalUsername,
+            kullaniciAdi_lower: (data.kullaniciAdi_lower || finalUsername).toLowerCase(),
+            email: currentUser.email || 'ogrenci@egitimkocum.ai',
+            avatarUrl: currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+            targetExam: data.targetExam,
+            targetExamDate: data.targetExamDate,
+          });
+          onClose();
+        } else {
+          const base = (currentUser.email?.split('@')[0] || currentUser.displayName || 'ogrenci')
+            .toLowerCase()
+            .replace(/[^a-z0-9_]/g, '')
+            .slice(0, 12);
+          const finalUsername = (userSnap.exists() && userSnap.data()?.kullaniciAdi)
+            ? userSnap.data().kullaniciAdi
+            : `${base || 'ogrenci'}_${Math.floor(100 + Math.random() * 900)}`;
+
+          setPendingGoogleUser({
+            uid: currentUser.uid,
+            displayName: currentUser.displayName || 'Öğrenci',
+            email: currentUser.email || 'ogrenci@egitimkocum.ai',
+            photoURL: currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+            username: finalUsername,
+          });
+          setIsGoogleLoading(false);
+          setIsEmailLoading(false);
+          setMode('google_exam_select');
         }
-      };
-      checkExamTarget();
-    }
-  }, [isOpen, auth.currentUser?.uid, mode]);
+      } catch (e) {
+        console.warn('AuthModal onAuthStateChanged check warning:', e);
+      }
+    });
+
+    return () => unsub();
+  }, [isOpen, mode]);
 
   // Countdown timer effect
   useEffect(() => {
