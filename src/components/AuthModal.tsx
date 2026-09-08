@@ -56,68 +56,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsEmailLoading(false);
   }, [mode]);
 
-  // Real-time reactive auth state listener ONLY for Google SSO flow
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const unsub = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) return;
-      if (mode === 'google_exam_select') return;
-
-      // Only handle Google provider logins reactively so email registration is never disrupted
-      const isGoogleProvider = currentUser.providerData.some((p) => p.providerId === 'google.com');
-      if (!isGoogleProvider) return;
-
-      try {
-        const userSnap = await Promise.race([
-          getDoc(doc(db, 'users', currentUser.uid)),
-          new Promise<null>((r) => setTimeout(() => r(null), 3500)),
-        ]);
-
-        if (userSnap && userSnap.exists() && userSnap.data()?.targetExam) {
-          const data = userSnap.data();
-          const finalUsername = data.kullaniciAdi || 'ogrenci';
-          setIsGoogleLoading(false);
-          setIsEmailLoading(false);
-          onLoginSuccess({
-            id: currentUser.uid,
-            ad: data.ad || currentUser.displayName || 'Öğrenci',
-            kullaniciAdi: finalUsername,
-            kullaniciAdi_lower: (data.kullaniciAdi_lower || finalUsername).toLowerCase(),
-            email: currentUser.email || 'ogrenci@egitimkocum.ai',
-            avatarUrl: data.avatarUrl || currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-            targetExam: data.targetExam,
-            targetExamDate: data.targetExamDate,
-          });
-          onClose();
-        } else {
-          const base = (currentUser.email?.split('@')[0] || currentUser.displayName || 'ogrenci')
-            .toLowerCase()
-            .replace(/[^a-z0-9_]/g, '')
-            .slice(0, 12);
-          const finalUsername = (userSnap && userSnap.exists() && userSnap.data()?.kullaniciAdi)
-            ? userSnap.data().kullaniciAdi
-            : `${base || 'ogrenci'}_${Math.floor(100 + Math.random() * 900)}`;
-
-          setPendingGoogleUser({
-            uid: currentUser.uid,
-            displayName: currentUser.displayName || 'Öğrenci',
-            email: currentUser.email || 'ogrenci@egitimkocum.ai',
-            photoURL: currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-            username: finalUsername,
-          });
-          setIsGoogleLoading(false);
-          setIsEmailLoading(false);
-          setMode('google_exam_select');
-        }
-      } catch (e) {
-        console.warn('AuthModal onAuthStateChanged check warning:', e);
-      }
-    });
-
-    return () => unsub();
-  }, [isOpen, mode]);
-
   // Countdown timer effect
   useEffect(() => {
     let timer: any;
@@ -309,14 +247,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         updatedAt: new Date().toISOString(),
       };
 
-      try {
-        await Promise.race([
-          setDoc(doc(db, 'users', pendingGoogleUser.uid), cleanUserData, { merge: true }),
-          new Promise((r) => setTimeout(r, 4000)),
-        ]);
-      } catch (docErr) {
-        console.warn('Google exam submit setDoc warning:', docErr);
-      }
+      // Write to Firestore in background without delaying UI transition
+      Promise.race([
+        setDoc(doc(db, 'users', pendingGoogleUser.uid), cleanUserData, { merge: true }),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]).catch((docErr) => {
+        console.warn('Google exam submit setDoc warning (non-fatal):', docErr);
+      });
 
       onLoginSuccess({
         id: pendingGoogleUser.uid,
@@ -507,7 +444,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       try {
                         const userSnap = await Promise.race([
                           getDoc(doc(db, 'users', firebaseUser.uid)),
-                          new Promise<null>((r) => setTimeout(() => r(null), 3500)),
+                          new Promise<null>((r) => setTimeout(() => r(null), 2000)),
                         ]);
 
                         if (userSnap && userSnap.exists()) {
@@ -525,6 +462,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                       // If user is already registered and targetExam is defined, proceed immediately!
                       if (userExistsInDb && targetExam) {
+                        setIsGoogleLoading(false);
                         onLoginSuccess({
                           id: firebaseUser.uid,
                           ad: userDisplayName,
@@ -556,69 +494,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         username: finalUsername,
                       });
 
-                      setMode('google_exam_select');
                       setIsGoogleLoading(false);
+                      setMode('google_exam_select');
                       return;
                     }
                   } catch (err: any) {
                     console.warn('Google Auth Status:', err);
-                    if (auth.currentUser) {
-                      try {
-                        const userSnap = await Promise.race([
-                          getDoc(doc(db, 'users', auth.currentUser.uid)),
-                          new Promise<null>((r) => setTimeout(() => r(null), 3500)),
-                        ]);
-                        if (userSnap && userSnap.exists() && userSnap.data()?.targetExam) {
-                          const data = userSnap.data();
-                          onLoginSuccess({
-                            id: auth.currentUser.uid,
-                            ad: data.ad || auth.currentUser.displayName || 'Öğrenci',
-                            kullaniciAdi: data.kullaniciAdi || 'ogrenci',
-                            kullaniciAdi_lower: (data.kullaniciAdi || 'ogrenci').toLowerCase(),
-                            email: auth.currentUser.email || 'ogrenci@egitimkocum.ai',
-                            avatarUrl: data.avatarUrl || auth.currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-                            targetExam: data.targetExam,
-                            targetExamDate: data.targetExamDate,
-                          });
-                          onClose();
-                          return;
-                        } else {
-                          const base = (auth.currentUser.email?.split('@')[0] || auth.currentUser.displayName || 'ogrenci')
-                            .toLowerCase()
-                            .replace(/[^a-z0-9_]/g, '')
-                            .slice(0, 12);
-                          setPendingGoogleUser({
-                            uid: auth.currentUser.uid,
-                            displayName: auth.currentUser.displayName || 'Öğrenci',
-                            email: auth.currentUser.email || 'ogrenci@egitimkocum.ai',
-                            photoURL: auth.currentUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-                            username: `${base || 'ogrenci'}_${Math.floor(100 + Math.random() * 900)}`,
-                          });
-                          setMode('google_exam_select');
-                          return;
-                        }
-                      } catch (dbErr) {
-                        console.warn('Error checking db in catch:', dbErr);
-                      }
-                    }
-
-                    if (err?.code === 'auth/cancelled-popup-request') {
-                      return;
-                    } else if (err?.code === 'auth/popup-closed-by-user') {
-                      setErrorMsg('Giriş penceresi kapatıldı.');
+                    setIsGoogleLoading(false);
+                    const msg = err?.message || '';
+                    if (msg.includes('iptal') || msg.includes('cancel')) {
+                      // User cancelled
                     } else if (err?.code === 'auth/operation-not-allowed') {
                       setErrorMsg('Firebase Console üzerinde Google ile Giriş sağlayıcısı henüz etkinleştirilmemiş.');
                     } else if (err?.code === 'auth/unauthorized-domain') {
-                      setErrorMsg('🔒 Google Giriş Yetkisi: Bağlantı adresiniz yetkili alan adlarında bulunamadı. Lütfen Firebase yetkilerini kontrol edin.');
-                    } else if (err?.code === 'auth/popup-blocked') {
-                      setErrorMsg('🔒 Giriş penceresi açılamadı. Lütfen tarayıcınızın açılır pencere (popup) engelleyicisini kapatıp tekrar deneyin.');
+                      setErrorMsg('🔒 Google Giriş Yetkisi: Bağlantı adresiniz yetkili alan adlarında bulunamadı.');
                     } else {
-                      const msg = err?.message || 'Lütfen tekrar deneyin.';
-                      if (msg.includes('iptal') || msg.includes('cancel')) {
-                        // User cancelled
-                      } else {
-                        setErrorMsg(`Google ile giriş yapılamadı: ${msg}`);
-                      }
+                      setErrorMsg(`Google ile giriş yapılamadı: ${msg || 'Lütfen tekrar deneyin.'}`);
                     }
                   } finally {
                     setIsGoogleLoading(false);

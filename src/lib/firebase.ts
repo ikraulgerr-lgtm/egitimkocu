@@ -58,13 +58,21 @@ export async function loginWithEmailFirebase(email: string, pass: string) {
     }
   }
 
+  if (resolvedUser) {
+    // Non-blocking JS SDK synchronization (max 2s)
+    Promise.race([
+      signInWithEmailAndPassword(auth, cleanEmail, pass),
+      new Promise((r) => setTimeout(r, 2000)),
+    ]).catch((e) => {
+      console.warn('JS SDK sync after native login warning (non-fatal):', e);
+    });
+    return resolvedUser;
+  }
+
   try {
     const result = await signInWithEmailAndPassword(auth, cleanEmail, pass);
     return result.user;
   } catch (error) {
-    if (resolvedUser) {
-      return resolvedUser;
-    }
     console.error('Firebase Login Error:', error);
     throw error;
   }
@@ -116,30 +124,28 @@ export async function registerWithEmailFirebase(
     }
   }
 
-  // Also authenticate on the JS SDK side so auth.currentUser is synchronized
-  try {
-    if (resolvedUser) {
-      try {
-        const jsCred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
-        resolvedUser = jsCred.user;
-      } catch (jsErr) {
-        console.warn('Syncing JS SDK auth after native registration:', jsErr);
-      }
-    } else {
+  // Also authenticate on the JS SDK side non-blockingly (max 2s) so auth.currentUser is synchronized
+  if (resolvedUser) {
+    Promise.race([
+      signInWithEmailAndPassword(auth, cleanEmail, pass),
+      new Promise((r) => setTimeout(r, 2000)),
+    ]).catch((jsErr) => {
+      console.warn('Syncing JS SDK auth after native registration (non-fatal):', jsErr);
+    });
+  } else {
+    try {
       const result = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
       try {
         await updateProfile(result.user, { displayName: cleanName });
       } catch (e) {}
       resolvedUser = result.user;
-    }
-  } catch (error) {
-    if (!resolvedUser) {
+    } catch (error) {
       console.error('Firebase Register Error:', error);
       throw error;
     }
   }
 
-  // Write initial user profile to Firestore (with non-blocking timeout safety)
+  // Write initial user profile to Firestore non-blockingly (fire and forget with error logging)
   try {
     const userDocRef = doc(db, 'users', resolvedUser.uid);
     const initialDocData = {
@@ -160,12 +166,14 @@ export async function registerWithEmailFirebase(
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    await Promise.race([
+    Promise.race([
       setDoc(userDocRef, initialDocData, { merge: true }),
-      new Promise((r) => setTimeout(r, 4000)),
-    ]);
+      new Promise((r) => setTimeout(r, 2000)),
+    ]).catch((err) => {
+      console.warn('Firestore initial user setDoc warning (non-fatal):', err);
+    });
   } catch (err) {
-    console.warn('Firestore initial user setDoc warning:', err);
+    console.warn('Firestore initial user setup warning:', err);
   }
 
   return resolvedUser;
@@ -179,9 +187,9 @@ export async function loginWithGoogle() {
         return await FirebaseAuthentication.signInWithGoogle();
       };
 
-      // 45-second timeout safety to guarantee UI never hangs indefinitely
+      // 30-second timeout safety to guarantee UI never hangs indefinitely
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Google ile giriş zaman aşımına uğradı. Lütfen tekrar deneyin.')), 45000)
+        setTimeout(() => reject(new Error('Google ile giriş zaman aşımına uğradı. Lütfen tekrar deneyin.')), 30000)
       );
 
       result = await Promise.race([nativeSignInPromise(), timeoutPromise]);
@@ -197,14 +205,17 @@ export async function loginWithGoogle() {
         result?.credential?.accessToken ||
         result?.accessToken;
 
+      // Synchronize JS SDK auth in background non-blockingly (max 2.5s)
       if (idToken) {
         try {
           const credential = GoogleAuthProvider.credential(idToken, accessToken || undefined);
-          const userCred = await signInWithCredential(auth, credential);
-          return userCred.user;
-        } catch (credErr: any) {
-          console.warn('signInWithCredential with idToken error:', credErr);
-        }
+          Promise.race([
+            signInWithCredential(auth, credential),
+            new Promise((r) => setTimeout(r, 2500)),
+          ]).catch((credErr) => {
+            console.warn('signInWithCredential with idToken error (non-fatal):', credErr);
+          });
+        } catch (e) {}
       }
 
       if (result?.user) {
@@ -224,7 +235,7 @@ export async function loginWithGoogle() {
     } catch (err: any) {
       console.error('Native Google Sign-In Error:', err);
       const msg = err?.message || '';
-      if (msg.includes('cancel') || msg.includes('Canceled') || msg.includes('16') || msg.includes('cancelled')) {
+      if (msg.includes('cancel') || msg.includes('Canceled') || msg.includes('16') || msg.includes('cancelled') || msg.includes('user cancelled')) {
         throw new Error('Giriş işlemi iptal edildi.');
       }
       throw new Error(msg || 'Google ile giriş başarısız oldu.');

@@ -300,6 +300,20 @@ export function App() {
 
   // Listen to Firebase Auth state changes
   useEffect(() => {
+    // Check native auth on mount if on native platform
+    if (Capacitor.isNativePlatform()) {
+      FirebaseAuthentication.getCurrentUser().then((res) => {
+        if (res?.user) {
+          const uid = res.user.uid;
+          const savedUser = getUser(uid);
+          if (savedUser && savedUser.id && savedUser.targetExam) {
+            setUserState(savedUser);
+            setIsAuthModalOpen(false);
+          }
+        }
+      }).catch(() => {});
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const uid = firebaseUser.uid;
@@ -307,7 +321,7 @@ export function App() {
         try {
           const userSnap = await Promise.race([
             getDoc(userDocRef),
-            new Promise<null>((r) => setTimeout(() => r(null), 3500)),
+            new Promise<null>((r) => setTimeout(() => r(null), 2500)),
           ]);
           const todayTr = getTurkeyDateString();
           let currentUsername = 'ogrenci';
@@ -417,14 +431,22 @@ export function App() {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
         }
       } else {
-        // Logged-out state: clean all in-memory user data so next login starts isolated
-        setUserState(INITIAL_USER);
-        setQuestionsState([]);
-        setScheduleState([]);
-        setFriendsState([]);
-        setNotifications([]);
-        setSelectedQuestion(null);
-        setIsAuthModalOpen(true);
+        // Firebase JS auth reported null: check if user is already authenticated locally or via native auth
+        const savedUser = getUser();
+        if (savedUser && savedUser.id && savedUser.id !== 'student' && savedUser.id !== 'usr_new' && savedUser.email && savedUser.targetExam) {
+          // Keep local user authenticated!
+          setUserState(savedUser);
+          setIsAuthModalOpen(false);
+        } else {
+          // Truly logged out: show auth screen
+          setUserState(INITIAL_USER);
+          setQuestionsState([]);
+          setScheduleState([]);
+          setFriendsState([]);
+          setNotifications([]);
+          setSelectedQuestion(null);
+          setIsAuthModalOpen(true);
+        }
       }
     });
 
@@ -506,23 +528,29 @@ export function App() {
 
   // Helper to sync user state to Firestore, Firebase Auth profile & Mutual Friends
   const syncUserToFirestore = async (updatedUser: Kullanici) => {
-    if (auth.currentUser) {
-      try {
-        const myUid = auth.currentUser.uid;
-        const userDocRef = doc(db, 'users', myUid);
-        const cleanUserData = JSON.parse(
-          JSON.stringify({
-            ...updatedUser,
-            displayName: updatedUser.ad,
-            kullaniciAdi: updatedUser.kullaniciAdi || 'ogrenci',
-            kullaniciAdi_lower: (updatedUser.kullaniciAdi || 'ogrenci').toLowerCase(),
-            photoURL: updatedUser.avatarUrl,
-            updatedAt: new Date().toISOString(),
-          })
-        );
-        await setDoc(userDocRef, cleanUserData, { merge: true });
+    const myUid = updatedUser.id || auth.currentUser?.uid;
+    if (!myUid) return;
+    try {
+      const userDocRef = doc(db, 'users', myUid);
+      const cleanUserData = JSON.parse(
+        JSON.stringify({
+          ...updatedUser,
+          displayName: updatedUser.ad,
+          kullaniciAdi: updatedUser.kullaniciAdi || 'ogrenci',
+          kullaniciAdi_lower: (updatedUser.kullaniciAdi || 'ogrenci').toLowerCase(),
+          photoURL: updatedUser.avatarUrl,
+          updatedAt: new Date().toISOString(),
+        })
+      );
+      Promise.race([
+        setDoc(userDocRef, cleanUserData, { merge: true }),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]).catch((err) => {
+        console.warn('syncUserToFirestore setDoc warning (non-fatal):', err);
+      });
 
-        // Update Firebase Auth profile displayName & photoURL
+      // Update Firebase Auth profile displayName & photoURL if auth.currentUser exists
+      if (auth.currentUser) {
         const profileUpdates: { displayName?: string; photoURL?: string } = {};
         if (updatedUser.ad && auth.currentUser.displayName !== updatedUser.ad) {
           profileUpdates.displayName = updatedUser.ad;
@@ -531,8 +559,9 @@ export function App() {
           profileUpdates.photoURL = updatedUser.avatarUrl;
         }
         if (Object.keys(profileUpdates).length > 0) {
-          await updateProfile(auth.currentUser, profileUpdates).catch(() => {});
+          updateProfile(auth.currentUser, profileUpdates).catch(() => {});
         }
+      }
 
         // Mutual Sync: Update this user's name & avatar in all mutual friends' friend documents
         try {
@@ -586,8 +615,7 @@ export function App() {
       } catch (err) {
         console.warn('Error syncing user profile to Firestore:', err);
       }
-    }
-  };
+    };
 
   const handleUpdateUser = (updatedUser: Kullanici) => {
     setUserState(updatedUser);

@@ -64,12 +64,15 @@ class GoogleAuthProviderHandler: NSObject {
             }
             let scopes = call.getArray("scopes", String.self) ?? []
 
-            GIDSignIn.sharedInstance.signIn(withPresenting: controller, hint: nil, additionalScopes: scopes) { [unowned self] result, error in
+            GIDSignIn.sharedInstance.signIn(withPresenting: controller, hint: nil, additionalScopes: scopes) { [weak self] result, error in
+                guard let self = self else { return }
                 if let error = error {
-                    if isLink == true {
-                        self.pluginImplementation.handleFailedLink(message: error.localizedDescription, error: error)
-                    } else {
-                        self.pluginImplementation.handleFailedSignIn(message: error.localizedDescription, error: error)
+                    DispatchQueue.main.async {
+                        if isLink == true {
+                            self.pluginImplementation.handleFailedLink(message: error.localizedDescription, error: error)
+                        } else {
+                            self.pluginImplementation.handleFailedSignIn(message: error.localizedDescription, error: error)
+                        }
                     }
                     return
                 }
@@ -79,22 +82,26 @@ class GoogleAuthProviderHandler: NSObject {
                 else {
                     let errMsg = "Google Sign-In: idToken is missing or nil."
                     let err = NSError(domain: "GoogleAuthProviderHandler", code: -1, userInfo: [NSLocalizedDescriptionKey: errMsg])
-                    if isLink == true {
-                        self.pluginImplementation.handleFailedLink(message: errMsg, error: err)
-                    } else {
-                        self.pluginImplementation.handleFailedSignIn(message: errMsg, error: err)
+                    DispatchQueue.main.async {
+                        if isLink == true {
+                            self.pluginImplementation.handleFailedLink(message: errMsg, error: err)
+                        } else {
+                            self.pluginImplementation.handleFailedSignIn(message: errMsg, error: err)
+                        }
                     }
                     return
                 }
                 let accessToken = user.accessToken.tokenString
                 let serverAuthCode = result?.serverAuthCode
                 let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: accessToken)
-                if isLink == true {
-                    self.pluginImplementation.handleSuccessfulLink(credential: credential, idToken: idToken, nonce: nil,
-                                                                   accessToken: accessToken, serverAuthCode: serverAuthCode, displayName: nil, authorizationCode: nil)
-                } else {
-                    self.pluginImplementation.handleSuccessfulSignIn(credential: credential, idToken: idToken, nonce: nil,
-                                                                     accessToken: accessToken, displayName: nil, authorizationCode: nil, serverAuthCode: serverAuthCode)
+                DispatchQueue.main.async {
+                    if isLink == true {
+                        self.pluginImplementation.handleSuccessfulLink(credential: credential, idToken: idToken, nonce: nil,
+                                                                       accessToken: accessToken, serverAuthCode: serverAuthCode, displayName: user.profile?.name, authorizationCode: nil)
+                    } else {
+                        self.pluginImplementation.handleSuccessfulSignIn(credential: credential, idToken: idToken, nonce: nil,
+                                                                         accessToken: accessToken, displayName: user.profile?.name, authorizationCode: nil, serverAuthCode: serverAuthCode)
+                    }
                 }
             }
         }
