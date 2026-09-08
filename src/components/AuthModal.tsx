@@ -40,6 +40,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   } | null>(null);
 
   // UI status states
+  const [canInteract, setCanInteract] = useState<boolean>(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
   const [isEmailLoading, setIsEmailLoading] = useState<boolean>(false);
   const [isGoogleExamLoading, setIsGoogleExamLoading] = useState<boolean>(false);
@@ -60,6 +61,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Always reset mode to 'login' and clear pending state whenever modal is opened
   useEffect(() => {
     if (isOpen) {
+      setCanInteract(false);
       setMode('login');
       setPendingGoogleUser(null);
       setErrorMsg(null);
@@ -70,6 +72,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setNewPassword('');
       setConfirmPassword('');
       setOtpCode('');
+
+      // Prevent accidental click-through from underlying screen (e.g. logout button)
+      const timer = setTimeout(() => {
+        setCanInteract(true);
+      }, 400);
+      return () => clearTimeout(timer);
+    } else {
+      setCanInteract(false);
     }
   }, [isOpen]);
 
@@ -443,11 +453,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
 
             {/* Social SSO Logins */}
-            <div className="space-y-2">
+            <div className="space-y-2 select-none">
               <button
                 type="button"
-                disabled={isGoogleLoading || isEmailLoading}
-                onClick={async () => {
+                disabled={!canInteract || isGoogleLoading || isEmailLoading}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!canInteract || isGoogleLoading || isEmailLoading) return;
                   setErrorMsg(null);
                   setIsGoogleLoading(true);
                   try {
@@ -544,7 +557,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     setIsGoogleLoading(false);
                   }
                 }}
-                className="w-full flex items-center justify-center gap-2 bg-surface-container-low border border-card-border py-3 px-4 rounded-xl text-xs font-bold text-text-main hover:border-primary/50 active:scale-98 transition-all cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 bg-surface-container-low border border-card-border py-3 px-4 rounded-xl text-xs font-bold text-text-main hover:border-primary/50 active:scale-98 transition-all cursor-pointer disabled:opacity-50 select-none"
               >
                 <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>

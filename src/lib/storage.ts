@@ -42,19 +42,22 @@ export const INITIAL_QUESTIONS: SoruKaydi[] = [];
 export const INITIAL_SCHEDULE: ProgramOgesi[] = [];
 export const INITIAL_DENEMELER: DenemeRecord[] = [];
 
+const nowMs = Date.now();
+const dayMs = 24 * 60 * 60 * 1000;
+
 export const INITIAL_COMMUNITY: ToplulukSoru[] = [
   {
     id: 'c_welcome',
     yazarAd: 'Eğitim Koçum AI Rehberlik',
     kullaniciAdi: 'rehberlik_ai',
     yazarAvatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
-    zaman: '15 dk önce',
-    createdAt: Date.now() - 1000 * 60 * 15,
+    zaman: '10 dk önce',
+    createdAt: nowMs - 1000 * 60 * 10,
     ders: 'Genel Rehberlik',
-    soruMetni: 'Eğitim Koçum AI sistemine hoş geldin! Takıldığın soruların fotoğrafını çekip atabilir ya da metin olarak yazarak pedagojik AI analizi alabilirsin.',
+    soruMetni: 'Eğitim Koçum AI topluluğuna hoş geldin! Takıldığın soruların fotoğrafını çekip sorabilir, diğer öğrencilerin sorularını inceleyebilir ve yapay zeka pedagoji asistanından anında çözüm adımları alabilirsin.',
     cevapSayisi: 1,
     hasAiAnswer: true,
-    begeniSayisi: 3,
+    begeniSayisi: 12,
     isLiked: false,
     cevaplar: [
       {
@@ -62,10 +65,176 @@ export const INITIAL_COMMUNITY: ToplulukSoru[] = [
         yazarAd: 'Eğitim Koçum AI Pedagoji',
         kullaniciAdi: 'pedagoji_ai',
         avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
-        metin: 'Soru analizi başlatmak için ana sayfadaki kamera veya metin alanını kullanabilirsin.',
+        metin: 'Soru analizi başlatmak için ana sayfadaki kamera veya metin alanını kullanabilir, toplulukta paylaşarak tartışabilirsin.',
         isAi: true,
-        zaman: '14 dk önce',
-        createdAt: Date.now() - 1000 * 60 * 14,
+        zaman: '9 dk önce',
+        createdAt: nowMs - 1000 * 60 * 9,
+      },
+    ],
+  },
+  {
+    id: 'c_math_1',
+    yazarAd: 'Zeynep Kaya',
+    kullaniciAdi: 'zeynep_yks',
+    yazarAvatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=ZeynepKaya&backgroundColor=ec4899',
+    zaman: '3 saat önce',
+    createdAt: nowMs - 1000 * 60 * 60 * 3,
+    ders: 'Matematik',
+    soruMetni: 'f(x) = x³ - 3x² + 4 fonksiyonunun yerel ekstremum noktalarını bulurken türevin köklerini tabloya yerleştirdim ama işaret incelemesinde takıldım. Yardımcı olur musunuz?',
+    cevapSayisi: 2,
+    hasAiAnswer: true,
+    begeniSayisi: 8,
+    isLiked: false,
+    cevaplar: [
+      {
+        id: 'ans_math_ai',
+        yazarAd: 'Eğitim Koçum AI',
+        kullaniciAdi: 'ai_asistan',
+        avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
+        metin: '💡 f\'(x) = 3x² - 6x = 3x(x - 2) olur. Kökler x = 0 ve x = 2\'dir. Başkatsayı pozitif olduğu için tablodaki işaret dizilimi: (+, -, +) şeklinde ilerler. x = 0 yerel maksimum, x = 2 yerel minimum noktasıdır.',
+        isAi: true,
+        zaman: '2 saat önce',
+        createdAt: nowMs - 1000 * 60 * 60 * 2,
+      },
+      {
+        id: 'ans_math_user',
+        yazarAd: 'Emre Demir',
+        kullaniciAdi: 'emredemir_99',
+        avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=EmreDemir&backgroundColor=3b82f6',
+        metin: 'Evet yapay zekanın yazdığı gibi, başkatsayı işaretine bakıp en sağdan + ile başlaman gerekiyor.',
+        isAi: false,
+        zaman: '1 saat önce',
+        createdAt: nowMs - 1000 * 60 * 60 * 1,
+      },
+    ],
+  },
+  {
+    id: 'c_phys_1',
+    yazarAd: 'Burak Yıldız',
+    kullaniciAdi: 'burak_fizik',
+    yazarAvatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=BurakYildiz&backgroundColor=10b981',
+    zaman: '2 gün önce',
+    createdAt: nowMs - dayMs * 2,
+    ders: 'Fizik',
+    soruMetni: 'Yerden v₀ hızıyla eğik atılan bir cismin menzili maksimum olduğunda atış açısı kaç derecedir ve tepe noktasındaki ivmesi nedir?',
+    cevapSayisi: 1,
+    hasAiAnswer: true,
+    begeniSayisi: 15,
+    isLiked: false,
+    cevaplar: [
+      {
+        id: 'ans_phys_ai',
+        yazarAd: 'Eğitim Koçum AI',
+        kullaniciAdi: 'ai_asistan',
+        avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
+        metin: 'Maksimum menzil sin(2θ)=1 olduğunda yani atış açısı θ = 45° olduğunda gerçekleşir. Tepe noktasında hız sıfır değil, sadece yatay hız bileşeni vardır (vx = v₀·cos45°). İvme ise hareket boyunca sabittir ve yerçekimi ivmesi g = 9.8 m/s² (aşağı yönlü) dir.',
+        isAi: true,
+        zaman: '2 gün önce',
+        createdAt: nowMs - dayMs * 2 + 1000 * 60 * 5,
+      },
+    ],
+  },
+  {
+    id: 'c_chem_1',
+    yazarAd: 'Elif Şahin',
+    kullaniciAdi: 'elif_kimya',
+    yazarAvatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=ElifSahin&backgroundColor=f59e0b',
+    zaman: '5 gün önce',
+    createdAt: nowMs - dayMs * 5,
+    ders: 'Kimya',
+    soruMetni: 'Normal şartlar altında (NŞA) 5.6 litre hacim kaplayan CH₄ gazı kaç moldür ve kaç gramdır? (C:12, H:1)',
+    cevapSayisi: 1,
+    hasAiAnswer: true,
+    begeniSayisi: 9,
+    isLiked: false,
+    cevaplar: [
+      {
+        id: 'ans_chem_ai',
+        yazarAd: 'Eğitim Koçum AI',
+        kullaniciAdi: 'ai_asistan',
+        avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
+        metin: '1. Adım: NŞA\'da 1 mol gaz 22.4 litredir. n = V / 22.4 = 5.6 / 22.4 = 0.25 mol CH₄.\n2. Adım: CH₄ mol kütlesi = 12 + (4 × 1) = 16 g/mol.\n3. Adım: m = n × M_A = 0.25 × 16 = 4 gramdır.',
+        isAi: true,
+        zaman: '5 gün önce',
+        createdAt: nowMs - dayMs * 5 + 1000 * 60 * 8,
+      },
+    ],
+  },
+  {
+    id: 'c_bio_1',
+    yazarAd: 'Canberk Arslan',
+    kullaniciAdi: 'canberk_bio',
+    yazarAvatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=CanberkArslan&backgroundColor=8b5cf6',
+    zaman: '12 gün önce',
+    createdAt: nowMs - dayMs * 12,
+    ders: 'Biyoloji',
+    soruMetni: 'Mitoz bölünme ile Mayoz bölünme arasındaki en temel farklar nelerdir? Sınavda hangi öncüllere dikkat etmeliyiz?',
+    cevapSayisi: 1,
+    hasAiAnswer: true,
+    begeniSayisi: 19,
+    isLiked: false,
+    cevaplar: [
+      {
+        id: 'ans_bio_ai',
+        yazarAd: 'Eğitim Koçum AI',
+        kullaniciAdi: 'ai_asistan',
+        avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
+        metin: '🌱 1. Kromozom Sayısı: Mitozda korunur (2n → 2n), Mayozda yarıya iner (2n → n).\n🌱 2. Çeşitlilik: Mayozda krossing-over ve homolog kromozomların rastgele dağılımı genetik çeşitlilik sağlar. Mitozda mutasyon yoksa kalıtsal çeşitlilik oluşmaz.\n🌱 3. Oluşan Hücre: Mitozda 2, mayozda 4 hücre oluşur.',
+        isAi: true,
+        zaman: '12 gün önce',
+        createdAt: nowMs - dayMs * 12 + 1000 * 60 * 15,
+      },
+    ],
+  },
+  {
+    id: 'c_turk_1',
+    yazarAd: 'Selin Doğan',
+    kullaniciAdi: 'selin_turkce',
+    yazarAvatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=SelinDogan&backgroundColor=06b6d4',
+    zaman: '25 gün önce',
+    createdAt: nowMs - dayMs * 25,
+    ders: 'Türkçe',
+    soruMetni: '"Kitap okumak, zihnin en verimli egzersizidir." cümlesinin yükleminin türüne ve yapısına göre özellikleri nelerdir?',
+    cevapSayisi: 1,
+    hasAiAnswer: true,
+    begeniSayisi: 14,
+    isLiked: false,
+    cevaplar: [
+      {
+        id: 'ans_turk_ai',
+        yazarAd: 'Eğitim Koçum AI',
+        kullaniciAdi: 'ai_asistan',
+        avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
+        metin: '1. Yüklemin Türüne Göre: "zihnin en verimli egzersizidir" bir isim tamlamasıdır, dolayısıyla İsim (Ad) cümlesidir.\n2. Cümle Yapısına Göre: İçinde "okumak" fiilimsisi (isim-fiil) bulunduğu için Girişik Birleşik Cümledir.\n3. Öğe Dizilişine Göre: Yüklem sonda olduğu için Kurallı cümledir.',
+        isAi: true,
+        zaman: '25 gün önce',
+        createdAt: nowMs - dayMs * 25 + 1000 * 60 * 20,
+      },
+    ],
+  },
+  {
+    id: 'c_hist_1',
+    yazarAd: 'Ahmet Öztürk',
+    kullaniciAdi: 'ahmet_tarih',
+    yazarAvatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=AhmetOzturk&backgroundColor=ef4444',
+    zaman: '45 gün önce',
+    createdAt: nowMs - dayMs * 45,
+    ders: 'Tarih',
+    soruMetni: 'Amasya Genelgesi\'nde yer alan "Milletin bağımsızlığını yine milletin azim ve kararı kurtaracaktır" maddesi neden bir ihtilal bildirisi niteliğindedir?',
+    cevapSayisi: 1,
+    hasAiAnswer: true,
+    begeniSayisi: 22,
+    isLiked: false,
+    cevaplar: [
+      {
+        id: 'ans_hist_ai',
+        yazarAd: 'Eğitim Koçum AI',
+        kullaniciAdi: 'ai_asistan',
+        avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
+        metin: 'Bu madde Kurtuluş Savaşı\'nın yöntemini ve amacını belirler. Aynı zamanda millet iradesine vurgu yaparak Osmanlı saltanat yönetimine karşı ilk kez halk egemenliğini öne çıkardığı için demokratik bir ihtilal çağrısı ve ulusal egemenliğin ilk adımıdır.',
+        isAi: true,
+        zaman: '45 gün önce',
+        createdAt: nowMs - dayMs * 45 + 1000 * 60 * 30,
       },
     ],
   },
@@ -77,7 +246,8 @@ export function resetToCleanState(userId?: string): Kullanici {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (k && (k.startsWith('edumind_') || k.startsWith('active_pomo') || k.startsWith('completed_pomo'))) {
-        if (k !== BASE_THEME_KEY) {
+        // PRESERVE GLOBAL COMMUNITY AND THEME ACROSS LOGOUTS
+        if (k !== BASE_THEME_KEY && k !== BASE_COMMUNITY_KEY) {
           keysToRemove.push(k);
         }
       }
@@ -325,7 +495,19 @@ export function getCommunityPosts(): ToplulukSoru[] {
     return INITIAL_COMMUNITY;
   }
   try {
-    return JSON.parse(data);
+    const parsed: ToplulukSoru[] = JSON.parse(data);
+    if (Array.isArray(parsed)) {
+      const existingIds = new Set(parsed.map((p) => p.id));
+      const merged = [...parsed];
+      INITIAL_COMMUNITY.forEach((initPost) => {
+        if (!existingIds.has(initPost.id)) {
+          merged.push(initPost);
+        }
+      });
+      merged.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      return merged;
+    }
+    return INITIAL_COMMUNITY;
   } catch {
     return INITIAL_COMMUNITY;
   }

@@ -21,6 +21,7 @@ import {
   getDenemeler,
   saveDenemelerLocally,
   INITIAL_USER,
+  INITIAL_COMMUNITY,
 } from './lib/storage';
 import { getTurkeyDateString } from './lib/dateUtils';
 import { trySolveMathExpression } from './lib/mathUtils';
@@ -82,6 +83,7 @@ export function App() {
   const [isExamModalOpen, setIsExamModalOpen] = useState(false);
   const [quizQuestion, setQuizQuestion] = useState<SoruKaydi | null>(null);
   const [quizList, setQuizList] = useState<SoruKaydi[]>([]);
+  const isLoggingOutRef = useRef<boolean>(false);
   const [quizIndex, setQuizIndex] = useState<number>(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Bildirim[]>([]);
@@ -225,12 +227,19 @@ export function App() {
     const unsubCommunity = onSnapshot(
       collection(db, 'community'),
       (cSnap) => {
+        let loadedPosts: ToplulukSoru[] = [];
         if (!cSnap.empty) {
-          const loadedPosts: ToplulukSoru[] = cSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as ToplulukSoru);
-          loadedPosts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-          setPostsState(loadedPosts);
-          savePosts(loadedPosts);
+          loadedPosts = cSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as ToplulukSoru);
         }
+        const existingIds = new Set(loadedPosts.map((p) => p.id));
+        INITIAL_COMMUNITY.forEach((initP) => {
+          if (!existingIds.has(initP.id)) {
+            loadedPosts.push(initP);
+          }
+        });
+        loadedPosts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        setPostsState(loadedPosts);
+        savePosts(loadedPosts);
       },
       (cErr) => {
         console.warn('Community snapshot listener warning:', cErr);
@@ -317,6 +326,17 @@ export function App() {
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (isLoggingOutRef.current) {
+        setUserState(INITIAL_USER);
+        setQuestionsState([]);
+        setScheduleState([]);
+        setFriendsState([]);
+        setNotifications([]);
+        setSelectedQuestion(null);
+        setIsAuthModalOpen(true);
+        return;
+      }
+
       if (firebaseUser) {
         const uid = firebaseUser.uid;
         const todayTr = getTurkeyDateString();
@@ -446,8 +466,8 @@ export function App() {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
         }
       } else {
-        // Firebase JS auth reported null: check if native auth has an active user
-        if (Capacitor.isNativePlatform()) {
+        // Firebase JS auth reported null: check if native auth has an active user ONLY when NOT logging out
+        if (!isLoggingOutRef.current && Capacitor.isNativePlatform()) {
           try {
             const nativeRes = await FirebaseAuthentication.getCurrentUser();
             if (nativeRes?.user) {
@@ -1672,6 +1692,7 @@ export function App() {
               showToast('Profil ve ayarlarınız başarıyla güncellendi!');
             }}
             onLogout={async () => {
+              isLoggingOutRef.current = true;
               const currentUid = user?.id;
               // 1. Immediately reset storage and React states
               resetToCleanState(currentUid);
@@ -1698,6 +1719,10 @@ export function App() {
               resetToCleanState(currentUid);
               setUserState(INITIAL_USER);
               setIsAuthModalOpen(true);
+
+              setTimeout(() => {
+                isLoggingOutRef.current = false;
+              }, 2000);
             }}
           />
         )}

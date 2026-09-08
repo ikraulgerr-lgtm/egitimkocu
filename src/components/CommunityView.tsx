@@ -5,6 +5,7 @@ import { getCommunityAiAnswerService } from '../lib/geminiClient';
 import { FormattedMathText } from './FormattedMathText';
 import { db, auth } from '../lib/firebase';
 import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore';
+import { INITIAL_COMMUNITY } from '../lib/storage';
 
 interface CommunityViewProps {
   posts: ToplulukSoru[];
@@ -31,10 +32,30 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const [isGeneratingAiForPost, setIsGeneratingAiForPost] = useState<{ [postId: string]: boolean }>({});
 
   // Local state for answers dynamically added to posts
-  const [localPosts, setLocalPosts] = useState<ToplulukSoru[]>(posts);
+  const [localPosts, setLocalPosts] = useState<ToplulukSoru[]>(() => {
+    const list = [...(posts || [])];
+    const existingIds = new Set(list.map((p) => p.id));
+    INITIAL_COMMUNITY.forEach((initP) => {
+      if (!existingIds.has(initP.id)) {
+        list.push(initP);
+      }
+    });
+    list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return list;
+  });
 
   useEffect(() => {
-    setLocalPosts(posts);
+    if (posts && posts.length > 0) {
+      const list = [...posts];
+      const existingIds = new Set(list.map((p) => p.id));
+      INITIAL_COMMUNITY.forEach((initP) => {
+        if (!existingIds.has(initP.id)) {
+          list.push(initP);
+        }
+      });
+      list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setLocalPosts(list);
+    }
   }, [posts]);
 
   // Real-time listener directly on the Firestore 'community' collection so EVERY question from EVERY user appears immediately
@@ -44,6 +65,12 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
       (snap) => {
         if (!snap.empty) {
           const list: ToplulukSoru[] = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ToplulukSoru);
+          const existingIds = new Set(list.map((p) => p.id));
+          INITIAL_COMMUNITY.forEach((initP) => {
+            if (!existingIds.has(initP.id)) {
+              list.push(initP);
+            }
+          });
           list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
           setLocalPosts(list);
         }
