@@ -34,10 +34,10 @@ workflows:
       - name: Set dynamic build version
         script: |
           BUILD_NUM=$((${BUILD_NUMBER:-1} + 100))
-          echo "Setting dynamic build number to: $BUILD_NUM and marketing version to: 1.0.3"
+          echo "Setting dynamic build number to: $BUILD_NUM and marketing version to: 1.0.4"
           cd ios/App
           agvtool new-version -all $BUILD_NUM
-          agvtool new-marketing-version "1.0.3" || true
+          agvtool new-marketing-version "1.0.4" || true
           cd ../..
       - name: Build and Package IPA for App Store
         script: |
