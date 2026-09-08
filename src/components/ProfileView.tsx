@@ -321,14 +321,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
 
             {/* Logout Button */}
-            <div className="pt-3 flex justify-center">
+            <div className="pt-3 flex justify-center select-none">
               <button
                 type="button"
                 onClick={onLogout}
-                className="inline-flex items-center gap-1.5 bg-rose-500/30 hover:bg-rose-500/40 border border-rose-300/50 text-rose-100 text-xs font-extrabold px-5 py-2 rounded-full transition-all cursor-pointer backdrop-blur-md active:scale-95 shadow-sm"
+                className="inline-flex items-center gap-1.5 bg-rose-500/30 hover:bg-rose-500/40 border border-rose-300/50 text-rose-100 text-xs font-extrabold px-5 py-2 rounded-full transition-all cursor-pointer backdrop-blur-md active:scale-95 shadow-sm select-none"
               >
-                <span className="material-symbols-outlined text-base">logout</span>
-                <span>Çıkış Yap</span>
+                <span className="material-symbols-outlined text-base select-none">logout</span>
+                <span className="select-none">Çıkış Yap</span>
               </button>
             </div>
           </div>
@@ -851,14 +851,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
             {/* Hesaptan Çıkış Yap */}
             {onLogout && (
-              <div className="pt-2">
+              <div className="pt-2 select-none">
                 <button
                   type="button"
                   onClick={onLogout}
-                  className="w-full flex items-center justify-center gap-2 p-3.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-extrabold text-xs rounded-2xl border border-rose-500/20 transition-all cursor-pointer active:scale-98 shadow-xs"
+                  className="w-full flex items-center justify-center gap-2 p-3.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-extrabold text-xs rounded-2xl border border-rose-500/20 transition-all cursor-pointer active:scale-98 shadow-xs select-none"
                 >
-                  <span className="material-symbols-outlined text-lg">logout</span>
-                  <span>Hesaptan Çıkış Yap</span>
+                  <span className="material-symbols-outlined text-lg select-none">logout</span>
+                  <span className="select-none">Hesaptan Çıkış Yap</span>
                 </button>
               </div>
             )}

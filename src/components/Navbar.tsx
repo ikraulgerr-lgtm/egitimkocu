@@ -223,23 +223,24 @@ export const BottomNavBar: React.FC<NavbarProps> = ({ activeTab, setActiveTab })
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 dark:bg-background/95 backdrop-blur-xl border-t border-card-border/80 py-1.5 sm:py-2 px-3 pb-safe shadow-2xl transition-colors">
-      <div className="max-w-lg mx-auto flex justify-between items-center gap-1.5 sm:gap-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 dark:bg-background/95 backdrop-blur-xl border-t border-card-border/80 py-1.5 sm:py-2 px-3 pb-safe shadow-2xl transition-colors select-none">
+      <div className="max-w-lg mx-auto flex justify-between items-center gap-1.5 sm:gap-2 select-none">
         {navItems.map((item) => (
           <button
             key={item.id}
+            type="button"
             id={`nav-item-${item.id}`}
             onClick={item.onClick}
-            className={`flex flex-col items-center justify-center py-2 px-2 rounded-2xl transition-all duration-200 cursor-pointer flex-1 min-w-0 ${
+            className={`flex flex-col items-center justify-center py-2 px-2 rounded-2xl transition-all duration-200 cursor-pointer flex-1 min-w-0 select-none ${
               item.isActive
                 ? 'bg-primary text-white font-bold shadow-md scale-105'
                 : 'text-text-muted hover:text-text-main hover:bg-surface-container-low'
             }`}
           >
-            <span className={`material-symbols-outlined text-xl sm:text-2xl ${item.isActive ? 'fill-1' : ''}`}>
+            <span className={`material-symbols-outlined text-xl sm:text-2xl select-none ${item.isActive ? 'fill-1' : ''}`}>
               {item.icon}
             </span>
-            <span className="text-[11px] font-bold tracking-tight truncate max-w-full leading-tight mt-0.5">
+            <span className="text-[11px] font-bold tracking-tight truncate max-w-full leading-tight mt-0.5 select-none">
               {item.label}
             </span>
           </button>

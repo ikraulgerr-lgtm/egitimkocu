@@ -319,13 +319,24 @@ export function App() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const uid = firebaseUser.uid;
+        const todayTr = getTurkeyDateString();
+
+        // Instant local cache restoration
+        const cachedUser = getUser(uid);
+        if (cachedUser && cachedUser.id && cachedUser.targetExam) {
+          setUserState(cachedUser);
+          setQuestionsState(getQuestions(uid));
+          setScheduleState(getSchedule(uid));
+          setFriendsState(getFriends(uid));
+          setIsAuthModalOpen(false);
+        }
+
         const userDocRef = doc(db, 'users', uid);
         try {
           const userSnap = await Promise.race([
             getDoc(userDocRef),
-            new Promise<null>((r) => setTimeout(() => r(null), 2500)),
+            new Promise<null>((r) => setTimeout(() => r(null), 7000)),
           ]);
-          const todayTr = getTurkeyDateString();
           let currentUsername = 'ogrenci';
 
           if (userSnap && userSnap.exists()) {
@@ -357,6 +368,8 @@ export function App() {
               kullaniciAdi_lower: currentUsername.toLowerCase(),
               email: data.email || firebaseUser.email || 'ogrenci@egitimkocum.ai',
               avatarUrl: finalAvatar,
+              targetExam: data.targetExam || cachedUser?.targetExam || 'YKS',
+              targetExamDate: data.targetExamDate || cachedUser?.targetExamDate || '2027-06-19',
               kredi: userKredi,
               maxKredi: 10,
               lastResetDate: userResetDate,
@@ -404,8 +417,8 @@ export function App() {
               }
             }).catch(() => {});
 
-            // If user has targetExam configured, close auth modal
-            if (data.targetExam) {
+            // If user has targetExam configured (or doc exists), close auth modal
+            if (userData.targetExam) {
               setIsAuthModalOpen(false);
             }
           } else {

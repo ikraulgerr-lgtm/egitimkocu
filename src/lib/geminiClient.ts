@@ -251,8 +251,58 @@ function getAIClient(customKey?: string): GoogleGenAI | null {
   }
 }
 
+// High-speed client-side image downscaling and compression for instant AI vision
+export async function optimizeImageForAi(
+  imageData: string,
+  maxDim: number = 1280,
+  quality: number = 0.82
+): Promise<string> {
+  if (!imageData || typeof imageData !== 'string') return imageData;
+  if (!imageData.startsWith('data:image')) return imageData;
+  if (typeof window === 'undefined' || typeof document === 'undefined') return imageData;
+
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(imageData);
+            return;
+          }
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+          const optimizedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(optimizedDataUrl);
+        } catch {
+          resolve(imageData);
+        }
+      };
+      img.onerror = () => resolve(imageData);
+      img.src = imageData;
+    } catch {
+      resolve(imageData);
+    }
+  });
+}
+
 async function callGeminiClientWithFallback(ai: GoogleGenAI, contents: any, isJson: boolean = true): Promise<string> {
-  const modelsToTry = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
   let lastErr: any = null;
 
   for (const modelName of modelsToTry) {
@@ -416,18 +466,27 @@ export function detectSubjectAndTopic(textPrompt: string, dersInput?: string, ko
 async function prepareImageInlineData(imageData?: string | null): Promise<{ mimeType: string; data: string } | null> {
   if (!imageData || typeof imageData !== 'string') return null;
 
+  let processedImage = imageData;
+  if (processedImage.startsWith('data:image')) {
+    try {
+      processedImage = await optimizeImageForAi(processedImage, 1280, 0.82);
+    } catch (e) {
+      console.warn('Image optimization notice:', e);
+    }
+  }
+
   // Case 1: Data URL (e.g. data:image/jpeg;base64,....)
-  if (imageData.includes('base64,')) {
-    const parts = imageData.split('base64,');
+  if (processedImage.includes('base64,')) {
+    const parts = processedImage.split('base64,');
     const mimeType = parts[0].replace('data:', '').replace(';', '').trim() || 'image/jpeg';
     const base64Data = parts[1].trim();
     return { mimeType, data: base64Data };
   }
 
   // Case 2: Remote URL (e.g. https://... or http://...)
-  if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
+  if (processedImage.startsWith('http://') || processedImage.startsWith('https://')) {
     try {
-      const res = await fetch(imageData);
+      const res = await fetch(processedImage);
       if (res.ok) {
         const blob = await res.blob();
         const mimeType = blob.type || 'image/jpeg';

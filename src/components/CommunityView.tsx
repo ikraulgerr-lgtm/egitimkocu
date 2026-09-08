@@ -20,6 +20,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   onToggleLike,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('Hepsi');
+  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isAskModalOpen, setIsAskModalOpen] = useState<boolean>(false);
   const [isSubmittingAi, setIsSubmittingAi] = useState<boolean>(false);
@@ -84,13 +85,38 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
 
   const categories = ['Hepsi', 'Matematik', 'Fizik', 'Türkçe', 'Biyoloji', 'Kimya', 'Tarih'];
 
+  const now = Date.now();
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  const oneWeekMs = 7 * oneDayMs;
+  const oneMonthMs = 30 * oneDayMs;
+
+  const getPostTimestamp = (post: ToplulukSoru): number => {
+    if (typeof post.createdAt === 'number') return post.createdAt;
+    if (typeof post.createdAt === 'string') {
+      const p = new Date(post.createdAt).getTime();
+      if (!isNaN(p)) return p;
+    }
+    return now;
+  };
+
   const filteredPosts = localPosts.filter((post) => {
     const matchesCategory = selectedCategory === 'Hepsi' || post.ders === selectedCategory;
     const matchesSearch =
       searchQuery === '' ||
       post.soruMetni.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      post.ders.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+      post.ders.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (post.yazarAd && post.yazarAd.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    let matchesTime = true;
+    if (timeFilter !== 'all') {
+      const postTime = getPostTimestamp(post);
+      const diff = now - postTime;
+      if (timeFilter === 'today') matchesTime = diff <= oneDayMs;
+      else if (timeFilter === 'week') matchesTime = diff <= oneWeekMs;
+      else if (timeFilter === 'month') matchesTime = diff <= oneMonthMs;
+    }
+
+    return matchesCategory && matchesSearch && matchesTime;
   });
 
   // Create new post (with AI answer or community-only option)
@@ -392,6 +418,32 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
               }`}
             >
               {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Time Filter Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 pt-0.5">
+          <span className="text-[11px] font-extrabold text-text-muted shrink-0 mr-1 flex items-center gap-1 select-none">
+            <span className="material-symbols-outlined text-sm">schedule</span>
+            <span>Zaman:</span>
+          </span>
+          {[
+            { id: 'all', label: '🌟 Tüm Zamanlar' },
+            { id: 'month', label: '📆 Bu Ay' },
+            { id: 'week', label: '🗓️ Bu Hafta' },
+            { id: 'today', label: '⚡ Bugün' },
+          ].map((tf) => (
+            <button
+              key={tf.id}
+              onClick={() => setTimeFilter(tf.id as any)}
+              className={`px-3 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer border select-none ${
+                timeFilter === tf.id
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                  : 'bg-surface-container-low text-text-muted hover:text-text-main border-card-border hover:border-indigo-400/50'
+              }`}
+            >
+              {tf.label}
             </button>
           ))}
         </div>

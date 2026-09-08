@@ -3,6 +3,7 @@ import { Kullanici } from '../types';
 import { auth, db, loginWithGoogle, resetPasswordFirebase, loginWithEmailFirebase, registerWithEmailFirebase } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc, getDocs, collection, query, where } from 'firebase/firestore';
+import { getUser } from '../lib/storage';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -459,27 +460,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       let userDisplayName = firebaseUser.displayName || 'Öğrenci';
                       let userAvatar = firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
 
+                      // 1. Check local cached user first for instant recognition
+                      const cachedUser = getUser(firebaseUser.uid);
+                      if (cachedUser && cachedUser.targetExam) {
+                        userExistsInDb = true;
+                        if (cachedUser.ad) userDisplayName = cachedUser.ad;
+                        if (cachedUser.kullaniciAdi) finalUsername = cachedUser.kullaniciAdi;
+                        targetExam = cachedUser.targetExam;
+                        targetExamDate = cachedUser.targetExamDate || '';
+                        if (cachedUser.avatarUrl) userAvatar = cachedUser.avatarUrl;
+                      }
+
+                      // 2. Check Firestore user document with reliable 7s timeout
                       try {
                         const userSnap = await Promise.race([
                           getDoc(doc(db, 'users', firebaseUser.uid)),
-                          new Promise<null>((r) => setTimeout(() => r(null), 2000)),
+                          new Promise<null>((r) => setTimeout(() => r(null), 7000)),
                         ]);
 
                         if (userSnap && userSnap.exists()) {
                           userExistsInDb = true;
                           const data = userSnap.data();
                           if (data?.ad) userDisplayName = data.ad;
-                          finalUsername = data?.kullaniciAdi || 'ogrenci';
-                          targetExam = data?.targetExam || '';
-                          targetExamDate = data?.targetExamDate || '';
+                          if (data?.kullaniciAdi) finalUsername = data.kullaniciAdi;
+                          targetExam = data?.targetExam || targetExam || 'YKS';
+                          targetExamDate = data?.targetExamDate || targetExamDate || '2027-06-19';
                           if (data?.avatarUrl) userAvatar = data.avatarUrl;
                         }
                       } catch (e) {
                         console.warn('User doc check warning:', e);
                       }
 
-                      // If user is already registered and targetExam is defined, proceed immediately!
-                      if (userExistsInDb && targetExam) {
+                      // If user is already registered (or exists in Firestore/cache), proceed immediately!
+                      if (userExistsInDb) {
                         setIsGoogleLoading(false);
                         onLoginSuccess({
                           id: firebaseUser.uid,
@@ -488,21 +501,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           kullaniciAdi_lower: finalUsername.toLowerCase(),
                           email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
                           avatarUrl: userAvatar,
-                          targetExam: targetExam as any,
-                          targetExamDate: targetExamDate,
+                          targetExam: (targetExam || 'YKS') as any,
+                          targetExamDate: targetExamDate || '2027-06-19',
                         });
                         onClose();
                         return;
                       }
 
-                      // FIRST TIME GOOGLE USER OR MISSING TARGET EXAM:
-                      if (!userExistsInDb) {
-                        const base = (firebaseUser.email?.split('@')[0] || firebaseUser.displayName || 'ogrenci')
-                          .toLowerCase()
-                          .replace(/[^a-z0-9_]/g, '')
-                          .slice(0, 12);
-                        finalUsername = `${base || 'ogrenci'}_${Math.floor(100 + Math.random() * 900)}`;
-                      }
+                      // ONLY FOR BRAND NEW FIRST TIME GOOGLE USERS:
+                      const base = (firebaseUser.email?.split('@')[0] || firebaseUser.displayName || 'ogrenci')
+                        .toLowerCase()
+                        .replace(/[^a-z0-9_]/g, '')
+                        .slice(0, 12);
+                      finalUsername = `${base || 'ogrenci'}_${Math.floor(100 + Math.random() * 900)}`;
 
                       setPendingGoogleUser({
                         uid: firebaseUser.uid,

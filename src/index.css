@@ -127,14 +127,32 @@
   }
 }
 
+*, *::before, *::after {
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   background-color: var(--background);
   color: var(--on-background);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   transition: background-color 0.25s ease, color 0.25s ease;
   -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
+  -webkit-touch-callout: none !important;
   overscroll-behavior-y: none;
+}
+
+input, textarea, [contenteditable="true"], .selectable-text {
+  -webkit-touch-callout: default !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+button, [role="button"], a, nav, header, footer, svg, .material-symbols-outlined, .no-callout, .select-none {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  touch-action: manipulation;
 }
 
 button, a, input, select, textarea {
