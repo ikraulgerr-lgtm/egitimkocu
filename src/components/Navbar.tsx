@@ -46,30 +46,34 @@ export const TopHeader: React.FC<{
     <header className="sticky top-0 z-40 bg-surface/90 dark:bg-background/90 backdrop-blur-md border-b border-card-border/40 transition-colors pt-safe">
       <div className="flex justify-between items-center px-2.5 sm:px-4 py-2 sm:py-3 max-w-7xl mx-auto gap-2">
         <div 
-          className="flex items-center gap-1.5 sm:gap-2 cursor-pointer group shrink-0 min-w-0"
+          role="button"
+          tabIndex={-1}
+          style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          className="flex items-center gap-1.5 sm:gap-2 cursor-pointer group shrink-0 min-w-0 select-none"
           onClick={() => {
             triggerHaptic();
             setActiveTab('home');
           }}
         >
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden border-2 border-primary group-hover:scale-105 transition-transform shrink-0">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden border-2 border-primary group-hover:scale-105 transition-transform shrink-0 select-none pointer-events-none">
             <img 
               src={user.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1'} 
               alt={user.ad} 
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover select-none pointer-events-none"
             />
           </div>
-          <div className="min-w-0">
-            <h1 className="font-extrabold text-sm xs:text-base sm:text-xl tracking-tight text-primary flex items-center gap-1 truncate">
-              <span className="truncate">Eğitim Koçum</span>
-              <span className="hidden xs:inline">AI</span>
+          <div className="min-w-0 select-none pointer-events-none">
+            <h1 className="font-extrabold text-sm xs:text-base sm:text-xl tracking-tight text-primary flex items-center gap-1 truncate select-none">
+              <span className="truncate select-none">Eğitim Koçum</span>
+              <span className="hidden xs:inline select-none">AI</span>
               {user.isPremium && (
-                <span className="text-[9px] sm:text-[10px] bg-amber-400 text-slate-900 font-bold px-1 sm:px-1.5 py-0.5 rounded uppercase shrink-0">
+                <span className="text-[9px] sm:text-[10px] bg-amber-400 text-slate-900 font-bold px-1 sm:px-1.5 py-0.5 rounded uppercase shrink-0 select-none">
                   PRO
                 </span>
               )}
             </h1>
-            <p className="text-[11px] text-text-muted font-medium hidden sm:block">{user.sinif}</p>
+            <p className="text-[11px] text-text-muted font-medium hidden sm:block select-none">{user.sinif}</p>
           </div>
         </div>
 
@@ -230,17 +234,22 @@ export const BottomNavBar: React.FC<NavbarProps> = ({ activeTab, setActiveTab })
             key={item.id}
             type="button"
             id={`nav-item-${item.id}`}
-            onClick={item.onClick}
+            style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => {
+              e.preventDefault();
+              item.onClick();
+            }}
             className={`flex flex-col items-center justify-center py-2 px-2 rounded-2xl transition-all duration-200 cursor-pointer flex-1 min-w-0 select-none ${
               item.isActive
                 ? 'bg-primary text-white font-bold shadow-md scale-105'
                 : 'text-text-muted hover:text-text-main hover:bg-surface-container-low'
             }`}
           >
-            <span className={`material-symbols-outlined text-xl sm:text-2xl select-none ${item.isActive ? 'fill-1' : ''}`}>
+            <span className={`material-symbols-outlined text-xl sm:text-2xl select-none pointer-events-none ${item.isActive ? 'fill-1' : ''}`}>
               {item.icon}
             </span>
-            <span className="text-[11px] font-bold tracking-tight truncate max-w-full leading-tight mt-0.5 select-none">
+            <span className="text-[11px] font-bold tracking-tight truncate max-w-full leading-tight mt-0.5 select-none pointer-events-none">
               {item.label}
             </span>
           </button>
