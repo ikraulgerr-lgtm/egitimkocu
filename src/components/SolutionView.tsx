@@ -519,7 +519,10 @@ function cleanTextFormatting(str: string | undefined): string {
   const staticChoices = getStaticChoices();
 
   return (
-    <div className="space-y-5 max-w-2xl mx-auto pb-52 sm:pb-56 animate-fadeIn">
+    <div
+      className="space-y-5 max-w-2xl mx-auto animate-fadeIn"
+      style={{ paddingBottom: 'calc(200px + env(safe-area-inset-bottom, 0px))' }}
+    >
       {/* Okunamayan / Soru İçermeyen Fotoğraf Uyarısı */}
       {question.isUnreadable && (
         <div className="bg-rose-500/10 border-2 border-rose-500 rounded-3xl p-5 text-center space-y-3.5 shadow-lg animate-fadeIn">
@@ -1010,7 +1013,10 @@ function cleanTextFormatting(str: string | undefined): string {
       </section>
 
       {/* Bottom Sticky Action Buttons & Difficulty Selector */}
-      <div className="fixed bottom-[58px] sm:bottom-[64px] left-0 right-0 z-40 bg-background/95 dark:bg-background/95 backdrop-blur-xl p-2 sm:p-2.5 border-t border-card-border shadow-2xl max-w-2xl mx-auto space-y-1.5 sm:space-y-2 transition-colors">
+      <div
+        className="fixed left-0 right-0 z-40 bg-background/95 dark:bg-background/95 backdrop-blur-xl p-2.5 sm:p-3 border-t border-card-border shadow-2xl max-w-2xl mx-auto space-y-1.5 sm:space-y-2 transition-colors"
+        style={{ bottom: 'calc(62px + env(safe-area-inset-bottom, 0px))' }}
+      >
         {/* Difficulty Selector Row */}
         <div className="flex items-center justify-between gap-2 px-1 text-xs">
           <div className="flex items-center gap-1.5 font-extrabold text-text-main">

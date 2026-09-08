@@ -878,6 +878,19 @@ function normalizeAnalysisResultServer(data: any, defaultText: string = '', ders
   if (!data || typeof data !== 'object') return null;
   const res = { ...data };
 
+  // If the model or input was detected as unreadable / not a valid question
+  if (res.isUnreadable || res.ders === 'Analiz Edilemedi') {
+    return {
+      isUnreadable: true,
+      unreadableReason: res.unreadableReason || 'Gönderilen görsel veya metin analiz edilebilir bir ders sorusu içermiyor. Lütfen net bir ders veya sınav sorusu gönderin.',
+      ders: 'Analiz Edilemedi',
+      konu: 'Geçersiz Soru',
+      ocrMetin: res.ocrMetin || '',
+      cozumAdimlari: [],
+      bilgiKartlari: [],
+    };
+  }
+
   // 1. Normalize solution steps array
   if (!Array.isArray(res.cozumAdimlari)) {
     if (Array.isArray(res.cozum_adimlari)) res.cozumAdimlari = res.cozum_adimlari;
@@ -912,7 +925,7 @@ function normalizeAnalysisResultServer(data: any, defaultText: string = '', ders
     res.ocrMetin = cleanRawOcrText(res.ocrMetin);
   }
 
-  // 3. Guarantee at least 3 pedagogical steps
+  // 3. Guarantee at least 3 pedagogical steps for valid questions
   if (!Array.isArray(res.cozumAdimlari) || res.cozumAdimlari.length === 0) {
     const ders = res.ders || 'Matematik';
     const konu = res.konu || 'Soru Çözümü';

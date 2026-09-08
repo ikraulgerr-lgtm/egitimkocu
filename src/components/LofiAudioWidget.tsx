@@ -538,11 +538,11 @@ export const LofiAudioWidget: React.FC<LofiAudioWidgetProps> = ({
 
   const containerStyle = position
     ? { left: `${position.x}px`, top: `${position.y}px`, bottom: 'auto', right: 'auto' }
-    : undefined;
+    : { bottom: 'calc(140px + env(safe-area-inset-bottom, 0px))' };
 
   const containerClass = position
     ? `fixed z-40 touch-none select-none ${className}`
-    : `fixed bottom-24 right-4 sm:bottom-28 sm:right-6 z-40 touch-none select-none ${className}`;
+    : `fixed right-3 sm:right-6 z-40 touch-none select-none ${className}`;
 
   const popoverPosClass = `absolute ${isNearBottom ? 'bottom-full mb-3' : 'top-full mt-3'} ${
     isNearRight ? 'right-0' : 'left-0'

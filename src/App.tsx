@@ -1122,56 +1122,39 @@ export function App() {
 
       let finalData = data;
       const hasValidSteps = Array.isArray(finalData?.cozumAdimlari) && finalData.cozumAdimlari.length > 0;
+      const isUnreadable = finalData?.isUnreadable || finalData?.ders === 'Analiz Edilemedi' || !hasValidSteps;
 
-      if (!hasValidSteps || finalData?.isUnreadable || finalData?.ders === 'Analiz Edilemedi') {
-        if (customPrompt && customPrompt.trim().length >= 2) {
-          const dynamicFallback = buildDynamicSteps(customPrompt, data?.ders, data?.konu);
-          finalData = {
-            ...finalData,
-            ...dynamicFallback,
-            isUnreadable: false,
+      if (isUnreadable) {
+        // Refund credit when question cannot be analyzed (if non-PRO)
+        if (!user.isPremium) {
+          const refundedUser = {
+            ...user,
+            kredi: Math.min(user.maxKredi || 10, user.kredi + 1),
           };
-        } else if (imageData) {
-          const dynamicFallback = buildDynamicSteps('Görsel Soru İncelemesi', data?.ders || 'Matematik', data?.konu || 'Soru Çözümü');
-          finalData = {
-            ...finalData,
-            ...dynamicFallback,
-            isUnreadable: false,
-          };
-        } else {
-          // Refund credit when question cannot be analyzed (if non-PRO)
-          if (!user.isPremium) {
-            const refundedUser = {
-              ...user,
-              kredi: Math.min(user.maxKredi || 10, user.kredi + 1),
-            };
-            setUserState(refundedUser);
-            saveUser(refundedUser);
-            syncUserToFirestore(refundedUser);
-          }
-          setIsAnalyzingAi(false);
-          showToast(data?.unreadableReason || '⚠️ Soru anlaşılamadı veya geçerli bir ders sorusu tespit edilemedi. Lütfen sorunuzu tekrar sorun.');
-          return false;
+          setUserState(refundedUser);
+          saveUser(refundedUser);
+          syncUserToFirestore(refundedUser);
         }
+        setIsAnalyzingAi(false);
+        showToast(finalData?.unreadableReason || '⚠️ Soru analiz edilemedi. Lütfen analiz edilebilir net bir ders veya sınav sorusu gönderin.');
+        return false;
       }
-
-      const dynamicFallback = buildDynamicSteps(customPrompt, finalData?.ders, finalData?.konu);
 
       const newQ: SoruKaydi = {
         id: `q_${Date.now()}`,
         tarih: 'Şimdi',
-        ders: finalData?.ders && finalData.ders !== 'Analiz Edilemedi' ? finalData.ders : dynamicFallback.ders,
-        konu: finalData?.konu || dynamicFallback.konu,
+        ders: finalData.ders || 'Genel Ders',
+        konu: finalData.konu || 'Soru Çözümü',
         gorselUrl: imageData || undefined,
-        ocrMetin: finalData?.ocrMetin || customPrompt || 'Görseldeki soru metni okundu ve analiz edildi.',
-        hataTuru: finalData?.hataTuru || dynamicFallback.hataTuru,
-        siklar: (finalData?.siklar && finalData.siklar.length >= 4) ? finalData.siklar : undefined,
-        dogruSikIndex: typeof finalData?.dogruSikIndex === 'number' ? finalData.dogruSikIndex : undefined,
-        kritikAdimIndex: finalData?.kritikAdimIndex || 2,
-        pedagojikTeshis: finalData?.pedagojikTeshis || dynamicFallback.pedagojikTeshis,
-        sokratikIpucu: finalData?.sokratikIpucu || dynamicFallback.sokratikIpucu,
-        bilgiKartlari: (Array.isArray(finalData?.bilgiKartlari) && finalData.bilgiKartlari.length >= 3) ? finalData.bilgiKartlari : undefined,
-        cozumAdimlari: (finalData?.cozumAdimlari && finalData.cozumAdimlari.length > 0) ? finalData.cozumAdimlari : dynamicFallback.cozumAdimlari,
+        ocrMetin: finalData.ocrMetin || customPrompt || 'Görseldeki soru metni okundu ve analiz edildi.',
+        hataTuru: finalData.hataTuru || 'Kavram Yanılgısı',
+        siklar: (finalData.siklar && finalData.siklar.length >= 4) ? finalData.siklar : undefined,
+        dogruSikIndex: typeof finalData.dogruSikIndex === 'number' ? finalData.dogruSikIndex : undefined,
+        kritikAdimIndex: finalData.kritikAdimIndex || 2,
+        pedagojikTeshis: finalData.pedagojikTeshis || 'Bu soruda temel kural ve formül adımlarına dikkat edilmelidir.',
+        sokratikIpucu: finalData.sokratikIpucu || 'Sorunun çözüm adımlarını ve kritik kuralı tekrar incelemek ister misin?',
+        bilgiKartlari: (Array.isArray(finalData.bilgiKartlari) && finalData.bilgiKartlari.length >= 3) ? finalData.bilgiKartlari : undefined,
+        cozumAdimlari: finalData.cozumAdimlari,
         ebbinghausTarihi: new Date().toISOString().split('T')[0],
         olusturmaTarihi: new Date().toISOString().split('T')[0],
         isUnreadable: false,

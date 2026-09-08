@@ -277,18 +277,45 @@ async function callGeminiClientWithFallback(ai: GoogleGenAI, contents: any, isJs
   throw lastErr || new Error('All Gemini model calls failed on client');
 }
 
+export function isLikelyAcademicQuestion(text: string): boolean {
+  if (!text) return false;
+  const clean = text.trim();
+  if (clean.length < 3) return false;
+
+  // Direct math expressions e.g. "2x+5=15", "12*4" are valid
+  if (/^[\d\s\+\-\*\/\^\(\)\=\.\,xXyYzZ\<\>\≤\≥\√\%\:\/]+$/.test(clean) && /[\d]/.test(clean)) {
+    return true;
+  }
+
+  // Check for vowels in Turkish
+  const vowels = clean.match(/[aeıioöuüAEIİOÖUÜ]/g);
+  if (!vowels || vowels.length === 0) return false;
+
+  const lower = clean.toLowerCase();
+  const nonQuestions = ['selam', 'merhaba', 'naber', 'hey', 'test', 'deneme', 'asdf', 'qwe', 'asd', '123', 'abc', 'hata', 'aaa'];
+  if (nonQuestions.includes(lower)) return false;
+
+  // Check consonant-to-vowel ratio (keyboard mashing usually has almost no vowels)
+  if (clean.length > 8 && (vowels.length / clean.length) < 0.15) {
+    return false;
+  }
+
+  return true;
+}
+
 // Fallback generator when offline or no API key
 function generateClientFallback(textPrompt: string, dersInput?: string, konuInput?: string) {
   const textToUse = (textPrompt || '').trim();
 
-  // If completely empty or meaningless
-  if (!textToUse && !dersInput) {
+  // If completely empty, meaningless, or not an academic question
+  if (!textToUse || !isLikelyAcademicQuestion(textToUse)) {
     return {
       isUnreadable: true,
-      unreadableReason: 'Soru anlaşılamadı veya geçerli bir ders sorusu tespit edilemedi. Lütfen sorunuzu net bir şekilde tekrar söyleyin.',
+      unreadableReason: 'Gönderilen metin analiz edilebilir bir ders veya sınav sorusu içermiyor. Lütfen net bir ders sorusu yazın.',
       ders: 'Analiz Edilemedi',
-      konu: 'Soru Bulunamadı',
+      konu: 'Geçersiz Soru',
       cozumAdimlari: [],
+      bilgiKartlari: [],
     };
   }
 
@@ -298,12 +325,12 @@ function generateClientFallback(textPrompt: string, dersInput?: string, konuInpu
     return mathSolved;
   }
 
-  const ders = dersInput || 'Matematik';
-  const konu = konuInput || 'Soru Çözümü';
+  const ders = dersInput && dersInput !== 'Analiz Edilemedi' ? dersInput : 'Matematik';
+  const konu = konuInput && konuInput !== 'Geçersiz Soru' ? konuInput : 'Soru Çözümü';
 
   return {
     isUnreadable: false,
-    ocrMetin: textToUse || `${ders} — ${konu} Soru İncelemesi`,
+    ocrMetin: textToUse,
     ders: ders,
     konu: konu,
     hataTuru: 'İşlem / Kavram Hatası',
@@ -313,7 +340,7 @@ function generateClientFallback(textPrompt: string, dersInput?: string, konuInpu
       {
         adimNo: 1,
         baslik: 'Sorunun Kurulumu ve İncelemesi',
-        aciklama: textToUse ? `Sorudaki veriler analiz edildi: "${textToUse.slice(0, 80)}"` : 'Soru verileri ve istenen ifade belirlendi.',
+        aciklama: `Sorudaki veriler analiz edildi: "${textToUse.slice(0, 80)}"`,
         isCorrect: true,
         dogruMetin: 'Sorudaki Veriler ve Başlangıç Koşulları',
       },
@@ -426,6 +453,19 @@ export function normalizeAnalysisResult(data: any, defaultText: string = ''): an
   if (!data || typeof data !== 'object') return null;
   const res = { ...data };
 
+  // If the model or input was detected as unreadable / not a valid question
+  if (res.isUnreadable || res.ders === 'Analiz Edilemedi') {
+    return {
+      isUnreadable: true,
+      unreadableReason: res.unreadableReason || 'Gönderilen görsel veya metin analiz edilebilir bir ders sorusu içermiyor. Lütfen net bir ders veya sınav sorusu gönderin.',
+      ders: 'Analiz Edilemedi',
+      konu: 'Geçersiz Soru',
+      ocrMetin: res.ocrMetin || '',
+      cozumAdimlari: [],
+      bilgiKartlari: [],
+    };
+  }
+
   // 1. Normalize solution steps array
   if (!Array.isArray(res.cozumAdimlari)) {
     if (Array.isArray(res.cozum_adimlari)) res.cozumAdimlari = res.cozum_adimlari;
@@ -460,7 +500,22 @@ export function normalizeAnalysisResult(data: any, defaultText: string = ''): an
     res.ocrMetin = cleanRawOcrText(res.ocrMetin);
   }
 
-  // 3. Guarantee at least 3 pedagogical steps
+  // If no steps and ocrMetin is empty or not academic
+  if (!Array.isArray(res.cozumAdimlari) || res.cozumAdimlari.length === 0) {
+    if (!res.ocrMetin || !isLikelyAcademicQuestion(res.ocrMetin)) {
+      return {
+        isUnreadable: true,
+        unreadableReason: 'Gönderilen içerik analiz edilebilir bir ders sorusu içermiyor. Lütfen net bir ders sorusu gönderin.',
+        ders: 'Analiz Edilemedi',
+        konu: 'Geçersiz Soru',
+        ocrMetin: '',
+        cozumAdimlari: [],
+        bilgiKartlari: [],
+      };
+    }
+  }
+
+  // 3. Guarantee at least 3 pedagogical steps for VALID questions
   if (!Array.isArray(res.cozumAdimlari) || res.cozumAdimlari.length === 0) {
     const ders = res.ders || 'Matematik';
     const konu = res.konu || 'Soru Çözümü';
@@ -556,8 +611,23 @@ export async function analyzeQuestionService(params: {
 
       const systemInstruction = `Sen MEB, ÖSYM (YKS, LGS, KPSS, YDS, MSÜ, ALES) ve tüm okul müfredatı için uzman yapay zeka soru analiz öğretmenisin.
 GÖREVİN:
-Öğrencinin gönderdiği soru görselini, ses kaydını veya soru metnini dikkatle oku ve eksiksiz çöz.
-KRİTİK KURALLAR:
+Öğrencinin gönderdiği soru görselini, ses kaydını veya soru metnini dikkatle incele.
+
+ÇOK ÖNEMLİ GEÇERLİLİK VE DERS SORUSU KONTROLÜ:
+Eğer yüklenen görsel veya metin bir DERS / SINAV / TEST / ÖDEV SORUSU İÇERMİYORSA:
+(Örneğin: selfie, manzara, karanlık/boş ekran, rastgele nesneler, anlamsız karalamalar, ders dışı sohbet veya saçma harf dizileri ise):
+KESİNLİKLE uydurma veya zoraki bir çözüm üretme!
+Bu durumda DOĞRUDAN aşağıdaki JSON formatını döndür:
+{
+  "isUnreadable": true,
+  "unreadableReason": "Gönderilen görsel veya metin analiz edilebilir bir ders sorusu içermiyor. Lütfen net bir ders veya sınav sorusu gönderin.",
+  "ocrMetin": "",
+  "ders": "Analiz Edilemedi",
+  "konu": "Geçersiz İçerik",
+  "cozumAdimlari": []
+}
+
+EĞER GEÇERLİ BİR DERS SORUSU İSE:
 1. "ocrMetin": Görseldeki soru metnini, matematiksel formülleri, grafikleri ve soru kökünü doğrudan görselden oku. Filigranları, sayfa/soru numarası etiketlerini (örn: 'VT (Bococ...', '9 2 x © Lisans 2024 Vv SoruNo: 11' gibi çöp yazıları) KESİNLİKLE TEMİZLE. 'ocrMetin' alanına sorunun gerçek, akıcı ve doğru Türkçe/Matematik soru metnini yaz.
 2. Soru çoktan seçmeli ise 'siklar' dizisine seçenekleri (A, B, C, D, E) yaz ve 'dogruSikIndex' (0, 1, 2, 3, 4) olarak doğru cevabı belirt. Açık uçlu ise siklar: [] bırak.
 3. Çözüm adımlarını en az 3 pedagojik adım ('cozumAdimlari') olarak detaylıca oluştur.
@@ -611,6 +681,9 @@ KRİTİK KURALLAR:
       const parsed = safeParseJSON(rawText);
       if (parsed && typeof parsed === 'object') {
         const normalized = normalizeAnalysisResult(parsed, rawUserNote);
+        if (normalized?.isUnreadable) {
+          return sanitizeObjectMath(normalized);
+        }
         if (normalized && Array.isArray(normalized.cozumAdimlari) && normalized.cozumAdimlari.length > 0) {
           return sanitizeObjectMath(normalized);
         }
@@ -638,13 +711,18 @@ KRİTİK KURALLAR:
     try {
       const groqSystemPrompt = `Sen MEB ve ÖSYM (YKS, LGS, KPSS, YDS, MSÜ) müfredatına tam hâkim uzman yapay zeka soru analiz öğretmenisin.
 GÖREVİN:
-Verilen ders sorusunu (fotoğraftan okunan veya yazılan soru metnini) matematiksel, mantıksal veya sözel olarak tam olarak çözmek, doğru şıkkı (A-E) veya cevabı hesaplamak, öğrencinin yapabileceği kritik hatayı ve pedagojik adımları eksiksiz üretmektir.
+Verilen metni incele. Eğer metin anlamlı bir okul/ders/sınav sorusu DEĞİLSE (örneğin rastgele harfler "asdfghjk", anlamsız kelimeler, ders dışı sohbet vb. ise):
+KESİNLİKLE uydurma çözüm üretme! DOĞRUDAN şu JSON formatını döndür:
+{
+  "isUnreadable": true,
+  "unreadableReason": "Gönderilen metin analiz edilebilir bir ders sorusu içermiyor. Lütfen net bir ders veya sınav sorusu yazın.",
+  "ocrMetin": "",
+  "ders": "Analiz Edilemedi",
+  "konu": "Geçersiz Soru",
+  "cozumAdimlari": []
+}
 
-ÇOK ÖNEMLİ KURALLAR:
-1. "ocrMetin": OCR çıktısındaki tüm filigranları, sayfa/soru numarası etiketlerini (örn: "VT (Bococ...", "9 2 x © Lisans 2024 Vv SoruNo: 11" gibi çöp yazıları), tarama gürültülerini ve harf hatalarını KESİNLİKLE TEMİZLE. 'ocrMetin' alanına yalnızca sorunun gerçek, akıcı ve doğru Türkçe/Matematik soru metnini yaz!
-2. Soru çoktan seçmeli ise 'siklar' dizisine seçenekleri (A, B, C, D, E) yaz ve 'dogruSikIndex' (0, 1, 2, 3, 4) olarak doğru cevabı belirt.
-3. Matematik sembollerini okunaklı unicode (x², sin²x, cos²x, cot x, √x, ≤, ≥) olarak yaz. LaTeX ($$) KULLANMA.
-Yanıtını MUTLAKA STRICT JSON formatında döndür.`;
+Eğer geçerli bir ders sorusu ise tüm OCR çöplerini temizleyip düzgün soru metnini oluştur, doğru çözümü hesapla ve en az 3 pedagojik adım üret. STRICT JSON formatında döndür.`;
 
       const groqUserPrompt = `Soru Metni:
 "${userPrompt}"
@@ -677,6 +755,9 @@ Lütfen bu soruyu dikkatle incele, tüm OCR çöplerini temizleyip düzgün soru
         const groqParsed = safeParseJSON(groqRaw);
         if (groqParsed && typeof groqParsed === 'object') {
           const normalized = normalizeAnalysisResult(groqParsed, userPrompt);
+          if (normalized?.isUnreadable) {
+            return sanitizeObjectMath(normalized);
+          }
           if (normalized && Array.isArray(normalized.cozumAdimlari) && normalized.cozumAdimlari.length > 0) {
             return sanitizeObjectMath(normalized);
           }
