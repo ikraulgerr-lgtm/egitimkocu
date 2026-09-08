@@ -54,6 +54,8 @@ import { SplashScreen } from './components/SplashScreen';
 import { auth, db, handleFirestoreError, OperationType, logoutFirebase } from './lib/firebase';
 import { onAuthStateChanged, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 
 export function App() {
   const [user, setUserState] = useState<Kullanici>(getUser());
