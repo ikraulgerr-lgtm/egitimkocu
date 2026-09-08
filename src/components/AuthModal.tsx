@@ -56,6 +56,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsEmailLoading(false);
   }, [mode]);
 
+  // Always reset mode to 'login' and clear pending state whenever modal is opened
+  useEffect(() => {
+    if (isOpen) {
+      setMode('login');
+      setPendingGoogleUser(null);
+      setErrorMsg(null);
+      setIsGoogleLoading(false);
+      setIsEmailLoading(false);
+      setIsGoogleExamLoading(false);
+      setPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setOtpCode('');
+    }
+  }, [isOpen]);
+
   // Countdown timer effect
   useEffect(() => {
     let timer: any;
@@ -266,6 +282,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         targetExamDate: examDate,
       });
 
+      setPendingGoogleUser(null);
+      setMode('login');
       onClose();
     } catch (err: any) {
       console.error('Google exam onboarding save error:', err);
