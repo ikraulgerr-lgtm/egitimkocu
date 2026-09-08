@@ -848,6 +848,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 </span>
               </div>
             )}
+
+            {/* Hesaptan Çıkış Yap */}
+            {onLogout && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="w-full flex items-center justify-center gap-2 p-3.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-extrabold text-xs rounded-2xl border border-rose-500/20 transition-all cursor-pointer active:scale-98 shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-lg">logout</span>
+                  <span>Hesaptan Çıkış Yap</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </section>

@@ -433,22 +433,30 @@ export function App() {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
         }
       } else {
-        // Firebase JS auth reported null: check if user is already authenticated locally or via native auth
-        const savedUser = getUser();
-        if (savedUser && savedUser.id && savedUser.id !== 'student' && savedUser.id !== 'usr_new' && savedUser.email && savedUser.targetExam) {
-          // Keep local user authenticated!
-          setUserState(savedUser);
-          setIsAuthModalOpen(false);
-        } else {
-          // Truly logged out: show auth screen
-          setUserState(INITIAL_USER);
-          setQuestionsState([]);
-          setScheduleState([]);
-          setFriendsState([]);
-          setNotifications([]);
-          setSelectedQuestion(null);
-          setIsAuthModalOpen(true);
+        // Firebase JS auth reported null: check if native auth has an active user
+        if (Capacitor.isNativePlatform()) {
+          try {
+            const nativeRes = await FirebaseAuthentication.getCurrentUser();
+            if (nativeRes?.user) {
+              const uid = nativeRes.user.uid;
+              const savedUser = getUser(uid);
+              if (savedUser && savedUser.id && savedUser.id !== 'student' && savedUser.id !== 'usr_new' && savedUser.email && savedUser.targetExam) {
+                setUserState(savedUser);
+                setIsAuthModalOpen(false);
+                return;
+              }
+            }
+          } catch (e) {}
         }
+
+        // Truly logged out: show auth screen
+        setUserState(INITIAL_USER);
+        setQuestionsState([]);
+        setScheduleState([]);
+        setFriendsState([]);
+        setNotifications([]);
+        setSelectedQuestion(null);
+        setIsAuthModalOpen(true);
       }
     });
 
@@ -1668,11 +1676,10 @@ export function App() {
               showToast('Profil ve ayarlarınız başarıyla güncellendi!');
             }}
             onLogout={async () => {
-              try {
-                await logoutFirebase();
-              } catch (e) {}
-              const cleanUser = resetToCleanState();
-              setUserState(cleanUser);
+              const currentUid = user?.id;
+              // 1. Immediately reset storage and React states
+              resetToCleanState(currentUid);
+              setUserState(INITIAL_USER);
               setQuestionsState([]);
               setScheduleState([]);
               setFriendsState([]);
@@ -1681,8 +1688,20 @@ export function App() {
               setActiveBannerNotif(null);
               setActiveTab('home');
               setIsAuthModalOpen(true);
-              setToastMessage('👋 Oturum kapatıldı.');
+              setToastMessage('👋 Hesabınızdan başarıyla çıkış yapıldı.');
               setTimeout(() => setToastMessage(null), 3000);
+
+              // 2. Perform native and JS Firebase signOut
+              try {
+                await logoutFirebase();
+              } catch (e) {
+                console.warn('Logout error:', e);
+              }
+
+              // 3. Re-verify clean state after async signOut
+              resetToCleanState(currentUid);
+              setUserState(INITIAL_USER);
+              setIsAuthModalOpen(true);
             }}
           />
         )}

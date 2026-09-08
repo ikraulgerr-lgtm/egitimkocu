@@ -72,20 +72,26 @@ export const INITIAL_COMMUNITY: ToplulukSoru[] = [
 ];
 
 export function resetToCleanState(userId?: string): Kullanici {
-  const userKey = getScopedKey(BASE_USER_KEY, userId);
-  const qKey = getScopedKey(BASE_QUESTIONS_KEY, userId);
-  const sKey = getScopedKey(BASE_SCHEDULE_KEY, userId);
-  const fKey = getScopedKey(BASE_FRIENDS_KEY, userId);
-  const dKey = getScopedKey(BASE_DENEME_KEY, userId);
-
-  localStorage.removeItem(userKey);
-  localStorage.removeItem(BASE_USER_KEY);
-  localStorage.removeItem(qKey);
-  localStorage.removeItem(sKey);
-  localStorage.removeItem(fKey);
-  localStorage.removeItem(dKey);
-  localStorage.removeItem('active_pomo_group_room');
-  localStorage.removeItem('completed_pomodoros_count');
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('edumind_') || k.startsWith('active_pomo') || k.startsWith('completed_pomo'))) {
+        if (k !== BASE_THEME_KEY) {
+          keysToRemove.push(k);
+        }
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+    localStorage.removeItem('active_pomo_group_room');
+    localStorage.removeItem('completed_pomodoros_count');
+    localStorage.removeItem(BASE_USER_KEY);
+    if (userId) {
+      localStorage.removeItem(getScopedKey(BASE_USER_KEY, userId));
+    }
+  } catch (e) {
+    console.warn('Error clearing localStorage on reset:', e);
+  }
   return { ...EMPTY_USER };
 }
 
