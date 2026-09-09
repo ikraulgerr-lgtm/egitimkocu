@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ProgramOgesi, SoruKaydi, ActiveTab, Arkadas, Kullanici, Bildirim } from '../types';
 import { LofiAudioWidget } from './LofiAudioWidget';
 import { playPomodoroBellSound } from '../lib/soundUtils';
-import { updatePomodoroLocalNotification, clearPomodoroLocalNotification } from '../lib/notificationService';
+import { schedulePomodoroNotification, clearPomodoroLocalNotification } from '../lib/notificationService';
 import { db, auth } from '../lib/firebase';
 import { doc, getDoc, getDocFromServer, getDocs, collection, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
@@ -903,7 +903,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           `Harika bir çalışma seansı geçirdin! +${earnedXp} XP kazandın ve görevin tamamlandı. Şimdi ${customBreakMinutes} dakikalık mola zamanı.`,
           'work'
         );
-        updatePomodoroLocalNotification('🍅 Pomodoro Süresi Doldu!', `Mola zamanı başladı! ${customBreakMinutes} dk dinlenebilirsin.`, true);
+        clearPomodoroLocalNotification();
 
         // Switch to Break Mode automatically
         setPomoMode('break');
@@ -918,7 +918,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           `Mola bitti, zihnin tazelendi! Yeni bir ${customWorkMinutes} dakikalık Pomodoro odaklanma seansına başlamaya hazır mısın?`,
           'break'
         );
-        updatePomodoroLocalNotification('☕ Mola Sona Erdi!', `Yeni bir ${customWorkMinutes} dakikalık çalışma seansına başlayabilirsin!`, true);
+        clearPomodoroLocalNotification();
 
         // Switch back to Work Mode
         setPomoMode('work');
@@ -932,22 +932,32 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     };
   }, [isPomoRunning, pomoTimeLeft, pomoMode, pomoSelectedItemId, scheduleItems, selectedDay, customWorkMinutes, customBreakMinutes, completedPomoCount, onToggleItem, onRewardXp]);
 
-  // Synchronize background notification countdown
+  // Schedule native notification when timer starts or mode changes, clear when paused/stopped
   useEffect(() => {
-    if (isPomoRunning) {
-      const minutes = Math.floor(pomoTimeLeft / 60);
-      const seconds = pomoTimeLeft % 60;
-      const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-      const title = pomoMode === 'work' ? `🧠 Pomodoro Odaklanılıyor: ${timeStr}` : `☕ Mola Zamanı: ${timeStr}`;
-      const body = activeGroupRoom ? `Grup Odası: ${activeGroupRoom.title}` : 'Eğitim Koçum AI Odaklanma Seansı';
-      updatePomodoroLocalNotification(title, body);
+    if (isPomoRunning && pomoTimeLeft > 0) {
+      schedulePomodoroNotification({
+        mode: pomoMode,
+        durationSeconds: pomoTimeLeft,
+        roomTitle: activeGroupRoom?.title,
+      });
     } else {
       clearPomodoroLocalNotification();
     }
-  }, [isPomoRunning, pomoTimeLeft, pomoMode, activeGroupRoom]);
+  }, [isPomoRunning, pomoMode]);
 
   const handleTogglePomo = () => {
-    setIsPomoRunning(!isPomoRunning);
+    const nextRunning = !isPomoRunning;
+    if (nextRunning) {
+      playPomodoroBellSound('start');
+      schedulePomodoroNotification({
+        mode: pomoMode,
+        durationSeconds: pomoTimeLeft,
+        roomTitle: activeGroupRoom?.title,
+      });
+    } else {
+      clearPomodoroLocalNotification();
+    }
+    setIsPomoRunning(nextRunning);
   };
 
   const handleSetWorkMinutes = (mins: number) => {
@@ -2313,39 +2323,48 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
       {/* FULLSCREEN FOCUS MODE MODAL (Tam Ekran Odaklanma Modu) */}
       {isFullScreenFocus && (
-        <div className="fixed inset-0 z-[99999] bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white flex flex-col justify-between p-4 sm:p-8 select-none animate-fadeIn overflow-y-auto">
+        <div
+          className="fixed inset-0 z-[99999] bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white flex flex-col justify-between select-none animate-fadeIn overflow-y-auto"
+          style={{
+            paddingTop: 'max(env(safe-area-inset-top, 0px) + 1.25rem, 3.5rem)',
+            paddingBottom: 'max(env(safe-area-inset-bottom, 0px) + 1rem, 1.75rem)',
+            paddingLeft: 'max(env(safe-area-inset-left, 0px) + 1rem, 1rem)',
+            paddingRight: 'max(env(safe-area-inset-right, 0px) + 1rem, 1rem)',
+          }}
+        >
           {/* Header Bar */}
-          <div className="flex items-center justify-between w-full max-w-4xl mx-auto border-b border-white/10 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-xl shadow-inner">
+          <div className="flex items-center justify-between w-full max-w-4xl mx-auto border-b border-white/10 pb-3 sm:pb-4 shrink-0 gap-2">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-lg sm:text-xl shadow-inner shrink-0">
                 {pomoMode === 'work' ? '🍅' : '☕'}
               </div>
-              <div>
-                <h2 className="text-base sm:text-lg font-black tracking-wide text-white flex items-center gap-2">
-                  <span>{activeGroupRoom ? activeGroupRoom.title : 'Pomodoro Odaklanma Modu'}</span>
+              <div className="min-w-0">
+                <h2 className="text-sm sm:text-lg font-black tracking-wide text-white flex items-center gap-1.5 truncate">
+                  <span className="truncate">{activeGroupRoom ? activeGroupRoom.title : 'Pomodoro Odaklanma'}</span>
                   {activeGroupRoom && (
-                    <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-500/40">
-                      🟢 CANLI ODA
+                    <span className="bg-emerald-500/20 text-emerald-300 text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded-full border border-emerald-500/40 shrink-0">
+                      🟢 CANLI
                     </span>
                   )}
                 </h2>
-                <p className="text-xs text-indigo-300/80 font-medium">
-                  {pomoMode === 'work' ? `🧠 Odaklanma Seansı (${customWorkMinutes} Dk)` : `☕ Dinlenme & Mola (${customBreakMinutes} Dk)`}
+                <p className="text-[11px] sm:text-xs text-indigo-300/80 font-medium truncate">
+                  {pomoMode === 'work' ? `🧠 Odaklanma (${customWorkMinutes} Dk)` : `☕ Mola (${customBreakMinutes} Dk)`}
                 </p>
               </div>
             </div>
 
             <button
+              type="button"
               onClick={() => {
                 if (typeof document !== 'undefined' && document.fullscreenElement) {
                   document.exitFullscreen().catch(() => {});
                 }
                 setIsFullScreenFocus(false);
               }}
-              className="bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold px-3.5 py-2 rounded-xl border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+              className="bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold px-3 py-1.5 sm:py-2 rounded-xl border border-white/20 transition-all flex items-center gap-1 cursor-pointer shadow-md shrink-0"
             >
               <span className="material-symbols-outlined text-base">fullscreen_exit</span>
-              <span className="hidden sm:inline">Tam Ekrandan Çık</span>
+              <span>Çıkış</span>
             </button>
           </div>
 

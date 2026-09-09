@@ -285,33 +285,60 @@ export async function runSmartNotificationChecks({
   }
 }
 
-export async function updatePomodoroLocalNotification(title: string, body: string, isFinished: boolean = false) {
+const POMO_NOTIF_ID = 99999;
+
+export async function schedulePomodoroNotification({
+  mode,
+  durationSeconds,
+  roomTitle,
+}: {
+  mode: 'work' | 'break';
+  durationSeconds: number;
+  roomTitle?: string;
+}) {
   if (!Capacitor.isNativePlatform()) return;
   try {
     const hasPerm = await LocalNotifications.checkPermissions();
     if (hasPerm.display !== 'granted') {
-      await LocalNotifications.requestPermissions();
+      const req = await LocalNotifications.requestPermissions();
+      if (req.display !== 'granted') return;
     }
-    const POMO_NOTIF_ID = 99999;
+
+    // Cancel any previous pomodoro notification first
+    await LocalNotifications.cancel({ notifications: [{ id: POMO_NOTIF_ID }] }).catch(() => {});
+
+    if (durationSeconds <= 0) return;
+
+    const targetDate = new Date(Date.now() + durationSeconds * 1000);
+    const title = mode === 'work' ? '🍅 Pomodoro Süresi Doldu!' : '☕ Mola Süresi Bitti!';
+    const body =
+      mode === 'work'
+        ? (roomTitle ? `[${roomTitle}] Odaklanma seansını tamamladın! Şimdi dinlenme zamanı. 🌟` : 'Harika bir odaklanma seansı geçirdin! Şimdi dinlenme zamanı. 🌟')
+        : 'Mola bitti! Yeni bir odaklanma seansına başlamaya hazır mısın? 🚀';
+
     await LocalNotifications.schedule({
       notifications: [
         {
           id: POMO_NOTIF_ID,
-          title: title,
-          body: body,
-          schedule: { at: new Date(Date.now() + 100) },
+          title,
+          body,
+          schedule: { at: targetDate },
+          sound: 'default',
+          smallIcon: 'ic_stat_icon',
+          largeIcon: 'ic_launcher',
+          iconColor: '#4338ca',
+          extra: { type: 'pomodoro', mode },
         },
       ],
     });
   } catch (e) {
-    console.warn('Pomodoro local notification update error:', e);
+    console.warn('Pomodoro local notification error:', e);
   }
 }
 
 export async function clearPomodoroLocalNotification() {
   if (!Capacitor.isNativePlatform()) return;
   try {
-    const POMO_NOTIF_ID = 99999;
     await LocalNotifications.cancel({ notifications: [{ id: POMO_NOTIF_ID }] });
   } catch (e) {}
 }
