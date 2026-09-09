@@ -23,6 +23,7 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
   showToast,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [manualInput, setManualInput] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -38,19 +39,35 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Fixed public live production URL so anyone anywhere can open and join
+  // Live Firebase production web app URL
   const PUBLIC_APP_URL = 'https://gen-lang-client-0786231895.web.app';
-  const inviteUrl = `${PUBLIC_APP_URL}/?invite=${currentUser.id}&name=${encodeURIComponent(currentUser.ad || 'Öğrenci')}&username=${encodeURIComponent(currentUser.kullaniciAdi || '')}&avatar=${encodeURIComponent(currentUser.avatarUrl || '')}&xp=${currentUser.xp || 0}`;
-  const shareText = `🎓 Selam! Eğitim Koçum AI ile YKS/LGS sorularımı çözüp yapay zeka analizi alıyorum. Benimle arkadaş olmak ve ders yarışına katılmak için tıkla:`;
+  const myUsername = currentUser.kullaniciAdi || 'ogrenci';
+  const myName = currentUser.ad || 'Öğrenci';
+  const myAvatar = currentUser.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
+  const myId = currentUser.id || auth.currentUser?.uid || '';
+
+  const inviteUrl = `${PUBLIC_APP_URL}/?invite=${myId}&name=${encodeURIComponent(myName)}&username=${encodeURIComponent(myUsername)}&avatar=${encodeURIComponent(myAvatar)}&xp=${currentUser.xp || 0}`;
+  const shareText = `🎓 Selam! Eğitim Koçum AI ile YKS & LGS sınavlarıma çalışıyorum.\n\nBeni arkadaş olarak eklemek ve liderlik yarışına katılmak için:\n👉 Kullanıcı Adım: @${myUsername}\n🔗 Davet Linki: ${inviteUrl}\n\n(Uygulamayı açıp Arkadaş Ekle kısmına kullanıcı adımı yazarak da anında +50 XP kazanabilirsin!)`;
 
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
-      showToast('🔗 Gerçek davet bağlantısı kopyalandı!');
+      showToast('🔗 Davet bağlantısı panoya kopyalandı!');
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      showToast('🔗 Gerçek davet bağlantısı kopyalandı!');
+      showToast('🔗 Davet bağlantısı kopyalandı!');
+    }
+  };
+
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(`@${myUsername}`);
+      setCopiedCode(true);
+      showToast(`📋 Kullanıcı adın (@${myUsername}) kopyalandı!`);
+      setTimeout(() => setCopiedCode(false), 2500);
+    } catch {
+      showToast(`📋 @${myUsername} kopyalandı!`);
     }
   };
 
@@ -81,14 +98,17 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
       rawInput = rawInput.substring(1).trim();
     }
 
-    // Check if user pasted a link with ?invite=...
+    // Check if user pasted a link with ?invite=... or ?username=...
     let targetUidOrName = rawInput;
     try {
       if (rawInput.includes('invite=')) {
         const parsedUrl = new URL(rawInput.startsWith('http') ? rawInput : `https://${rawInput}`);
         const parsedInviteId = parsedUrl.searchParams.get('invite');
+        const parsedUsername = parsedUrl.searchParams.get('username');
         if (parsedInviteId) {
           targetUidOrName = parsedInviteId;
+        } else if (parsedUsername) {
+          targetUidOrName = parsedUsername.replace('@', '');
         }
       }
     } catch (e) {}
@@ -100,6 +120,7 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
     // 1. Self check
     if (
       targetUidOrName === currentUser.id ||
+      targetUidOrName === myId ||
       normalizedInput === normalizedCurrentUser ||
       normalizedInput === normalizedCurrentUsername ||
       (currentUser.email && normalizedInput === currentUser.email.toLowerCase())
@@ -121,12 +142,6 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
     }
 
     setIsSearching(true);
-
-    if (!auth.currentUser) {
-      setSearchError('Gerçek hesapları aramak ve arkadaş eklemek için lütfen önce giriş yapın.');
-      setIsSearching(false);
-      return;
-    }
 
     try {
       let matchedUser: { id: string; ad: string; kullaniciAdi?: string; avatarUrl?: string; xp?: number; seri?: number } | null = null;
@@ -156,7 +171,7 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
         }));
 
         const found = firebaseUsers.find((u) => {
-          if (u.id === currentUser.id) return false;
+          if (u.id === currentUser.id || u.id === myId) return false;
           const userAd = (u.ad || '').toLowerCase();
           const userKullaniciAdi = (u.kullaniciAdi || '').toLowerCase();
           const userEmail = (u.email || '').toLowerCase();
@@ -189,52 +204,65 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
         return;
       }
 
-      // Send Friend Request Notification to target user in Firebase Firestore
-      const notifId = `notif_friend_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const myName = currentUser.ad || 'Öğrenci';
-      const myUsername = currentUser.kullaniciAdi || 'ogrenci';
-      const myAvatar = currentUser.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
-      const myId = currentUser.id || auth.currentUser.uid;
-
-      const friendNotif = {
-        id: notifId,
-        type: 'friend_request' as const,
-        title: '👥 Arkadaşlık İsteği',
-        message: `@${myUsername} (${myName}) sana arkadaşlık isteği gönderdi! İsteği kabul ederek arkadaş sıralamasında yarışabilirsiniz.`,
-        senderId: myId,
-        senderName: myName,
-        senderUsername: myUsername,
-        senderAvatar: myAvatar,
-        recipientId: matchedUser.id,
-        recipientName: matchedUser.ad,
-        recipientUsername: matchedUser.kullaniciAdi,
-        createdAt: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-        read: false,
+      // Add to current user's local and Firestore friends immediately
+      const newFriend: Arkadas = {
+        id: matchedUser.id,
+        name: matchedUser.ad,
+        kullaniciAdi: matchedUser.kullaniciAdi || 'ogrenci',
+        avatar: matchedUser.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+        xp: matchedUser.xp || 100,
+        streak: matchedUser.seri || 1,
+        joinedAt: new Date().toLocaleDateString('tr-TR'),
       };
+      onAddFriend(newFriend);
 
-      const cleanNotif = JSON.parse(JSON.stringify(friendNotif));
+      // Save mutually in Firestore if authenticated
+      if (myId && matchedUser.id) {
+        const myFriendObj: Arkadas = {
+          id: myId,
+          name: myName,
+          kullaniciAdi: myUsername,
+          avatar: myAvatar,
+          xp: currentUser.xp || 0,
+          streak: currentUser.seri || 1,
+          joinedAt: new Date().toLocaleDateString('tr-TR'),
+        };
 
-      // Write to top-level friend_invites + recipient's notifications subcollection
-      try {
-        await setDoc(doc(db, 'friend_invites', notifId), cleanNotif);
-        await setDoc(doc(db, 'notifications', notifId), cleanNotif);
-        await setDoc(doc(db, 'users', matchedUser.id, 'notifications', notifId), cleanNotif);
-        await setDoc(doc(db, 'users', matchedUser.id, 'friend_invites', notifId), cleanNotif);
-        await setDoc(doc(db, 'users', matchedUser.id), { latestNotification: cleanNotif }, { merge: true });
-      } catch (e) {
-        console.error('Arkadaşlık isteği gönderme hatası:', e);
+        try {
+          await setDoc(doc(db, 'users', myId, 'friends', matchedUser.id), { ...newFriend, userId: myId }, { merge: true });
+          await setDoc(doc(db, 'users', matchedUser.id, 'friends', myId), { ...myFriendObj, userId: matchedUser.id }, { merge: true });
+
+          // Send an instant notification to the target user
+          const notifId = `notif_friend_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          const friendNotif = {
+            id: notifId,
+            type: 'friend_request' as const,
+            title: '👥 Yeni Arkadaş Eklendi!',
+            message: `@${myUsername} (${myName}) seni arkadaş olarak ekledi! Karşılıklı arkadaş oldunuz (+50 XP).`,
+            senderId: myId,
+            senderName: myName,
+            senderUsername: myUsername,
+            senderAvatar: myAvatar,
+            recipientId: matchedUser.id,
+            recipientName: matchedUser.ad,
+            recipientUsername: matchedUser.kullaniciAdi,
+            createdAt: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+            read: false,
+          };
+          const cleanNotif = JSON.parse(JSON.stringify(friendNotif));
+          await setDoc(doc(db, 'users', matchedUser.id, 'notifications', notifId), cleanNotif);
+          await setDoc(doc(db, 'users', matchedUser.id), { latestNotification: cleanNotif }, { merge: true });
+        } catch (e) {
+          console.error('Arkadaşlık kaydetme hatası:', e);
+        }
       }
 
-      showToast(`📩 @${matchedUser.kullaniciAdi || matchedUser.ad} kullanıcısına arkadaşlık isteği gönderildi!`);
+      showToast(`🎉 @${matchedUser.kullaniciAdi || matchedUser.ad} arkadaş olarak eklendi! (+50 XP)`);
       setManualInput('');
       setSearchError(null);
     } catch (err: any) {
-      console.error('Firebase kullanıcı sorgulama hatası:', err);
-      if (err?.code === 'permission-denied') {
-        setSearchError('Kullanıcı listesine erişmek için giriş yapmanız gerekmektedir.');
-      } else {
-        setSearchError('Kullanıcı doğrulanırken bir hata oluştu. Lütfen tekrar deneyin.');
-      }
+      console.error('Kullanıcı arama hatası:', err);
+      setSearchError('Kullanıcı doğrulanırken bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setIsSearching(false);
     }
@@ -271,16 +299,41 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
             </div>
             <div>
               <p className="text-xs font-black text-text-main">Her Davette +50 XP Kazan</p>
-              <p className="text-[11px] text-text-muted font-medium">Arkadaşın bağlantıya tıkladığında ikiniz de anında arkadaş olur ve XP kazanırsınız.</p>
+              <p className="text-[11px] text-text-muted font-medium">Arkadaşın bağlandığında veya kullanıcı adını yazdığında ikiniz de anında +50 XP kazanırsınız.</p>
             </div>
           </div>
+        </div>
+
+        {/* Username Quick Copy Card */}
+        <div className="bg-surface-container-low border border-card-border rounded-2xl p-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-lg">alternate_email</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Senin Kullanıcı Adın</p>
+              <p className="text-xs font-black text-primary font-mono truncate">@{myUsername}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopyCode}
+            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1 cursor-pointer shrink-0 ${
+              copiedCode
+                ? 'bg-emerald-600 text-white'
+                : 'bg-surface-container hover:bg-card-border text-text-main border border-card-border'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm">{copiedCode ? 'check' : 'content_copy'}</span>
+            <span>{copiedCode ? 'Kopyalandı' : 'Kodu Kopyala'}</span>
+          </button>
         </div>
 
         {/* Invite Link Section */}
         <div className="space-y-1.5">
           <label className="text-xs font-extrabold text-text-main flex items-center gap-1">
             <span className="material-symbols-outlined text-primary text-base">link</span>
-            <span>Sana Özel Canlı Davet Bağlantısı</span>
+            <span>Canlı Davet Bağlantısı</span>
           </label>
           <div className="flex items-center gap-2 bg-surface-container-low border border-card-border rounded-2xl p-1.5 pl-3">
             <input

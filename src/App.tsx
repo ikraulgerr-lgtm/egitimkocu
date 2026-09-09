@@ -57,6 +57,7 @@ import { onAuthStateChanged, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+import { App as CapApp, URLOpenListenerEvent } from '@capacitor/app';
 
 export function App() {
   const [user, setUserState] = useState<Kullanici>(getUser());
@@ -441,6 +442,20 @@ export function App() {
             if (userData.targetExam) {
               setIsAuthModalOpen(false);
             }
+
+            // Check for pending invite received before sign in
+            const pendingInviteStr = localStorage.getItem('pending_invite_data');
+            if (pendingInviteStr) {
+              try {
+                const pData = JSON.parse(pendingInviteStr);
+                localStorage.removeItem('pending_invite_data');
+                if (pData?.inviteId && pData.inviteId !== uid) {
+                  setTimeout(() => {
+                    handleProcessInvite(pData.inviteId, pData.inviteName, pData.inviteUsername, pData.inviteAvatar, pData.inviteXp);
+                  }, 800);
+                }
+              } catch {}
+            }
           } else {
             // First time or pending user: preserve any existing in-memory profile
             setUserState((prevUser) => {
@@ -495,79 +510,6 @@ export function App() {
 
     return () => unsubscribe();
   }, []);
-
-  // Process invite link from URL parameters
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const urlParams = new URLSearchParams(window.location.search);
-    const inviteId = urlParams.get('invite');
-    const inviteName = urlParams.get('name');
-    const inviteAvatar = urlParams.get('avatar');
-    const inviteXp = urlParams.get('xp');
-
-    if (inviteId) {
-      // Clean query parameter from URL bar without reload
-      try {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } catch {
-        // Ignore if restricted
-      }
-
-      // Check if current user is not inviting self
-      if (inviteId !== user.id && (!auth.currentUser || inviteId !== auth.currentUser.uid)) {
-        const friendName = inviteName ? decodeURIComponent(inviteName) : 'Davet Eden Öğrenci';
-        const friendAvatar = inviteAvatar ? decodeURIComponent(inviteAvatar) : 'https://api.dicebear.com/7.x/adventurer/svg?seed=InviterStudent&backgroundColor=6366f1';
-        const friendXp = inviteXp ? parseInt(inviteXp, 10) : 650;
-
-        const inviterObj: Arkadas = {
-          id: inviteId,
-          name: friendName,
-          avatar: friendAvatar,
-          xp: friendXp,
-          streak: 4,
-          joinedAt: new Date().toLocaleDateString('tr-TR'),
-        };
-
-        const currentFriendsList = getFriends();
-        const alreadyAdded = currentFriendsList.some((f) => f.id === inviteId || f.name.toLowerCase() === friendName.toLowerCase());
-
-        if (!alreadyAdded) {
-          // Mutually add to friends and Firestore!
-          handleAddFriend(inviterObj);
-
-          // Give current user +50 XP bonus for joining via invite!
-          const updatedUser = { ...user, xp: user.xp + 50 };
-          setUserState(updatedUser);
-          saveUser(updatedUser);
-          syncUserToFirestore(updatedUser);
-
-          // Send an instant notification to the inviter in Firestore!
-          const notifId = `notif_friend_joined_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-          const myName = user.ad && user.ad !== 'Selin Yılmaz' ? user.ad : 'Yeni Bir Öğrenci';
-          const joinNotif: Bildirim = {
-            id: notifId,
-            type: 'friend_request',
-            title: '🎉 Yeni Arkadaşın Katıldı!',
-            message: `${myName} paylaştığın davet bağlantısı ile sana katıldı! Karşılıklı arkadaş oldunuz (+50 XP).`,
-            senderId: user.id || auth.currentUser?.uid || 'student',
-            senderName: myName,
-            senderAvatar: user.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-            recipientId: inviteId,
-            createdAt: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-            read: false,
-          };
-
-          setDoc(doc(db, 'users', inviteId, 'notifications', notifId), joinNotif).catch(() => {});
-          setDoc(doc(db, 'users', inviteId), { latestNotification: joinNotif }, { merge: true }).catch(() => {});
-
-          setActiveTab('leaderboard');
-          showToast(`🎉 ${friendName} seni Eğitim Koçum'a davet etti! Artık arkadaşsınız (+50 XP)!`);
-        } else {
-          showToast(`🤝 ${friendName} zaten arkadaş listenizde kayıtlı!`);
-        }
-      }
-    }
-  }, [user?.id]);
 
   // Helper to sync user state to Firestore, Firebase Auth profile & Mutual Friends
   const syncUserToFirestore = async (updatedUser: Kullanici) => {
@@ -708,6 +650,154 @@ export function App() {
       }
     }
   };
+
+  // Process friend invite from deep links (egitimkocum:// or https://...) or URL query parameters
+  const handleProcessInvite = (
+    inviteId: string,
+    inviteName?: string | null,
+    inviteUsername?: string | null,
+    inviteAvatar?: string | null,
+    inviteXp?: string | null
+  ) => {
+    if (!inviteId) return;
+
+    const myUid = user.id || auth.currentUser?.uid;
+    if (!myUid) {
+      // Save pending invite for after login/register
+      try {
+        localStorage.setItem(
+          'pending_invite_data',
+          JSON.stringify({ inviteId, inviteName, inviteUsername, inviteAvatar, inviteXp })
+        );
+      } catch {}
+      return;
+    }
+
+    // Cannot invite oneself
+    if (inviteId === myUid || (auth.currentUser && inviteId === auth.currentUser.uid)) {
+      return;
+    }
+
+    const friendName = inviteName ? decodeURIComponent(inviteName) : 'Davet Eden Öğrenci';
+    const friendUsername = inviteUsername ? decodeURIComponent(inviteUsername).replace('@', '') : 'ogrenci';
+    const friendAvatar = inviteAvatar
+      ? decodeURIComponent(inviteAvatar)
+      : 'https://api.dicebear.com/7.x/adventurer/svg?seed=InviterStudent&backgroundColor=6366f1';
+    const friendXp = inviteXp ? parseInt(inviteXp, 10) : 100;
+
+    const inviterObj: Arkadas = {
+      id: inviteId,
+      name: friendName,
+      kullaniciAdi: friendUsername,
+      avatar: friendAvatar,
+      xp: friendXp,
+      streak: 3,
+      joinedAt: new Date().toLocaleDateString('tr-TR'),
+    };
+
+    const currentFriendsList = getFriends(myUid);
+    const alreadyAdded = currentFriendsList.some(
+      (f) =>
+        f.id === inviteId ||
+        (friendUsername && f.kullaniciAdi && f.kullaniciAdi.toLowerCase() === friendUsername.toLowerCase())
+    );
+
+    if (!alreadyAdded) {
+      // Mutually add to friends and Firestore!
+      handleAddFriend(inviterObj);
+
+      // Give current user +50 XP bonus for joining via invite!
+      const updatedUser = { ...user, xp: (user.xp || 0) + 50 };
+      setUserState(updatedUser);
+      saveUser(updatedUser, myUid);
+      syncUserToFirestore(updatedUser);
+
+      // Send an instant notification to the inviter in Firestore!
+      const notifId = `notif_friend_joined_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const myName = user.ad && user.ad !== 'Selin Yılmaz' ? user.ad : 'Yeni Bir Öğrenci';
+      const myUserTag = user.kullaniciAdi || 'ogrenci';
+      const joinNotif: Bildirim = {
+        id: notifId,
+        type: 'friend_request',
+        title: '🎉 Yeni Arkadaşın Katıldı!',
+        message: `@${myUserTag} (${myName}) paylaştığın davet bağlantısı ile sana katıldı! Karşılıklı arkadaş oldunuz (+50 XP).`,
+        senderId: myUid,
+        senderName: myName,
+        senderUsername: myUserTag,
+        senderAvatar: user.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+        recipientId: inviteId,
+        createdAt: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+        read: false,
+      };
+
+      setDoc(doc(db, 'users', inviteId, 'notifications', notifId), joinNotif).catch(() => {});
+      setDoc(doc(db, 'users', inviteId), { latestNotification: joinNotif }, { merge: true }).catch(() => {});
+
+      setActiveTab('leaderboard');
+      showToast(`🎉 @${friendUsername || friendName} arkadaş olarak eklendi! (+50 XP)`);
+    } else {
+      showToast(`🤝 @${friendUsername || friendName} zaten arkadaş listenizde kayıtlı!`);
+    }
+  };
+
+  // Listen for Deep Links & URL Invite Parameters
+  useEffect(() => {
+    const parseUrlAndProcess = (rawUrl: string) => {
+      try {
+        let urlString = rawUrl;
+        if (urlString.startsWith('egitimkocum://')) {
+          urlString = urlString.replace('egitimkocum://', 'https://egitimkocum.app/');
+        }
+        const parsed = new URL(urlString);
+        const inviteId = parsed.searchParams.get('invite') || parsed.searchParams.get('id');
+        const inviteName = parsed.searchParams.get('name');
+        const inviteUsername = parsed.searchParams.get('username') || parsed.searchParams.get('kullaniciAdi');
+        const inviteAvatar = parsed.searchParams.get('avatar');
+        const inviteXp = parsed.searchParams.get('xp');
+
+        if (inviteId) {
+          handleProcessInvite(inviteId, inviteName, inviteUsername, inviteAvatar, inviteXp);
+        }
+      } catch (e) {
+        console.warn('Error parsing invite deep link:', e);
+      }
+    };
+
+    // 1. Check web location query parameters
+    if (typeof window !== 'undefined' && window.location.search) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const inviteId = urlParams.get('invite') || urlParams.get('id');
+      if (inviteId) {
+        const inviteName = urlParams.get('name');
+        const inviteUsername = urlParams.get('username') || urlParams.get('kullaniciAdi');
+        const inviteAvatar = urlParams.get('avatar');
+        const inviteXp = urlParams.get('xp');
+        try {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch {}
+        handleProcessInvite(inviteId, inviteName, inviteUsername, inviteAvatar, inviteXp);
+      }
+    }
+
+    // 2. Check native launch URL & appUrlOpen events
+    if (Capacitor.isNativePlatform()) {
+      CapApp.getLaunchUrl().then((launchUrl) => {
+        if (launchUrl?.url) {
+          parseUrlAndProcess(launchUrl.url);
+        }
+      }).catch(() => {});
+
+      const urlListenerPromise = CapApp.addListener('appUrlOpen', (event: URLOpenListenerEvent) => {
+        if (event?.url) {
+          parseUrlAndProcess(event.url);
+        }
+      });
+
+      return () => {
+        urlListenerPromise.then((h) => h.remove()).catch(() => {});
+      };
+    }
+  }, [user?.id, auth.currentUser?.uid]);
 
   const handleStartQuiz = (q: SoruKaydi) => {
     setQuizList([q]);

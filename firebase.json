@@ -1,4 +1,18 @@
 {
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
   "firestore": {
     "databaseId": "ai-studio-edumind-20b64783-4f16-4998-b766-0f8bf0aa1a7d",
     "rules": "firestore.rules",
@@ -6,7 +20,7 @@
     "dataAccessMode": "FIRESTORE_NATIVE"
   },
   "auth": {
-    "authorizedDomains": ["localhost", "172.16.20.125"],
+    "authorizedDomains": ["localhost", "172.16.20.125", "gen-lang-client-0786231895.web.app", "gen-lang-client-0786231895.firebaseapp.com"],
     "providers": {
       "emailPassword": true,
       "googleSignIn": {
