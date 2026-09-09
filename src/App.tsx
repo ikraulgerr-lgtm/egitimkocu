@@ -47,6 +47,7 @@ import { AuthModal } from './components/AuthModal';
 import { QuizTestModal } from './components/QuizTestModal';
 import { AiAnalyzingOverlay } from './components/AiAnalyzingOverlay';
 import { InviteFriendsModal } from './components/InviteFriendsModal';
+import { AppInviteLanding } from './components/AppInviteLanding';
 import { LofiAudioWidget } from './components/LofiAudioWidget';
 import { ExamCountdownWidget } from './components/ExamCountdownWidget';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -75,6 +76,13 @@ export function App() {
   const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
   const [isNoCreditsModalOpen, setIsNoCreditsModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [landingInviteData, setLandingInviteData] = useState<{
+    inviteId: string;
+    inviteName?: string;
+    inviteUsername?: string;
+    inviteAvatar?: string;
+    inviteXp?: number;
+  } | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => {
     if (auth.currentUser) return false;
     const savedUser = getUser();
@@ -764,18 +772,25 @@ export function App() {
     };
 
     // 1. Check web location query parameters
-    if (typeof window !== 'undefined' && window.location.search) {
+    if (typeof window !== 'undefined' && window.location.search && !Capacitor.isNativePlatform()) {
       const urlParams = new URLSearchParams(window.location.search);
       const inviteId = urlParams.get('invite') || urlParams.get('id');
       if (inviteId) {
-        const inviteName = urlParams.get('name');
-        const inviteUsername = urlParams.get('username') || urlParams.get('kullaniciAdi');
-        const inviteAvatar = urlParams.get('avatar');
-        const inviteXp = urlParams.get('xp');
-        try {
-          window.history.replaceState({}, document.title, window.location.pathname);
-        } catch {}
-        handleProcessInvite(inviteId, inviteName, inviteUsername, inviteAvatar, inviteXp);
+        const inviteName = urlParams.get('name') ? decodeURIComponent(urlParams.get('name')!) : 'Öğrenci';
+        const inviteUsername = (urlParams.get('username') || urlParams.get('kullaniciAdi')) ? decodeURIComponent(urlParams.get('username') || urlParams.get('kullaniciAdi')!) : 'ogrenci';
+        const inviteAvatar = urlParams.get('avatar') ? decodeURIComponent(urlParams.get('avatar')!) : undefined;
+        const inviteXp = urlParams.get('xp') ? parseInt(urlParams.get('xp')!, 10) : 100;
+
+        // Display the dedicated Mobile / Web Invite Landing Card
+        setLandingInviteData({
+          inviteId,
+          inviteName,
+          inviteUsername,
+          inviteAvatar,
+          inviteXp,
+        });
+
+        handleProcessInvite(inviteId, inviteName, inviteUsername, inviteAvatar, inviteXp ? String(inviteXp) : '100');
       }
     }
 
@@ -2316,6 +2331,23 @@ export function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Dedicated Smart Invite Landing for Web / Mobile Browser Visitors */}
+      {landingInviteData && !Capacitor.isNativePlatform() && (
+        <AppInviteLanding
+          inviteId={landingInviteData.inviteId}
+          inviteName={landingInviteData.inviteName}
+          inviteUsername={landingInviteData.inviteUsername}
+          inviteAvatar={landingInviteData.inviteAvatar}
+          inviteXp={landingInviteData.inviteXp}
+          onContinueWeb={() => {
+            setLandingInviteData(null);
+            try {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            } catch {}
+          }}
+        />
       )}
 
       {/* Toast Notification Notification */}

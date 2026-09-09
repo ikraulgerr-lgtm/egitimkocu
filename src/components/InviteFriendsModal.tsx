@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Kullanici, Arkadas, Bildirim } from '../types';
 import { db, auth } from '../lib/firebase';
 import { collection, getDocs, doc, setDoc, getDoc } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
+import { Share } from '@capacitor/share';
 
 interface InviteFriendsModalProps {
   isOpen: boolean;
@@ -47,7 +49,7 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
   const myId = currentUser.id || auth.currentUser?.uid || '';
 
   const inviteUrl = `${PUBLIC_APP_URL}/?invite=${myId}&name=${encodeURIComponent(myName)}&username=${encodeURIComponent(myUsername)}&avatar=${encodeURIComponent(myAvatar)}&xp=${currentUser.xp || 0}`;
-  const shareText = `🎓 Selam! Eğitim Koçum AI ile YKS & LGS sınavlarıma çalışıyorum.\n\nBeni arkadaş olarak eklemek ve liderlik yarışına katılmak için:\n👉 Kullanıcı Adım: @${myUsername}\n🔗 Davet Linki: ${inviteUrl}\n\n(Uygulamayı açıp Arkadaş Ekle kısmına kullanıcı adımı yazarak da anında +50 XP kazanabilirsin!)`;
+  const shareText = `🎓 Selam! Eğitim Koçum AI ile YKS & LGS sınavlarıma çalışıyorum.\n\nBeni arkadaş olarak eklemek ve liderlik yarışına katılmak için:\n👉 Kullanıcı Adım: @${myUsername}\n📲 Uygulamada Aç / Katıl: ${inviteUrl}\n\n(Uygulamayı açıp Arkadaş Ekle kısmına @${myUsername} yazarak da anında +50 XP kazanabilirsin!)`;
 
   const handleCopyLink = async () => {
     try {
@@ -72,6 +74,21 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
   };
 
   const handleWebShare = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await Share.share({
+          title: 'Eğitim Koçum AI Arkadaş Daveti',
+          text: shareText,
+          url: inviteUrl,
+          dialogTitle: 'Arkadaşını Eğitim Koçum AI\'a Davet Et',
+        });
+        return;
+      } catch (e) {
+        // User dismissed share dialog
+        return;
+      }
+    }
+
     if (navigator.share) {
       try {
         await navigator.share({
@@ -79,12 +96,13 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
           text: shareText,
           url: inviteUrl,
         });
+        return;
       } catch {
         // User canceled share
       }
-    } else {
-      handleCopyLink();
     }
+
+    handleCopyLink();
   };
 
   const handleManualAdd = async (e: React.FormEvent) => {
