@@ -285,7 +285,8 @@ export async function runSmartNotificationChecks({
   }
 }
 
-const POMO_NOTIF_ID = 99999;
+const POMO_ONGOING_NOTIF_ID = 99990;
+const POMO_END_ALARM_ID = 99999;
 
 export async function schedulePomodoroNotification({
   mode,
@@ -304,30 +305,59 @@ export async function schedulePomodoroNotification({
       if (req.display !== 'granted') return;
     }
 
-    // Cancel any previous pomodoro notification first
-    await LocalNotifications.cancel({ notifications: [{ id: POMO_NOTIF_ID }] }).catch(() => {});
-
-    if (durationSeconds <= 0) return;
+    if (durationSeconds <= 0) {
+      await clearPomodoroLocalNotification();
+      return;
+    }
 
     const targetDate = new Date(Date.now() + durationSeconds * 1000);
-    const title = mode === 'work' ? '🍅 Pomodoro Süresi Doldu!' : '☕ Mola Süresi Bitti!';
-    const body =
+    const targetTimeFormatted = targetDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    const minsLeft = Math.max(1, Math.ceil(durationSeconds / 60));
+
+    const ongoingTitle =
       mode === 'work'
-        ? (roomTitle ? `[${roomTitle}] Odaklanma seansını tamamladın! Şimdi dinlenme zamanı. 🌟` : 'Harika bir odaklanma seansı geçirdin! Şimdi dinlenme zamanı. 🌟')
+        ? (roomTitle ? `🍅 [${roomTitle}] Odaklanma Devam Ediyor` : '🍅 Pomodoro Odaklanma Devam Ediyor')
+        : '☕ Pomodoro Mola Devam Ediyor';
+
+    const ongoingBody =
+      mode === 'work'
+        ? `⏳ Kalan: ~${minsLeft} dk (Bitiş: ${targetTimeFormatted}) • Odaklanmayı bozma! 💪`
+        : `☕ Kalan: ~${minsLeft} dk (Bitiş: ${targetTimeFormatted}) • Zihnini dinlendir. 🌟`;
+
+    const endTitle = mode === 'work' ? '🍅 Pomodoro Odaklanma Tamamlandı!' : '☕ Mola Süresi Bitti!';
+    const endBody =
+      mode === 'work'
+        ? (roomTitle
+            ? `[${roomTitle}] Odaklanma seansını tamamladın! Şimdi dinlenme zamanı. 🌟`
+            : 'Harika bir odaklanma seansı geçirdin! Şimdi dinlenme zamanı. 🌟')
         : 'Mola bitti! Yeni bir odaklanma seansına başlamaya hazır mısın? 🚀';
 
+    // 1. Ongoing Status Notification for Notification Panel & Lockscreen
+    // 2. Alarm Notification at Target Completion Time
     await LocalNotifications.schedule({
       notifications: [
         {
-          id: POMO_NOTIF_ID,
-          title,
-          body,
+          id: POMO_ONGOING_NOTIF_ID,
+          title: ongoingTitle,
+          body: ongoingBody,
+          schedule: { at: new Date(Date.now() + 100) },
+          sound: undefined,
+          smallIcon: 'ic_stat_icon',
+          largeIcon: 'ic_launcher',
+          iconColor: mode === 'work' ? '#e11d48' : '#059669',
+          ongoing: true,
+          extra: { type: 'pomodoro_ongoing', mode },
+        },
+        {
+          id: POMO_END_ALARM_ID,
+          title: endTitle,
+          body: endBody,
           schedule: { at: targetDate },
           sound: 'default',
           smallIcon: 'ic_stat_icon',
           largeIcon: 'ic_launcher',
           iconColor: '#4338ca',
-          extra: { type: 'pomodoro', mode },
+          extra: { type: 'pomodoro_alarm', mode },
         },
       ],
     });
@@ -339,6 +369,8 @@ export async function schedulePomodoroNotification({
 export async function clearPomodoroLocalNotification() {
   if (!Capacitor.isNativePlatform()) return;
   try {
-    await LocalNotifications.cancel({ notifications: [{ id: POMO_NOTIF_ID }] });
+    await LocalNotifications.cancel({
+      notifications: [{ id: POMO_ONGOING_NOTIF_ID }, { id: POMO_END_ALARM_ID }],
+    });
   } catch (e) {}
 }

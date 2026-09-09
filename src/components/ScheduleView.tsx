@@ -839,7 +839,17 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
     if (isPomoRunning && pomoTimeLeft > 0) {
       interval = setInterval(() => {
-        setPomoTimeLeft((prev) => prev - 1);
+        setPomoTimeLeft((prev) => {
+          const next = prev - 1;
+          if (next > 0 && next % 60 === 0) {
+            schedulePomodoroNotification({
+              mode: pomoMode,
+              durationSeconds: next,
+              roomTitle: activeGroupRoom?.title,
+            });
+          }
+          return next;
+        });
       }, 1000);
     } else if (isPomoRunning && pomoTimeLeft === 0) {
       // Timer Complete! Play audible alert bell chime
@@ -2335,6 +2345,20 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           {/* Header Bar */}
           <div className="flex items-center justify-between w-full max-w-4xl mx-auto border-b border-white/10 pb-3 sm:pb-4 shrink-0 gap-2">
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof document !== 'undefined' && document.fullscreenElement) {
+                    document.exitFullscreen().catch(() => {});
+                  }
+                  setIsFullScreenFocus(false);
+                }}
+                title="Tam Ekrandan Çık (Pomodoro ve müzik arka planda çalışmaya devam eder)"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center border border-white/20 transition-all cursor-pointer shadow-md shrink-0"
+              >
+                <span className="material-symbols-outlined text-lg sm:text-xl">close</span>
+              </button>
+
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-lg sm:text-xl shadow-inner shrink-0">
                 {pomoMode === 'work' ? '🍅' : '☕'}
               </div>
@@ -2364,7 +2388,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               className="bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold px-3 py-1.5 sm:py-2 rounded-xl border border-white/20 transition-all flex items-center gap-1 cursor-pointer shadow-md shrink-0"
             >
               <span className="material-symbols-outlined text-base">fullscreen_exit</span>
-              <span>Çıkış</span>
+              <span>Küçült</span>
             </button>
           </div>
 
@@ -2439,11 +2463,6 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 </div>
               </div>
             )}
-
-            {/* Ambient Lofi & White Noise Audio Generator */}
-            <div className="w-full max-w-md">
-              <LofiAudioWidget />
-            </div>
           </div>
 
           {/* Bottom Action Controls */}
