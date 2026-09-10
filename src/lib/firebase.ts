@@ -48,13 +48,12 @@ export async function loginWithEmailFirebase(email: string, pass: string) {
           displayName: nativeRes.user.displayName || 'Öğrenci',
           photoURL: nativeRes.user.photoUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
         };
+      } else {
+        throw new Error('Giriş başarısız oldu. Kullanıcı bilgisi alınamadı.');
       }
     } catch (nativeErr: any) {
-      console.warn('Native signInWithEmailAndPassword error, trying JS SDK...', nativeErr);
-      const msg = (nativeErr?.message || '').toLowerCase();
-      if (msg.includes('invalid') || msg.includes('wrong') || msg.includes('not-found') || msg.includes('user_not_found')) {
-        throw nativeErr;
-      }
+      console.error('Native signInWithEmailAndPassword error:', nativeErr);
+      throw nativeErr;
     }
   }
 

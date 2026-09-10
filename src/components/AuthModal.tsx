@@ -213,18 +213,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     } catch (err: any) {
       console.error('Auth submit error:', err);
-      const code = err?.code || '';
-      if (code === 'auth/operation-not-allowed') {
+      const code = (err?.code || '').toString().toLowerCase();
+      const msg = (err?.message || '').toString().toLowerCase();
+
+      if (code.includes('operation-not-allowed') || msg.includes('operation-not-allowed')) {
         setErrorMsg('Firebase Console üzerinde E-posta/Şifre ile Giriş yöntemi henüz etkinleştirilmemiş.');
-      } else if (code === 'auth/email-already-in-use') {
-        setErrorMsg('Bu e-posta adresi zaten başka bir hesapta kayıtlı. Lütfen giriş yapın.');
-      } else if (code === 'auth/invalid-credential' || code === 'auth/user-not-found' || code === 'auth/wrong-password') {
-        setErrorMsg('E-posta adresi veya şifre hatalı.');
-      } else if (code === 'auth/weak-password') {
+      } else if (code.includes('email-already-in-use') || msg.includes('email-already-in-use') || msg.includes('already in use') || msg.includes('already exists')) {
+        setErrorMsg('Bu e-posta adresi zaten başka bir hesapta kayıtlı. Lütfen "Giriş Yap" sekmesine geçin.');
+      } else if (
+        code.includes('invalid-credential') ||
+        code.includes('user-not-found') ||
+        code.includes('wrong-password') ||
+        code.includes('17011') ||
+        code.includes('17009') ||
+        msg.includes('user-not-found') ||
+        msg.includes('invalid-credential') ||
+        msg.includes('wrong-password') ||
+        msg.includes('no user record') ||
+        msg.includes('user not found') ||
+        msg.includes('invalid password') ||
+        msg.includes('credentials')
+      ) {
+        setErrorMsg('E-posta adresi veya şifre hatalı. Böyle bir kullanıcı kaydı bulunamadı.');
+      } else if (code.includes('weak-password') || msg.includes('weak-password') || msg.includes('weak password')) {
         setErrorMsg('Şifreniz en az 8 karakter ve büyük/küçük harf içermelidir.');
-      } else if (code === 'auth/invalid-email') {
+      } else if (code.includes('invalid-email') || msg.includes('invalid-email') || msg.includes('badly formatted')) {
         setErrorMsg('Geçersiz bir e-posta adresi girdiniz.');
-      } else if (code === 'auth/network-request-failed') {
+      } else if (code.includes('network-request-failed') || msg.includes('network')) {
         setErrorMsg('İnternet bağlantısı hatası. Lütfen ağınızı kontrol edip tekrar deneyin.');
       } else {
         setErrorMsg(err?.message || 'Giriş / Kayıt işlemi gerçekleştirilemedi. Lütfen bilgilerinizi kontrol edin.');
@@ -450,6 +465,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   ? 'Yapay zeka pedagoji asistanın ile eğitime başla.'
                   : 'Yapay zeka destekli çalışma asistanın seni bekliyor.'}
               </p>
+            </div>
+
+            {/* Segmented Mode Switcher Tabs */}
+            <div className="flex bg-surface-container-low p-1 rounded-2xl border border-card-border select-none">
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMsg(null);
+                  setMode('login');
+                }}
+                className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all cursor-pointer ${
+                  mode === 'login'
+                    ? 'bg-primary text-white shadow-xs'
+                    : 'text-text-muted hover:text-text-main'
+                }`}
+              >
+                Giriş Yap
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMsg(null);
+                  setMode('register');
+                }}
+                className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all cursor-pointer ${
+                  mode === 'register'
+                    ? 'bg-primary text-white shadow-xs'
+                    : 'text-text-muted hover:text-text-main'
+                }`}
+              >
+                Kayıt Ol
+              </button>
             </div>
 
             {/* Social SSO Logins */}
