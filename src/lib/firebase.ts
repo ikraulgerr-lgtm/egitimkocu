@@ -264,6 +264,42 @@ export async function logoutFirebase() {
   }
 }
 
+export async function deleteAccountFirebase(uid?: string) {
+  const currentUid = uid || auth.currentUser?.uid;
+
+  // 1. Delete Firestore user document
+  if (currentUid) {
+    try {
+      const userDocRef = doc(db, 'users', currentUid);
+      await deleteDoc(userDocRef);
+    } catch (e) {
+      console.warn('Firestore user doc deletion warning:', e);
+    }
+  }
+
+  // 2. Delete Native Auth User if on mobile
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await FirebaseAuthentication.deleteUser();
+    } catch (nativeErr) {
+      console.warn('Native deleteUser error:', nativeErr);
+    }
+  }
+
+  // 3. Delete Firebase Web JS Auth User
+  if (auth.currentUser) {
+    try {
+      await auth.currentUser.delete();
+    } catch (jsErr: any) {
+      console.warn('Firebase JS auth delete error:', jsErr);
+      if (jsErr?.code === 'auth/requires-recent-login') {
+        await signOut(auth);
+        throw new Error('Güvenlik nedeniyle hesabınızı silmek için lütfen çıkış yapıp tekrar giriş yaptıktan sonra deneyin.');
+      }
+    }
+  }
+}
+
 export async function resetPasswordFirebase(email: string) {
   const cleanEmail = email.trim();
   if (Capacitor.isNativePlatform()) {

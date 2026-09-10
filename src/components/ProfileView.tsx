@@ -84,6 +84,7 @@ interface ProfileViewProps {
   onUpdateAvatar?: (newAvatarUrl: string) => void;
   onUpdateUser?: (updatedFields: Partial<Kullanici>) => void;
   onLogout?: () => void;
+  onDeleteAccount?: () => Promise<void> | void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
@@ -102,12 +103,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onUpdateAvatar,
   onUpdateUser,
   onLogout,
+  onDeleteAccount,
 }) => {
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState<boolean>(false);
   const [isBadgesModalOpen, setIsBadgesModalOpen] = useState<boolean>(false);
   const [badgeFilter, setBadgeFilter] = useState<'all' | 'unlocked' | 'locked'>('all');
   const [selectedBadge, setSelectedBadge] = useState<Rozet | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState<boolean>(false);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState<boolean>(false);
 
   // Profile Settings States
   const [activeSettingsTab, setActiveSettingsTab] = useState<'profile' | 'security' | 'notifications' | 'account'>('profile');
@@ -680,6 +684,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   Güvenli
                 </span>
               </div>
+
+              {/* Account Deletion Link in Security Tab */}
+              <div className="pt-2">
+                <div className="p-3.5 bg-rose-500/5 dark:bg-rose-950/20 rounded-2xl border border-rose-500/20 flex items-center justify-between gap-3 text-xs">
+                  <div>
+                    <p className="font-extrabold text-rose-600 dark:text-rose-400">Hesabı Kalıcı Olarak Sil</p>
+                    <p className="text-[10px] text-text-muted">Kişisel verileriniz ve tüm soru geçmişiniz silinir</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteModal(true)}
+                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[11px] rounded-xl transition-colors cursor-pointer shadow-xs shrink-0"
+                  >
+                    Hesabı Sil
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -873,13 +894,34 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     e.stopPropagation();
                     onLogout?.();
                   }}
-                  className="w-full flex items-center justify-center gap-2 p-3.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-extrabold text-xs rounded-2xl border border-rose-500/20 transition-all cursor-pointer active:scale-98 shadow-xs select-none"
+                  className="w-full flex items-center justify-center gap-2 p-3.5 bg-slate-500/10 hover:bg-slate-500/20 text-slate-700 dark:text-slate-200 font-extrabold text-xs rounded-2xl border border-slate-500/20 transition-all cursor-pointer active:scale-98 shadow-xs select-none"
                 >
                   <span className="material-symbols-outlined text-lg select-none pointer-events-none">logout</span>
                   <span className="select-none pointer-events-none">Hesaptan Çıkış Yap</span>
                 </button>
               </div>
             )}
+
+            {/* Tehlikeli Bölge: Hesabı Sil (Apple Guideline 5.1.1(v) Uyumlu) */}
+            <div className="pt-4 border-t border-card-border/60">
+              <div className="p-4 rounded-2xl bg-rose-500/5 dark:bg-rose-950/20 border border-rose-500/20 space-y-2.5">
+                <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                  <span className="material-symbols-outlined text-lg">warning</span>
+                  <h4 className="font-extrabold text-xs">Tehlikeli Bölge</h4>
+                </div>
+                <p className="text-[11px] text-text-muted leading-relaxed font-medium">
+                  Hesabınızı sildiğinizde; profiliniz, soru geçmişiniz, yapay zeka analizleriniz, deneme kayıtlarınız ve tüm verileriniz kalıcı olarak silinir. Bu işlem geri alınamaz.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteModal(true)}
+                  className="w-full flex items-center justify-center gap-2 p-3 bg-rose-600/10 hover:bg-rose-600 text-rose-600 hover:text-white dark:text-rose-400 dark:hover:text-white font-extrabold text-xs rounded-xl border border-rose-600/30 transition-all cursor-pointer active:scale-98 shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-base">delete_forever</span>
+                  <span>Hesabımı ve Tüm Verilerimi Kalıcı Olarak Sil</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </section>
@@ -1208,6 +1250,80 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   Tamam / Kapat
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ACCOUNT DELETION CONFIRMATION MODAL (Apple App Store Guideline 5.1.1 Uyumlu) */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-card-bg w-full max-w-md rounded-3xl p-6 border-2 border-rose-500/30 shadow-2xl space-y-4 text-center">
+            <div className="w-16 h-16 rounded-full bg-rose-500/10 text-rose-500 border-2 border-rose-500/20 flex items-center justify-center mx-auto shadow-xs">
+              <span className="material-symbols-outlined text-3xl font-bold">delete_forever</span>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="font-black text-lg text-text-main">
+                Hesabınızı Silmek Üzeresiniz
+              </h3>
+              <p className="text-xs text-text-muted leading-relaxed font-medium">
+                Bu işlem <strong className="text-rose-600 dark:text-rose-400 font-extrabold">geri alınamaz</strong>. Hesabınızı sildiğinizde:
+              </p>
+            </div>
+
+            <div className="bg-surface-container-low p-3.5 rounded-2xl border border-card-border text-left space-y-2 text-xs text-text-muted font-medium">
+              <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                <span className="material-symbols-outlined text-sm shrink-0">close</span>
+                <span>Tüm soru çözümleriniz ve analizleriniz silinir</span>
+              </div>
+              <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                <span className="material-symbols-outlined text-sm shrink-0">close</span>
+                <span>Deneme takip ve haftalık ders programınız silinir</span>
+              </div>
+              <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                <span className="material-symbols-outlined text-sm shrink-0">close</span>
+                <span>Rozetleriniz, XP puanlarınız ve arkadaş listeniz sıfırlanır</span>
+              </div>
+              <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                <span className="material-symbols-outlined text-sm shrink-0">close</span>
+                <span>Kullanıcı hesabınız veritabanından kalıcı olarak kaldırılır</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeletingAccount}
+                onClick={async () => {
+                  if (isDeletingAccount) return;
+                  setIsDeletingAccount(true);
+                  try {
+                    if (onDeleteAccount) {
+                      await onDeleteAccount();
+                    }
+                    setShowDeleteModal(false);
+                  } catch (e) {
+                    console.error(e);
+                  } finally {
+                    setIsDeletingAccount(false);
+                  }
+                }}
+                className="flex-1 py-3 px-4 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-black rounded-xl transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5 active:scale-95"
+              >
+                <span className="material-symbols-outlined text-base">
+                  {isDeletingAccount ? 'hourglass_empty' : 'delete'}
+                </span>
+                <span>{isDeletingAccount ? 'Hesap Siliniyor...' : 'Evet, Hesabımı Kalıcı Olarak Sil'}</span>
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingAccount}
+                onClick={() => setShowDeleteModal(false)}
+                className="py-3 px-5 bg-surface-container-low hover:bg-card-border text-text-main text-xs font-bold rounded-xl transition-colors cursor-pointer border border-card-border"
+              >
+                Vazgeç
+              </button>
             </div>
           </div>
         </div>

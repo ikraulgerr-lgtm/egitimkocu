@@ -53,7 +53,7 @@ import { ExamCountdownWidget } from './components/ExamCountdownWidget';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SplashScreen } from './components/SplashScreen';
 
-import { auth, db, handleFirestoreError, OperationType, logoutFirebase } from './lib/firebase';
+import { auth, db, handleFirestoreError, OperationType, logoutFirebase, deleteAccountFirebase } from './lib/firebase';
 import { onAuthStateChanged, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
@@ -1828,6 +1828,34 @@ export function App() {
               setTimeout(() => {
                 isLoggingOutRef.current = false;
               }, 2000);
+            }}
+            onDeleteAccount={async () => {
+              isLoggingOutRef.current = true;
+              const currentUid = user?.id;
+              try {
+                showToast('⏳ Hesabınız ve tüm verileriniz siliniyor...');
+                await deleteAccountFirebase(currentUid);
+
+                // Immediately reset storage and React states
+                resetToCleanState(currentUid);
+                setUserState(INITIAL_USER);
+                setQuestionsState([]);
+                setScheduleState([]);
+                setFriendsState([]);
+                setNotifications([]);
+                setSelectedQuestion(null);
+                setActiveBannerNotif(null);
+                setActiveTab('home');
+                setIsAuthModalOpen(true);
+                showToast('🗑️ Hesabınız ve tüm verileriniz kalıcı olarak silindi.');
+              } catch (err: any) {
+                console.error('Delete account error:', err);
+                showToast(err?.message || 'Hesap silinirken bir hata oluştu.');
+              } finally {
+                setTimeout(() => {
+                  isLoggingOutRef.current = false;
+                }, 1500);
+              }
             }}
           />
         )}
