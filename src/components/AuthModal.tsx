@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Kullanici } from '../types';
-import { auth, db, loginWithGoogle, resetPasswordFirebase, loginWithEmailFirebase, registerWithEmailFirebase } from '../lib/firebase';
+import { auth, db, loginWithGoogle, loginWithApple, resetPasswordFirebase, loginWithEmailFirebase, registerWithEmailFirebase } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { getUser } from '../lib/storage';
@@ -42,6 +42,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // UI status states
   const [canInteract, setCanInteract] = useState<boolean>(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
+  const [isAppleLoading, setIsAppleLoading] = useState<boolean>(false);
+  const [isEulaModalOpen, setIsEulaModalOpen] = useState<boolean>(false);
   const [isEmailLoading, setIsEmailLoading] = useState<boolean>(false);
   const [isGoogleExamLoading, setIsGoogleExamLoading] = useState<boolean>(false);
   const [isResetLoading, setIsResetLoading] = useState<boolean>(false);
@@ -55,6 +57,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   useEffect(() => {
     setErrorMsg(null);
     setIsGoogleLoading(false);
+    setIsAppleLoading(false);
     setIsEmailLoading(false);
   }, [mode]);
 
@@ -499,15 +502,126 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </button>
             </div>
 
-            {/* Social SSO Logins */}
+            {/* Social SSO Logins (Google & Apple - Apple Guideline 4.8 Compliant) */}
             <div className="space-y-2 select-none">
+              {/* Sign in with Apple */}
               <button
                 type="button"
-                disabled={!canInteract || isGoogleLoading || isEmailLoading}
+                disabled={!canInteract || isAppleLoading || isGoogleLoading || isEmailLoading}
                 onClick={async (e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  if (!canInteract || isGoogleLoading || isEmailLoading) return;
+                  if (!canInteract || isAppleLoading || isGoogleLoading || isEmailLoading) return;
+                  setErrorMsg(null);
+                  setIsAppleLoading(true);
+                  try {
+                    const firebaseUser = await loginWithApple();
+                    if (firebaseUser) {
+                      let finalUsername = 'apple_ogrenci';
+                      let targetExam = '';
+                      let targetExamDate = '';
+                      let userExistsInDb = false;
+                      let userDisplayName = firebaseUser.displayName || 'Apple Kullanıcısı';
+                      let userAvatar = firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
+
+                      // 1. Check local cached user first for instant recognition
+                      const cachedUser = getUser(firebaseUser.uid);
+                      if (cachedUser && cachedUser.targetExam) {
+                        userExistsInDb = true;
+                        if (cachedUser.ad) userDisplayName = cachedUser.ad;
+                        if (cachedUser.kullaniciAdi) finalUsername = cachedUser.kullaniciAdi;
+                        targetExam = cachedUser.targetExam;
+                        targetExamDate = cachedUser.targetExamDate || '';
+                        if (cachedUser.avatarUrl) userAvatar = cachedUser.avatarUrl;
+                      }
+
+                      // 2. Check Firestore user document
+                      try {
+                        const userSnap = await Promise.race([
+                          getDoc(doc(db, 'users', firebaseUser.uid)),
+                          new Promise<null>((r) => setTimeout(() => r(null), 7000)),
+                        ]);
+
+                        if (userSnap && userSnap.exists()) {
+                          userExistsInDb = true;
+                          const data = userSnap.data();
+                          if (data?.ad) userDisplayName = data.ad;
+                          if (data?.kullaniciAdi) finalUsername = data.kullaniciAdi;
+                          targetExam = data?.targetExam || targetExam || 'YKS';
+                          targetExamDate = data?.targetExamDate || targetExamDate || '2027-06-19';
+                          if (data?.avatarUrl) userAvatar = data.avatarUrl;
+                        }
+                      } catch (e) {
+                        console.warn('Apple user doc check warning:', e);
+                      }
+
+                      // If user is already registered, proceed immediately!
+                      if (userExistsInDb) {
+                        setIsAppleLoading(false);
+                        onLoginSuccess({
+                          id: firebaseUser.uid,
+                          ad: userDisplayName,
+                          kullaniciAdi: finalUsername,
+                          kullaniciAdi_lower: finalUsername.toLowerCase(),
+                          email: firebaseUser.email || 'ogrenci@privaterelay.appleid.com',
+                          avatarUrl: userAvatar,
+                          targetExam: (targetExam || 'YKS') as any,
+                          targetExamDate: targetExamDate || '2027-06-19',
+                        });
+                        onClose();
+                        return;
+                      }
+
+                      // Brand new Apple user:
+                      const base = (firebaseUser.email?.split('@')[0] || firebaseUser.displayName || 'apple_user')
+                        .toLowerCase()
+                        .replace(/[^a-z0-9_]/g, '')
+                        .slice(0, 12);
+                      finalUsername = `${base || 'apple_user'}_${Math.floor(100 + Math.random() * 900)}`;
+
+                      setPendingGoogleUser({
+                        uid: firebaseUser.uid,
+                        displayName: userDisplayName,
+                        email: firebaseUser.email || 'ogrenci@privaterelay.appleid.com',
+                        photoURL: userAvatar,
+                        username: finalUsername,
+                      });
+
+                      setIsAppleLoading(false);
+                      setMode('google_exam_select');
+                      return;
+                    }
+                  } catch (err: any) {
+                    console.warn('Apple Auth Status:', err);
+                    setIsAppleLoading(false);
+                    const msg = err?.message || '';
+                    if (msg.includes('iptal') || msg.includes('cancel')) {
+                      // User cancelled
+                    } else if (err?.code === 'auth/operation-not-allowed') {
+                      setErrorMsg('Firebase Console üzerinde Apple ile Giriş sağlayıcısı henüz etkinleştirilmemiş.');
+                    } else {
+                      setErrorMsg(`Apple ile giriş yapılamadı: ${msg || 'Lütfen tekrar deneyin.'}`);
+                    }
+                  } finally {
+                    setIsAppleLoading(false);
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-2.5 bg-black hover:bg-neutral-900 text-white border border-neutral-800 py-3 px-4 rounded-xl text-xs font-bold active:scale-98 transition-all cursor-pointer disabled:opacity-50 select-none shadow-sm"
+              >
+                <svg className="w-4 h-4 shrink-0 fill-current" viewBox="0 0 170 170">
+                  <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.08-7.58-7.8-11.64-14.16-5.87-9.1-10.42-19.14-13.63-30.12-3.21-10.98-4.82-21.61-4.82-31.9 0-14.78 3.84-26.68 11.53-35.7 7.68-9.02 17.2-13.6 28.56-13.75 4.9.11 10.13 1.25 15.69 3.42 5.56 2.18 9.38 3.31 11.45 3.42 1.63-.11 5.62-1.33 11.96-3.66 6.35-2.33 11.77-3.39 16.27-3.18 10.02.66 18.28 4.25 24.78 10.78 6.5 6.53 10.63 14.54 12.38 24.03-9.03 5.44-13.5 13.11-13.41 23.01.09 7.84 2.87 14.48 8.35 19.92 5.48 5.44 11.96 8.71 19.45 9.8-2.61 7.62-5.77 14.69-9.49 21.2zm-28.79-114.72c.11 3.59-.97 7.03-3.24 10.33-2.28 3.3-5.28 5.86-9.01 7.68-1.74.87-3.81 1.41-6.21 1.63-.33-3.48.7-7.03 3.09-10.65 2.39-3.62 5.54-6.32 9.45-8.1 1.74-.76 3.7-1.28 5.92-1.57z"/>
+                </svg>
+                <span>{isAppleLoading ? 'Apple ile Bağlanılıyor...' : 'Apple ile Devam Et'}</span>
+              </button>
+
+              {/* Sign in with Google */}
+              <button
+                type="button"
+                disabled={!canInteract || isGoogleLoading || isAppleLoading || isEmailLoading}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!canInteract || isGoogleLoading || isAppleLoading || isEmailLoading) return;
                   setErrorMsg(null);
                   setIsGoogleLoading(true);
                   try {
@@ -773,25 +887,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               )}
 
-              {/* Terms checkbox for registration */}
+              {/* Terms and EULA zero-tolerance checkbox for registration (Apple Guideline 1.2 Compliant) */}
               {mode === 'register' && (
                 <div className="flex items-start gap-2 pt-1 text-[11px] text-text-muted">
                   <input
                     type="checkbox"
                     checked={agreeTerms}
                     onChange={(e) => setAgreeTerms(e.target.checked)}
-                    className="mt-0.5 rounded text-primary cursor-pointer"
+                    className="mt-0.5 rounded text-primary cursor-pointer shrink-0"
                     required
                   />
                   <span>
-                    <span className="text-primary font-bold">Kullanım Şartları</span>'nı ve <span className="text-primary font-bold">Gizlilik Politikası</span>'nı okudum, onaylıyorum.
+                    <button
+                      type="button"
+                      onClick={() => setIsEulaModalOpen(true)}
+                      className="text-primary font-bold hover:underline cursor-pointer text-left"
+                    >
+                      Kullanıcı Sözleşmesi, Gizlilik Politikası ve Topluluk Kuralları (EULA - Sıfır Tolerans İlkesi)
+                    </button>
+                    'ni okudum ve kabul ediyorum.
                   </span>
                 </div>
               )}
 
               <button
                 type="submit"
-                disabled={isEmailLoading || isGoogleLoading}
+                disabled={isEmailLoading || isGoogleLoading || isAppleLoading}
                 className="w-full bg-primary text-white font-extrabold text-sm py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer mt-2 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isEmailLoading ? (
@@ -1238,6 +1359,74 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 )}
               </button>
             </form>
+          </div>
+        )}
+
+        {/* EULA and Community Guidelines Modal (Apple Guideline 1.2 Compliant) */}
+        {isEulaModalOpen && (
+          <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-card-bg w-full max-w-lg rounded-3xl p-6 border border-card-border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
+              <div className="flex items-center justify-between border-b border-card-border pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-2xl">gavel</span>
+                  <div>
+                    <h3 className="font-extrabold text-base text-text-main">Topluluk Kuralları & EULA</h3>
+                    <p className="text-[11px] text-text-muted">Son Kullanıcı Lisans Sözleşmesi (Sıfır Tolerans)</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEulaModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <span className="material-symbols-outlined text-base">close</span>
+                </button>
+              </div>
+
+              <div className="space-y-3.5 text-xs text-text-muted leading-relaxed">
+                <div className="p-3 bg-primary/10 border border-primary/20 rounded-2xl text-primary font-bold">
+                  ⚠️ Sıfır Tolerans İlkesi: Eğitim Koçum platformunda uygunsuz içeriklere, hakaret, zorbalık, müstehcenlik veya nefret söylemine kesinlikle sıfır tolerans uygulanır.
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-extrabold text-xs text-text-main">1. Saygılı ve Eğitici İletişim</h4>
+                  <p>
+                    Topluluk alanı öğrencilerin ders sorularını paylaşması ve dayanışma kurması için tasarlanmıştır. Diğer öğrencileri rencide edici, küçük düşürücü veya saldırgan ifadeler kullanmak yasaktır.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-extrabold text-xs text-text-main">2. Otomatik Kelime Filtreleme</h4>
+                  <p>
+                    Sistemimiz küfür, hakaret ve uygunsuz ifadeleri anlık olarak filtreler ve bu tür gönderilerin yayınlanmasını engeller.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-extrabold text-xs text-text-main">3. Kullanıcı Şikayet ve Engelleme Mekanizması</h4>
+                  <p>
+                    Her gönderi ve yorumun yanında bulunan <strong>Şikayet Et</strong> ve <strong>Kullanıcıyı Engelle</strong> butonları ile rahatsız edici içerikleri anında akışınızdan gizleyebilir ve moderatörlerimize bildirebilirsiniz.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-extrabold text-xs text-text-main">4. 24 Saat İçinde Moderatör İncelemesi</h4>
+                  <p>
+                    Kullanıcılar tarafından bildirilen tüm şikayetler moderasyon ekibimizce <strong>en geç 24 saat içinde</strong> incelenir. Kuralları ihlal eden içerikler kalıcı olarak silinir ve ihlali gerçekleştiren kullanıcının hesabı derhal sonlandırılır.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-card-border flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsEulaModalOpen(false)}
+                  className="px-5 py-2.5 bg-primary text-white font-extrabold text-xs rounded-xl hover:bg-primary-hover transition-colors cursor-pointer"
+                >
+                  Anladım ve Kabul Ediyorum
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

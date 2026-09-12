@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
   GoogleAuthProvider, 
+  OAuthProvider,
   signInWithPopup, 
   signInWithCredential,
   signOut, 
@@ -248,6 +249,85 @@ export async function loginWithGoogle() {
     return result.user;
   } catch (error: any) {
     console.error('Google Popup Login Error:', error);
+    throw error;
+  }
+}
+
+export async function loginWithApple() {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      let result: any;
+      const nativeSignInPromise = async () => {
+        return await FirebaseAuthentication.signInWithApple({
+          scopes: ['email', 'name'],
+        });
+      };
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Apple ile giriş zaman aşımına uğradı. Lütfen tekrar deneyin.')), 30000)
+      );
+
+      result = await Promise.race([nativeSignInPromise(), timeoutPromise]);
+      console.log('FirebaseAuthentication.signInWithApple result:', result);
+
+      const idToken =
+        result?.credential?.idToken ||
+        result?.idToken ||
+        result?.credential?.token ||
+        (result?.user as any)?.idToken;
+      const rawNonce = result?.credential?.rawNonce || result?.rawNonce;
+
+      // Synchronize JS SDK auth in background non-blockingly (max 2.5s)
+      if (idToken) {
+        try {
+          const provider = new OAuthProvider('apple.com');
+          const credential = provider.credential({
+            idToken,
+            rawNonce,
+          });
+          Promise.race([
+            signInWithCredential(auth, credential),
+            new Promise((r) => setTimeout(r, 2500)),
+          ]).catch((credErr) => {
+            console.warn('signInWithCredential with Apple idToken error (non-fatal):', credErr);
+          });
+        } catch (e) {}
+      }
+
+      if (result?.user) {
+        const givenName = result.user.displayName || result.user.name?.givenName || 'Apple Kullanıcısı';
+        return {
+          uid: result.user.uid,
+          displayName: givenName,
+          email: result.user.email || 'ogrenci@privaterelay.appleid.com',
+          photoURL: result.user.photoUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+        } as any;
+      }
+
+      if (auth.currentUser) {
+        return auth.currentUser;
+      }
+
+      throw new Error('Apple giriş kimliği doğrulanamadı.');
+    } catch (err: any) {
+      console.error('Native Apple Sign-In Error:', err);
+      const msg = err?.message || '';
+      if (msg.includes('cancel') || msg.includes('Canceled') || msg.includes('1001') || msg.includes('cancelled') || msg.includes('user cancelled')) {
+        throw new Error('Giriş işlemi iptal edildi.');
+      }
+      throw new Error(msg || 'Apple ile giriş başarısız oldu.');
+    }
+  }
+
+  // WEB BROWSER ONLY (Not reached on Native)
+  try {
+    const appleProvider = new OAuthProvider('apple.com');
+    appleProvider.addScope('email');
+    appleProvider.addScope('name');
+    const result = await signInWithPopup(auth, appleProvider);
+    return result.user;
+  } catch (error: any) {
+    console.error('Apple Popup Login Error:', error);
     throw error;
   }
 }
