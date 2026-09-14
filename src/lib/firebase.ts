@@ -235,7 +235,17 @@ export async function loginWithGoogle() {
     } catch (err: any) {
       console.error('Native Google Sign-In Error:', err);
       const msg = err?.message || '';
-      if (msg.includes('cancel') || msg.includes('Canceled') || msg.includes('16') || msg.includes('cancelled') || msg.includes('user cancelled')) {
+      const code = (err?.code || '').toString();
+      if (
+        msg.includes('cancel') ||
+        msg.includes('Canceled') ||
+        msg.includes('16') ||
+        msg.includes('12501') ||
+        msg.includes('cancelled') ||
+        msg.includes('user cancelled') ||
+        code.includes('16') ||
+        code.includes('12501')
+      ) {
         throw new Error('Giriş işlemi iptal edildi.');
       }
       throw new Error(msg || 'Google ile giriş başarısız oldu.');
@@ -312,7 +322,15 @@ export async function loginWithApple() {
     } catch (err: any) {
       console.error('Native Apple Sign-In Error:', err);
       const msg = err?.message || '';
-      if (msg.includes('cancel') || msg.includes('Canceled') || msg.includes('1001') || msg.includes('cancelled') || msg.includes('user cancelled')) {
+      const code = (err?.code || '').toString();
+      if (
+        msg.includes('cancel') ||
+        msg.includes('Canceled') ||
+        msg.includes('1001') ||
+        msg.includes('cancelled') ||
+        msg.includes('user cancelled') ||
+        code.includes('1001')
+      ) {
         throw new Error('Giriş işlemi iptal edildi.');
       }
       throw new Error(msg || 'Apple ile giriş başarısız oldu.');
