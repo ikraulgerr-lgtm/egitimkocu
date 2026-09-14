@@ -47,7 +47,10 @@ workflows:
         script: |
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" || {
+              echo "=== XCODEBUILD ERROR LOGS ==="
+              xcodebuild -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" -archivePath build/ios/xcarchive/App.xcarchive archive CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=MZV9JU52M9 'CODE_SIGN_IDENTITY=Apple Distribution'
+            }
     artifacts:
       - build/ios/ipa/*.ipa
       - /Users/builder/export/*.ipa
