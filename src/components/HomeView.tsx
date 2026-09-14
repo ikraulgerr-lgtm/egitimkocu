@@ -263,7 +263,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
     setIsListeningVoiceQuestion(false);
 
-    if (!user.isPremium && user.kredi <= 0) {
+    if (user.kredi <= 0) {
       triggerNoCreditsModal();
       return;
     }
@@ -425,7 +425,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const handleStartClipboardAnalysis = async () => {
     if (!clipboardDetectedText) return;
 
-    if (!user.isPremium && user.kredi <= 0) {
+    if (user.kredi <= 0) {
       triggerNoCreditsModal();
       return;
     }
@@ -454,7 +454,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const handleTextSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!textPrompt.trim()) return;
-    if (!user.isPremium && user.kredi <= 0) {
+    if (user.kredi <= 0) {
       triggerNoCreditsModal();
       return;
     }
@@ -472,7 +472,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   };
 
   const handleCapture = async (imgUrl?: string) => {
-    if (!user.isPremium && user.kredi <= 0) {
+    if (user.kredi <= 0) {
       triggerNoCreditsModal();
       return;
     }
@@ -598,33 +598,31 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </span>
           </div>
           <span className={`font-extrabold text-[11px] sm:text-xs px-2.5 py-0.5 sm:py-1 rounded-full shrink-0 ${
-            !user.isPremium && user.kredi < 1
+            user.kredi < 1
               ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
               : 'text-primary bg-primary/10'
           }`}>
-            {user.isPremium ? 'Sınırsız PRO' : `${user.kredi}/${user.maxKredi} Hak`}
+            {`${user.kredi}/${user.maxKredi} Hak`}
           </span>
         </div>
 
         <div className="w-full bg-surface-container-low h-1.5 rounded-full overflow-hidden">
           <div 
             className={`h-full rounded-full transition-all duration-500 ${
-              !user.isPremium && user.kredi < 1 ? 'bg-amber-500' : 'bg-primary'
+              user.kredi < 1 ? 'bg-amber-500' : 'bg-primary'
             }`}
-            style={{ width: user.isPremium ? '100%' : `${(user.kredi / user.maxKredi) * 100}%` }}
+            style={{ width: `${Math.min(100, Math.max(0, (user.kredi / user.maxKredi) * 100))}%` }}
           />
         </div>
 
         <div className="flex justify-between items-center text-[11px] sm:text-xs text-text-muted">
           <span className="truncate">Yapay zeka pedagojik tanı asistanın hazır</span>
-          {!user.isPremium && (
-            <button 
-              onClick={onWatchAd}
-              className="text-primary font-extrabold hover:underline flex items-center gap-1 cursor-pointer shrink-0 ml-2"
-            >
-              <span>+ Reklam İzle (Ek Hak)</span>
-            </button>
-          )}
+          <button 
+            onClick={onWatchAd}
+            className="text-primary font-extrabold hover:underline flex items-center gap-1 cursor-pointer shrink-0 ml-2"
+          >
+            <span>+ Reklam İzle (Ek Hak)</span>
+          </button>
         </div>
       </section>
 

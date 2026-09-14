@@ -67,11 +67,6 @@ export const TopHeader: React.FC<{
             <h1 className="font-extrabold text-sm xs:text-base sm:text-xl tracking-tight text-primary flex items-center gap-1 truncate select-none">
               <span className="truncate select-none">Eğitim Koçum</span>
               <span className="hidden xs:inline select-none">AI</span>
-              {user.isPremium && (
-                <span className="text-[9px] sm:text-[10px] bg-amber-400 text-slate-900 font-bold px-1 sm:px-1.5 py-0.5 rounded uppercase shrink-0 select-none">
-                  PRO
-                </span>
-              )}
             </h1>
             <p className="text-[11px] text-text-muted font-medium hidden sm:block select-none">{user.sinif}</p>
           </div>
@@ -141,18 +136,16 @@ export const TopHeader: React.FC<{
             onClick={onWatchAd}
             title="Soru Hakkı Detayı - Reklam İzleyerek Soru Hakkı Kazan"
             className={`${
-              !user.isPremium && user.kredi < 1
+              user.kredi < 1
                 ? 'flex bg-amber-100 dark:bg-amber-950/90 text-amber-900 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900 border-amber-300 dark:border-amber-700 animate-pulse'
                 : 'hidden lg:flex bg-emerald-100 dark:bg-emerald-950/80 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-200 dark:hover:bg-emerald-900 border-emerald-300/80 dark:border-emerald-700/80'
             } px-2 sm:px-2.5 py-1 rounded-full items-center gap-1 font-extrabold text-[11px] sm:text-xs cursor-pointer active:scale-95 transition-all border shrink-0`}
           >
             <span className="material-symbols-outlined text-sm">
-              {!user.isPremium && user.kredi < 1 ? 'warning' : 'assignment'}
+              {user.kredi < 1 ? 'warning' : 'assignment'}
             </span>
             <span>
-              {user.isPremium
-                ? 'PRO'
-                : !user.isPremium && user.kredi < 1
+              {user.kredi < 1
                 ? '0 Hak (+1)'
                 : `${user.kredi}/${user.maxKredi} Hak`}
             </span>

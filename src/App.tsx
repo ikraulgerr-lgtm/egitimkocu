@@ -41,7 +41,6 @@ import { analyzeQuestionService, generateSimilarQuestionService } from './lib/ge
 import { NotificationSettingsModal } from './components/NotificationSettingsModal';
 import { runSmartNotificationChecks, sendNativeNotification, requestNotificationPermissions } from './lib/notificationService';
 import { initializeAdMob } from './lib/admobService';
-import { PremiumVideoModal } from './components/PremiumVideoModal';
 import { NoCreditsModal } from './components/NoCreditsModal';
 import { AuthModal } from './components/AuthModal';
 import { QuizTestModal } from './components/QuizTestModal';
@@ -73,7 +72,6 @@ export function App() {
   const [theme, setThemeState] = useState<'light' | 'dark'>(getTheme());
   const [isSplashActive, setIsSplashActive] = useState(true);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
-  const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
   const [isNoCreditsModalOpen, setIsNoCreditsModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [landingInviteData, setLandingInviteData] = useState<{
@@ -1036,7 +1034,7 @@ export function App() {
   };
 
   const handleWatchAdSuccess = (earnedCredits = 1) => {
-    const maxKredi = user.isPremium ? 999 : 10;
+    const maxKredi = user.maxKredi || 10;
     const newCredit = Math.min(maxKredi, user.kredi + earnedCredits);
     const updatedUser = {
       ...user,
@@ -1045,8 +1043,8 @@ export function App() {
     setUserState(updatedUser);
     saveUser(updatedUser);
     syncUserToFirestore(updatedUser);
-    if (!user.isPremium && user.kredi >= 10) {
-      showToast(`ℹ️ Soru hakkınız zaten maksimum seviyededir (10/10).`);
+    if (user.kredi >= maxKredi) {
+      showToast(`ℹ️ Soru hakkınız zaten maksimum seviyededir (${maxKredi}/${maxKredi}).`);
     } else {
       showToast(`🎉 +${earnedCredits} Soru Hakkı Kazanıldı! (${newCredit}/${maxKredi})`);
     }
@@ -1222,28 +1220,18 @@ export function App() {
 
   // Analyze Question API
   const handleAnalyzeNewQuestion = async (imageData: string | null, customPrompt?: string, audioData?: string): Promise<boolean> => {
-    if (!user.isPremium) {
-      if (user.kredi <= 0) {
-        setIsNoCreditsModalOpen(true);
-        return false;
-      }
-      const updatedUser = {
-        ...user,
-        kredi: Math.max(0, user.kredi - 1),
-        xp: user.xp + 50,
-      };
-      setUserState(updatedUser);
-      saveUser(updatedUser);
-      syncUserToFirestore(updatedUser);
-    } else {
-      const updatedUser = {
-        ...user,
-        xp: user.xp + 50,
-      };
-      setUserState(updatedUser);
-      saveUser(updatedUser);
-      syncUserToFirestore(updatedUser);
+    if (user.kredi <= 0) {
+      setIsNoCreditsModalOpen(true);
+      return false;
     }
+    const updatedUser = {
+      ...user,
+      kredi: Math.max(0, user.kredi - 1),
+      xp: user.xp + 50,
+    };
+    setUserState(updatedUser);
+    saveUser(updatedUser);
+    syncUserToFirestore(updatedUser);
 
     setIsAnalyzingAi(true);
     setAnalyzingMessage(audioData ? 'Sesli Soru Çözümleniyor...' : 'Yapay Zeka Pedagojik Tanı Koyuyor...');
@@ -1263,16 +1251,14 @@ export function App() {
       const isUnreadable = finalData?.isUnreadable || finalData?.ders === 'Analiz Edilemedi' || !hasValidSteps;
 
       if (isUnreadable) {
-        // Refund credit when question cannot be analyzed (if non-PRO)
-        if (!user.isPremium) {
-          const refundedUser = {
-            ...user,
-            kredi: Math.min(user.maxKredi || 10, user.kredi + 1),
-          };
-          setUserState(refundedUser);
-          saveUser(refundedUser);
-          syncUserToFirestore(refundedUser);
-        }
+        // Refund credit when question cannot be analyzed
+        const refundedUser = {
+          ...user,
+          kredi: Math.min(user.maxKredi || 10, user.kredi + 1),
+        };
+        setUserState(refundedUser);
+        saveUser(refundedUser);
+        syncUserToFirestore(refundedUser);
         setIsAnalyzingAi(false);
         showToast(finalData?.unreadableReason || '⚠️ Soru analiz edilemedi. Lütfen analiz edilebilir net bir ders veya sınav sorusu gönderin.');
         return false;
@@ -1327,16 +1313,14 @@ export function App() {
       return true;
     } catch (err) {
       console.error('Error analyzing question:', err);
-      // Refund credit when AI analysis fails for non-PRO users
-      if (!user.isPremium) {
-        const refundedUser = {
-          ...user,
-          kredi: Math.min(10, user.kredi + 1),
-        };
-        setUserState(refundedUser);
-        saveUser(refundedUser);
-        syncUserToFirestore(refundedUser);
-      }
+      // Refund credit when AI analysis fails
+      const refundedUser = {
+        ...user,
+        kredi: Math.min(user.maxKredi || 10, user.kredi + 1),
+      };
+      setUserState(refundedUser);
+      saveUser(refundedUser);
+      syncUserToFirestore(refundedUser);
       setIsAnalyzingAi(false);
       showToast('⚠️ Soru analiz edilemedi, lütfen tekrar deneyin veya cevap verilebilir bir soru sorun.');
       return false;
@@ -1503,51 +1487,6 @@ export function App() {
 
 
   // Upgrade user to PRO
-  const handleUpgradeToPremium = async () => {
-    const updated = {
-      ...user,
-      isPremium: true,
-      maxKredi: 999,
-      kredi: 999,
-    };
-    setUserState(updated);
-    saveUser(updated);
-
-    if (auth.currentUser) {
-      try {
-        const userDocRef = doc(db, 'users', auth.currentUser.uid);
-        await setDoc(userDocRef, { isPremium: true, maxKredi: 999, kredi: 999 }, { merge: true });
-      } catch (err) {
-        console.warn('Error saving PRO status to Firestore:', err);
-      }
-    }
-
-    showToast('👑 Tebrikler! Eğitim Koçum PRO üyeliğiniz aktif edildi!');
-  };
-
-  // Cancel PRO subscription
-  const handleCancelPremium = async () => {
-    const updated = {
-      ...user,
-      isPremium: false,
-      maxKredi: 10,
-      kredi: Math.min(user.kredi, 10),
-    };
-    setUserState(updated);
-    saveUser(updated);
-
-    if (auth.currentUser) {
-      try {
-        const userDocRef = doc(db, 'users', auth.currentUser.uid);
-        await setDoc(userDocRef, { isPremium: false, maxKredi: 10, kredi: Math.min(user.kredi, 10) }, { merge: true });
-      } catch (err) {
-        console.warn('Error saving PRO cancellation to Firestore:', err);
-      }
-    }
-
-    showToast('ℹ️ PRO aboneliğiniz iptal edildi. Standart 10 soru hakkı planına geçildi.');
-  };
-
   // Auth update user
   const handleLoginSuccess = (partial: Partial<Kullanici>) => {
     const updated: Kullanici = {
@@ -1775,8 +1714,6 @@ export function App() {
             friends={friends}
             onOpenNotifications={() => setIsNotificationsCenterOpen(true)}
             onOpenAuth={() => setIsAuthModalOpen(true)}
-            onOpenPremium={() => setIsPremiumModalOpen(true)}
-            onCancelPremium={handleCancelPremium}
             onOpenInviteModal={() => setIsInviteModalOpen(true)}
             theme={theme}
             onToggleTheme={handleToggleTheme}
@@ -1906,17 +1843,10 @@ export function App() {
         showToast={showToast}
       />
 
-      <PremiumVideoModal
-        isOpen={isPremiumModalOpen}
-        onClose={() => setIsPremiumModalOpen(false)}
-        onUpgradeSuccess={handleUpgradeToPremium}
-      />
-
       <NoCreditsModal
         isOpen={isNoCreditsModalOpen}
         onClose={() => setIsNoCreditsModalOpen(false)}
         onWatchAdSuccess={handleWatchAdSuccess}
-        onOpenProModal={() => setIsPremiumModalOpen(true)}
         userKredi={user.kredi}
         userMaxKredi={user.maxKredi || 10}
       />

@@ -6,7 +6,6 @@ interface NoCreditsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onWatchAdSuccess: (earnedCredits?: number) => void;
-  onOpenProModal?: () => void;
   userKredi?: number;
   userMaxKredi?: number;
 }
@@ -15,7 +14,6 @@ export const NoCreditsModal: React.FC<NoCreditsModalProps> = ({
   isOpen,
   onClose,
   onWatchAdSuccess,
-  onOpenProModal,
   userKredi = 0,
   userMaxKredi = 10,
 }) => {
@@ -177,19 +175,6 @@ export const NoCreditsModal: React.FC<NoCreditsModalProps> = ({
               >
                 <span className="material-symbols-outlined text-lg">play_circle</span>
                 <span>Reklam izleyerek soru hakkı kazan</span>
-              </button>
-            )}
-
-            {onOpenProModal && (
-              <button
-                onClick={() => {
-                  onClose();
-                  onOpenProModal();
-                }}
-                className="w-full bg-surface-container-low hover:bg-card-border/40 text-text-main font-bold text-xs py-3 px-4 rounded-xl border border-card-border transition-all cursor-pointer flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-amber-500 text-sm">workspace_premium</span>
-                <span>PRO'ya Geç (Sınırsız Soru Hakkı)</span>
               </button>
             )}
           </div>

@@ -74,8 +74,6 @@ interface ProfileViewProps {
   friends?: Arkadas[];
   onOpenNotifications: () => void;
   onOpenAuth: () => void;
-  onOpenPremium: () => void;
-  onCancelPremium?: () => void;
   onOpenInviteModal?: () => void;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
@@ -93,8 +91,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   friends = [],
   onOpenNotifications,
   onOpenAuth,
-  onOpenPremium,
-  onCancelPremium,
   onOpenInviteModal,
   theme,
   onToggleTheme,
@@ -313,15 +309,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <span>🎓 {user.sinif}</span>
               </div>
 
-              {user.isPremium ? (
-                <span className="inline-flex items-center gap-1 bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full text-[10px] font-black shadow-xs">
-                  ★ PRO ÜYE
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 bg-white/20 text-white px-2.5 py-0.5 rounded-full text-[10px] font-bold">
-                  Standart Plan
-                </span>
-              )}
+              <span className="inline-flex items-center gap-1 bg-white/20 text-white px-2.5 py-0.5 rounded-full text-[10px] font-bold">
+                Standart Plan (Ücretsiz)
+              </span>
             </div>
 
             {/* Logout Button */}
@@ -781,85 +771,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         {/* TAB 4: ABONELİK & HESAP */}
         {activeSettingsTab === 'account' && (
           <div className="space-y-4 animate-fadeIn">
-            {/* Upgrade / Active Premium Status Banner */}
-            {user.isPremium ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-950 text-white rounded-2xl shadow-md border border-emerald-600/50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-500/30 border border-white/20 flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-2xl fill-1 text-amber-300">verified</span>
-                    </div>
-                    <div className="text-left">
-                      <p className="font-black text-sm sm:text-base text-white">PRO Sınırsız Üyelik Aktif</p>
-                      <p className="text-xs text-emerald-100 font-extrabold">Sınırsız soru hakkı & detaylı yapay zeka çözümleri aktif</p>
-                    </div>
-                  </div>
-                  <span className="bg-amber-400 text-slate-950 text-xs font-black px-3 py-1 rounded-full shadow-md shrink-0">
-                    PRO AKTİF
-                  </span>
-                </div>
-
-                {onCancelPremium && (
-                  <>
-                    {!showCancelConfirm ? (
-                      <button
-                        type="button"
-                        onClick={() => setShowCancelConfirm(true)}
-                        className="w-full py-2.5 px-4 text-center font-extrabold text-xs text-red-700 dark:text-red-200 bg-red-100 hover:bg-red-200 dark:bg-red-950/80 dark:hover:bg-red-900/90 border border-red-300 dark:border-red-800 rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                      >
-                        <span className="material-symbols-outlined text-base">cancel</span>
-                        <span>PRO Aboneliğimi İptal Et (10 Hak Standart Plana Dön)</span>
-                      </button>
-                    ) : (
-                      <div className="p-4 bg-red-100 dark:bg-slate-900 border-2 border-red-400 dark:border-red-700 rounded-xl space-y-3 animate-fadeIn shadow-md">
-                        <p className="text-xs sm:text-sm font-black text-red-950 dark:text-red-100 text-center leading-relaxed">
-                          PRO üyeliğinizi iptal etmek istediğinize emin misiniz? Soru hakkınız standart 10 soru hakkı limitine düşecektir.
-                        </p>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onCancelPremium();
-                              setShowCancelConfirm(false);
-                            }}
-                            className="flex-1 py-2.5 px-3 text-xs font-black bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors cursor-pointer shadow-xs"
-                          >
-                            Evet, İptal Et
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setShowCancelConfirm(false)}
-                            className="flex-1 py-2.5 px-3 text-xs font-black bg-slate-900 text-white hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition-colors cursor-pointer shadow-xs border border-slate-900 dark:border-slate-600"
-                          >
-                            Vazgeç
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={onOpenPremium}
-                className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-indigo-800 via-indigo-900 to-slate-950 text-white rounded-2xl shadow-md border border-indigo-700/50 hover:brightness-110 transition-all cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-indigo-500/30 border border-white/20 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-2xl fill-1 text-amber-300">star</span>
-                  </div>
-                  <div className="text-left">
-                    <p className="font-extrabold text-sm text-white">PRO Sınırsız Mod'a Geç</p>
-                    <p className="text-xs text-indigo-100 font-medium">10 Soru Sınırını Kaldır • Sınırsız AI ve Video Çözümler</p>
-                  </div>
-                </div>
-                <span className="bg-amber-400 text-slate-950 text-xs font-black px-3 py-1 rounded-full shadow-xs">
-                  PRO YÜKSELT
-                </span>
-              </button>
-            )}
-
             {/* Arkadaşlarını Davet Et */}
             {onOpenInviteModal && (
               <div
