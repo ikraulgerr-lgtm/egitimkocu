@@ -348,7 +348,7 @@ export function App() {
         const uid = firebaseUser.uid;
         const todayTr = getTurkeyDateString();
 
-        // Instant local cache restoration
+        // 1. Instant local cache restoration
         const cachedUser = getUser(uid);
         if (cachedUser && cachedUser.id && cachedUser.targetExam) {
           setUserState(cachedUser);
@@ -362,13 +362,12 @@ export function App() {
         try {
           const userSnap = await Promise.race([
             getDoc(userDocRef),
-            new Promise<null>((r) => setTimeout(() => r(null), 7000)),
+            new Promise<null>((r) => setTimeout(() => r(null), 5000)),
           ]);
-          let currentUsername = 'ogrenci';
 
           if (userSnap && userSnap.exists()) {
-            const data = userSnap.data() as Kullanici;
-            let userKredi = data.kredi ?? 10;
+            const data = userSnap.data() as Partial<Kullanici>;
+            let userKredi = data.kredi ?? cachedUser?.kredi ?? 10;
             let userResetDate = data.lastResetDate || todayTr;
 
             if (userResetDate !== todayTr) {
@@ -378,17 +377,16 @@ export function App() {
 
             let cleanName = data.ad;
             if (!cleanName || cleanName === 'Selin Yılmaz' || cleanName === 'Yeni Öğrenci') {
-              cleanName = firebaseUser.displayName || 'Öğrenci';
+              cleanName = firebaseUser.displayName || cachedUser?.ad || 'Öğrenci';
             }
-            currentUsername = data.kullaniciAdi || (firebaseUser.email?.split('@')[0] || 'ogrenci').toLowerCase().replace(/[^a-z0-9_]/g, '');
+            const currentUsername = data.kullaniciAdi || cachedUser?.kullaniciAdi || (firebaseUser.email?.split('@')[0] || 'ogrenci').toLowerCase().replace(/[^a-z0-9_]/g, '');
             const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
-            let finalAvatar = data.avatarUrl;
+            let finalAvatar = data.avatarUrl || cachedUser?.avatarUrl;
             if (!finalAvatar || finalAvatar.includes('googleusercontent.com') || finalAvatar.includes('google.com')) {
-              finalAvatar = DEFAULT_AVATAR;
+              finalAvatar = firebaseUser.photoURL || DEFAULT_AVATAR;
             }
 
             const userData: Kullanici = {
-              ...data,
               id: uid,
               ad: cleanName,
               kullaniciAdi: currentUsername,
@@ -398,7 +396,12 @@ export function App() {
               targetExam: data.targetExam || cachedUser?.targetExam || 'YKS',
               targetExamDate: data.targetExamDate || cachedUser?.targetExamDate || '2027-06-19',
               kredi: userKredi,
-              maxKredi: 10,
+              maxKredi: data.maxKredi ?? 10,
+              seri: data.seri ?? cachedUser?.seri ?? 1,
+              xp: data.xp ?? cachedUser?.xp ?? 0,
+              isPremium: data.isPremium ?? cachedUser?.isPremium ?? false,
+              sinif: data.sinif || cachedUser?.sinif || '12. Sınıf / Mezun (YKS)',
+              customExamName: data.customExamName || cachedUser?.customExamName || '',
               lastResetDate: userResetDate,
             };
             setUserState(userData);
@@ -444,10 +447,7 @@ export function App() {
               }
             }).catch(() => {});
 
-            // If user has targetExam configured (or doc exists), close auth modal
-            if (userData.targetExam) {
-              setIsAuthModalOpen(false);
-            }
+            setIsAuthModalOpen(false);
 
             // Check for pending invite received before sign in
             const pendingInviteStr = localStorage.getItem('pending_invite_data');
@@ -463,25 +463,39 @@ export function App() {
               } catch {}
             }
           } else {
-            // First time or pending user: preserve any existing in-memory profile
-            setUserState((prevUser) => {
-              if (prevUser.id === uid && prevUser.targetExam) {
-                return prevUser;
-              }
-              const initialName = firebaseUser.displayName || 'Öğrenci';
-              currentUsername = (firebaseUser.email?.split('@')[0] || 'ogrenci').toLowerCase().replace(/[^a-z0-9_]/g, '') + `_${Math.floor(100 + Math.random() * 900)}`;
-              const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
-              return {
-                ...prevUser,
-                id: uid,
-                ad: initialName,
-                kullaniciAdi: currentUsername,
-                kullaniciAdi_lower: currentUsername.toLowerCase(),
-                email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
-                avatarUrl: DEFAULT_AVATAR,
-                lastResetDate: todayTr,
-              };
-            });
+            // First time user: initialize profile once with unique username and default YKS target
+            const cleanName = firebaseUser.displayName || 'Öğrenci';
+            const base = (firebaseUser.email?.split('@')[0] || cleanName)
+              .toLowerCase()
+              .replace(/[^a-z0-9_]/g, '')
+              .slice(0, 12) || 'ogrenci';
+            const autoUsername = `${base}_${Math.floor(100 + Math.random() * 900)}`;
+            const DEFAULT_AVATAR = firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
+
+            const newUserData: Kullanici = {
+              id: uid,
+              ad: cleanName,
+              kullaniciAdi: autoUsername,
+              kullaniciAdi_lower: autoUsername.toLowerCase(),
+              email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
+              avatarUrl: DEFAULT_AVATAR,
+              kredi: 10,
+              maxKredi: 10,
+              seri: 1,
+              xp: 0,
+              isPremium: false,
+              sinif: '12. Sınıf / Mezun (YKS)',
+              targetExam: 'YKS',
+              targetExamDate: '2027-06-19',
+              lastResetDate: todayTr,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            setUserState(newUserData);
+            saveUser(newUserData, uid);
+            setDoc(userDocRef, newUserData, { merge: true }).catch(() => {});
+            setIsAuthModalOpen(false);
           }
         } catch (err) {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
@@ -1486,22 +1500,78 @@ export function App() {
 
 
 
-  // Upgrade user to PRO
-  // Auth update user
-  const handleLoginSuccess = (partial: Partial<Kullanici>) => {
-    const updated: Kullanici = {
-      ...user,
-      ...partial,
-      id: partial.id || user.id || auth.currentUser?.uid || 'user_' + Date.now(),
-      ad: partial.ad || user.ad || 'Öğrenci',
-      email: partial.email || user.email || 'ogrenci@egitimkocum.ai',
+  // Auth login success handler
+  const handleLoginSuccess = async (incomingUser: Partial<Kullanici>) => {
+    const uid = incomingUser.id || auth.currentUser?.uid;
+    if (!uid) return;
+
+    const todayTr = getTurkeyDateString();
+    const cachedUser = getUser(uid);
+
+    const fullUser: Kullanici = {
+      id: uid,
+      ad: incomingUser.ad || cachedUser?.ad || 'Öğrenci',
+      kullaniciAdi: incomingUser.kullaniciAdi || cachedUser?.kullaniciAdi || 'ogrenci',
+      kullaniciAdi_lower: (incomingUser.kullaniciAdi || cachedUser?.kullaniciAdi || 'ogrenci').toLowerCase(),
+      email: incomingUser.email || cachedUser?.email || 'ogrenci@egitimkocum.ai',
+      avatarUrl: incomingUser.avatarUrl || cachedUser?.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+      targetExam: incomingUser.targetExam || cachedUser?.targetExam || 'YKS',
+      targetExamDate: incomingUser.targetExamDate || cachedUser?.targetExamDate || '2027-06-19',
+      kredi: incomingUser.kredi ?? cachedUser?.kredi ?? 10,
+      maxKredi: incomingUser.maxKredi ?? cachedUser?.maxKredi ?? 10,
+      seri: incomingUser.seri ?? cachedUser?.seri ?? 1,
+      xp: incomingUser.xp ?? cachedUser?.xp ?? 0,
+      isPremium: incomingUser.isPremium ?? cachedUser?.isPremium ?? false,
+      sinif: incomingUser.sinif || cachedUser?.sinif || '12. Sınıf / Mezun (YKS)',
+      customExamName: incomingUser.customExamName || cachedUser?.customExamName || '',
+      lastResetDate: incomingUser.lastResetDate || cachedUser?.lastResetDate || todayTr,
     };
-    setUserState(updated);
-    saveUser(updated, updated.id);
-    syncUserToFirestore(updated);
+
+    setUserState(fullUser);
+    saveUser(fullUser, uid);
     setIsAuthModalOpen(false);
     setActiveTab('home');
-    showToast(`👋 Hoş geldiniz, ${updated.ad}!`);
+
+    // Immediately load local questions, schedule, and friends for this user
+    setQuestionsState(getQuestions(uid));
+    setScheduleState(getSchedule(uid));
+    setFriendsState(getFriends(uid));
+
+    // Fetch and restore user subcollections from Firestore
+    try {
+      getDocs(collection(db, 'users', uid, 'questions')).then((qSnap) => {
+        if (!qSnap.empty) {
+          const userQuestions = qSnap.docs.map((doc) => doc.data() as SoruKaydi);
+          setQuestionsState(userQuestions);
+          saveQuestions(userQuestions, uid);
+        }
+      }).catch(() => {});
+
+      getDocs(collection(db, 'users', uid, 'schedule')).then((sSnap) => {
+        if (!sSnap.empty) {
+          const userSchedule = sSnap.docs.map((doc) => doc.data() as ProgramOgesi);
+          setScheduleState(userSchedule);
+          saveSchedule(userSchedule, uid);
+        }
+      }).catch(() => {});
+
+      getDocs(collection(db, 'users', uid, 'friends')).then((fSnap) => {
+        if (!fSnap.empty) {
+          const userFriends = fSnap.docs.map((doc) => doc.data() as Arkadas);
+          setFriendsState(userFriends);
+          saveFriends(userFriends, uid);
+        }
+      }).catch(() => {});
+
+      getDocs(collection(db, 'users', uid, 'denemeler')).then((dSnap) => {
+        if (!dSnap.empty) {
+          const userDenemeler = dSnap.docs.map((doc) => doc.data() as DenemeRecord);
+          saveDenemelerLocally(userDenemeler, uid);
+        }
+      }).catch(() => {});
+    } catch (e) {}
+
+    showToast(`👋 Hoş geldiniz, ${fullUser.ad}!`);
   };
 
   return (

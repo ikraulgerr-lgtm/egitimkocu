@@ -3,7 +3,8 @@ import { Kullanici } from '../types';
 import { auth, db, loginWithGoogle, loginWithApple, resetPasswordFirebase, loginWithEmailFirebase, registerWithEmailFirebase } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc, getDocs, collection, query, where } from 'firebase/firestore';
-import { getUser } from '../lib/storage';
+import { getUser, saveUser } from '../lib/storage';
+import { getTurkeyDateString } from '../lib/dateUtils';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -11,7 +12,31 @@ interface AuthModalProps {
   onLoginSuccess: (user: Partial<Kullanici>) => void;
 }
 
-type AuthMode = 'login' | 'register' | 'forgot_email' | 'forgot_otp' | 'forgot_new_password' | 'forgot_success' | 'forgot_link_sent' | 'google_exam_select';
+type AuthMode = 'login' | 'register' | 'forgot_email' | 'forgot_otp' | 'forgot_new_password' | 'forgot_success' | 'forgot_link_sent';
+
+// Unique automatic username generator based on email prefix or name (created once on first sign up)
+export const autoGenerateUsername = (emailStr?: string | null, nameStr?: string | null): string => {
+  const source = (emailStr?.split('@')[0] || nameStr || 'ogrenci')
+    .toLowerCase()
+    .replace(/İ/g, 'i')
+    .replace(/I/g, 'i')
+    .replace(/ı/g, 'i')
+    .replace(/ş/g, 's')
+    .replace(/Ş/g, 's')
+    .replace(/ğ/g, 'g')
+    .replace(/Ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/Ü/g, 'u')
+    .replace(/ö/g, 'o')
+    .replace(/Ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/Ç/g, 'c')
+    .replace(/[^a-z0-9_]/g, '')
+    .slice(0, 12);
+  const cleanBase = source || 'ogrenci';
+  const randomSuffix = Math.floor(100 + Math.random() * 900);
+  return `${cleanBase}_${randomSuffix}`;
+};
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
@@ -31,13 +56,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [otpCode, setOtpCode] = useState<string>('');
   const [agreeTerms, setAgreeTerms] = useState<boolean>(true);
   const [selectedExam, setSelectedExam] = useState<'YKS' | 'LGS' | 'KPSS' | 'YDS' | 'Hazırlanmıyorum'>('YKS');
-  const [pendingGoogleUser, setPendingGoogleUser] = useState<{
-    uid: string;
-    displayName: string;
-    email: string;
-    photoURL: string;
-    username: string;
-  } | null>(null);
 
   // UI status states
   const [canInteract, setCanInteract] = useState<boolean>(false);
@@ -45,7 +63,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isAppleLoading, setIsAppleLoading] = useState<boolean>(false);
   const [isEulaModalOpen, setIsEulaModalOpen] = useState<boolean>(false);
   const [isEmailLoading, setIsEmailLoading] = useState<boolean>(false);
-  const [isGoogleExamLoading, setIsGoogleExamLoading] = useState<boolean>(false);
   const [isResetLoading, setIsResetLoading] = useState<boolean>(false);
   const [isVerifyOtpLoading, setIsVerifyOtpLoading] = useState<boolean>(false);
   const [isSetNewPassLoading, setIsSetNewPassLoading] = useState<boolean>(false);
@@ -61,16 +78,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsEmailLoading(false);
   }, [mode]);
 
-  // Always reset mode to 'login' and clear pending state whenever modal is opened
+  // Always reset mode to 'login' whenever modal is opened
   useEffect(() => {
     if (isOpen) {
       setCanInteract(false);
       setMode('login');
-      setPendingGoogleUser(null);
       setErrorMsg(null);
       setIsGoogleLoading(false);
+      setIsAppleLoading(false);
       setIsEmailLoading(false);
-      setIsGoogleExamLoading(false);
       setPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -182,15 +198,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onClose();
       } else {
         const fbUser = await loginWithEmailFirebase(email.trim(), password);
-        let userKullaniciAdi = 'ogrenci';
-        let userTargetExam = 'YKS';
-        let userTargetExamDate = '2027-06-19';
-        let userDisplayName = fbUser.displayName || name.trim() || 'Öğrenci';
-        let userAvatar = fbUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
+        const uid = fbUser.uid;
+        const cachedUser = getUser(uid);
+        let userKullaniciAdi = cachedUser?.kullaniciAdi || 'ogrenci';
+        let userTargetExam = cachedUser?.targetExam || 'YKS';
+        let userTargetExamDate = cachedUser?.targetExamDate || '2027-06-19';
+        let userDisplayName = fbUser.displayName || cachedUser?.ad || name.trim() || 'Öğrenci';
+        let userAvatar = fbUser.photoURL || cachedUser?.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
+        let userKredi = cachedUser?.kredi ?? 10;
+        let userXp = cachedUser?.xp ?? 0;
+        let userSeri = cachedUser?.seri ?? 1;
+        let userIsPremium = cachedUser?.isPremium ?? false;
+        let userSinif = cachedUser?.sinif || '12. Sınıf / Mezun (YKS)';
+
         try {
           const userDocSnap = await Promise.race([
-            getDoc(doc(db, 'users', fbUser.uid)),
-            new Promise<null>((r) => setTimeout(() => r(null), 3500)),
+            getDoc(doc(db, 'users', uid)),
+            new Promise<null>((r) => setTimeout(() => r(null), 5000)),
           ]);
           if (userDocSnap && userDocSnap.exists()) {
             const d = userDocSnap.data();
@@ -199,11 +223,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             if (d?.targetExam) userTargetExam = d.targetExam;
             if (d?.targetExamDate) userTargetExamDate = d.targetExamDate;
             if (d?.avatarUrl) userAvatar = d.avatarUrl;
+            if (d?.kredi !== undefined) userKredi = d.kredi;
+            if (d?.xp !== undefined) userXp = d.xp;
+            if (d?.seri !== undefined) userSeri = d.seri;
+            if (d?.isPremium !== undefined) userIsPremium = d.isPremium;
+            if (d?.sinif) userSinif = d.sinif;
           }
         } catch (e) {}
 
-        onLoginSuccess({
-          id: fbUser.uid,
+        const fullUser: Kullanici = {
+          id: uid,
           ad: userDisplayName,
           kullaniciAdi: userKullaniciAdi,
           kullaniciAdi_lower: userKullaniciAdi.toLowerCase(),
@@ -211,7 +240,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           avatarUrl: userAvatar,
           targetExam: userTargetExam as any,
           targetExamDate: userTargetExamDate,
-        });
+          kredi: userKredi,
+          maxKredi: 10,
+          xp: userXp,
+          seri: userSeri,
+          isPremium: userIsPremium,
+          sinif: userSinif,
+          lastResetDate: getTurkeyDateString(),
+        };
+
+        saveUser(fullUser, uid);
+        onLoginSuccess(fullUser);
         onClose();
       }
     } catch (err: any) {
@@ -249,76 +288,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     } finally {
       setIsEmailLoading(false);
-    }
-  };
-
-  // Google First-time User Onboarding: Save Selected Exam Target to Firestore
-  const handleGoogleExamSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pendingGoogleUser) return;
-    setIsGoogleExamLoading(true);
-    setErrorMsg(null);
-
-    try {
-      let examDate = '2027-06-19';
-      if (selectedExam === 'LGS') examDate = '2027-06-06';
-      else if (selectedExam === 'KPSS') examDate = '2027-07-18';
-      else if (selectedExam === 'YDS') examDate = '2027-04-11';
-      else if (selectedExam === 'Hazırlanmıyorum') examDate = '';
-
-      const sinifVal =
-        selectedExam === 'LGS'
-          ? '8. Sınıf (LGS)'
-          : selectedExam === 'YKS'
-          ? '12. Sınıf / Mezun (YKS)'
-          : 'YKS / LGS Hazırlık';
-
-      const cleanUserData = {
-        id: pendingGoogleUser.uid,
-        ad: pendingGoogleUser.displayName,
-        kullaniciAdi: pendingGoogleUser.username,
-        kullaniciAdi_lower: pendingGoogleUser.username.toLowerCase(),
-        email: pendingGoogleUser.email,
-        kredi: 10,
-        maxKredi: 10,
-        seri: 1,
-        xp: 0,
-        isPremium: false,
-        sinif: sinifVal,
-        avatarUrl: pendingGoogleUser.photoURL,
-        targetExam: selectedExam,
-        targetExamDate: examDate,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      // Write to Firestore in background without delaying UI transition
-      Promise.race([
-        setDoc(doc(db, 'users', pendingGoogleUser.uid), cleanUserData, { merge: true }),
-        new Promise((r) => setTimeout(r, 2000)),
-      ]).catch((docErr) => {
-        console.warn('Google exam submit setDoc warning (non-fatal):', docErr);
-      });
-
-      onLoginSuccess({
-        id: pendingGoogleUser.uid,
-        ad: pendingGoogleUser.displayName,
-        kullaniciAdi: pendingGoogleUser.username,
-        kullaniciAdi_lower: pendingGoogleUser.username.toLowerCase(),
-        email: pendingGoogleUser.email,
-        avatarUrl: pendingGoogleUser.photoURL,
-        targetExam: selectedExam,
-        targetExamDate: examDate,
-      });
-
-      setPendingGoogleUser(null);
-      setMode('login');
-      onClose();
-    } catch (err: any) {
-      console.error('Google exam onboarding save error:', err);
-      setErrorMsg('Hedef sınav kaydedilirken bir sorun oluştu. Lütfen tekrar deneyin.');
-    } finally {
-      setIsGoogleExamLoading(false);
     }
   };
 
@@ -517,78 +486,84 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   try {
                     const firebaseUser = await loginWithApple();
                     if (firebaseUser) {
-                      let finalUsername = 'apple_ogrenci';
-                      let targetExam = '';
-                      let targetExamDate = '';
-                      let userExistsInDb = false;
-                      let userDisplayName = firebaseUser.displayName || 'Apple Kullanıcısı';
-                      let userAvatar = firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
+                      const uid = firebaseUser.uid;
+                      const userDocRef = doc(db, 'users', uid);
+                      const cachedUser = getUser(uid);
 
-                      // 1. Check local cached user first for instant recognition
-                      const cachedUser = getUser(firebaseUser.uid);
-                      if (cachedUser && cachedUser.targetExam) {
-                        userExistsInDb = true;
-                        if (cachedUser.ad) userDisplayName = cachedUser.ad;
-                        if (cachedUser.kullaniciAdi) finalUsername = cachedUser.kullaniciAdi;
-                        targetExam = cachedUser.targetExam;
-                        targetExamDate = cachedUser.targetExamDate || '';
-                        if (cachedUser.avatarUrl) userAvatar = cachedUser.avatarUrl;
-                      }
-
-                      // 2. Check Firestore user document
+                      let userSnap: any = null;
                       try {
-                        const userSnap = await Promise.race([
-                          getDoc(doc(db, 'users', firebaseUser.uid)),
-                          new Promise<null>((r) => setTimeout(() => r(null), 7000)),
+                        userSnap = await Promise.race([
+                          getDoc(userDocRef),
+                          new Promise<null>((r) => setTimeout(() => r(null), 5000)),
                         ]);
-
-                        if (userSnap && userSnap.exists()) {
-                          userExistsInDb = true;
-                          const data = userSnap.data();
-                          if (data?.ad) userDisplayName = data.ad;
-                          if (data?.kullaniciAdi) finalUsername = data.kullaniciAdi;
-                          targetExam = data?.targetExam || targetExam || 'YKS';
-                          targetExamDate = data?.targetExamDate || targetExamDate || '2027-06-19';
-                          if (data?.avatarUrl) userAvatar = data.avatarUrl;
-                        }
                       } catch (e) {
                         console.warn('Apple user doc check warning:', e);
                       }
 
-                      // If user is already registered, proceed immediately!
-                      if (userExistsInDb) {
-                        setIsAppleLoading(false);
-                        onLoginSuccess({
-                          id: firebaseUser.uid,
-                          ad: userDisplayName,
-                          kullaniciAdi: finalUsername,
-                          kullaniciAdi_lower: finalUsername.toLowerCase(),
+                      let finalUserData: Kullanici;
+
+                      if (userSnap && userSnap.exists()) {
+                        // 1. Existing registered user -> Restore everything faithfully
+                        const data = userSnap.data() as Partial<Kullanici>;
+                        const currentName = data.ad || firebaseUser.displayName || cachedUser?.ad || 'Apple Kullanıcısı';
+                        const currentUsername = data.kullaniciAdi || cachedUser?.kullaniciAdi || autoGenerateUsername(firebaseUser.email, currentName);
+
+                        finalUserData = {
+                          ...data,
+                          id: uid,
+                          ad: currentName,
+                          kullaniciAdi: currentUsername,
+                          kullaniciAdi_lower: currentUsername.toLowerCase(),
+                          email: data.email || firebaseUser.email || 'ogrenci@privaterelay.appleid.com',
+                          avatarUrl: data.avatarUrl || firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                          targetExam: data.targetExam || cachedUser?.targetExam || 'YKS',
+                          targetExamDate: data.targetExamDate || cachedUser?.targetExamDate || '2027-06-19',
+                          kredi: data.kredi ?? cachedUser?.kredi ?? 10,
+                          maxKredi: data.maxKredi ?? 10,
+                          seri: data.seri ?? cachedUser?.seri ?? 1,
+                          xp: data.xp ?? cachedUser?.xp ?? 0,
+                          isPremium: data.isPremium ?? false,
+                          sinif: data.sinif || cachedUser?.sinif || '12. Sınıf / Mezun (YKS)',
+                          lastResetDate: data.lastResetDate || getTurkeyDateString(),
+                        };
+                      } else if (cachedUser && cachedUser.id === uid && cachedUser.targetExam) {
+                        // 2. Found in local cache
+                        finalUserData = {
+                          ...cachedUser,
+                          id: uid,
+                          email: firebaseUser.email || cachedUser.email || 'ogrenci@privaterelay.appleid.com',
+                        };
+                        setDoc(userDocRef, finalUserData, { merge: true }).catch(() => {});
+                      } else {
+                        // 3. Brand new first-time Apple user -> Auto-generate unique username and set default YKS target
+                        const autoName = firebaseUser.displayName || 'Apple Kullanıcısı';
+                        const autoUsername = autoGenerateUsername(firebaseUser.email, autoName);
+                        finalUserData = {
+                          id: uid,
+                          ad: autoName,
+                          kullaniciAdi: autoUsername,
+                          kullaniciAdi_lower: autoUsername.toLowerCase(),
                           email: firebaseUser.email || 'ogrenci@privaterelay.appleid.com',
-                          avatarUrl: userAvatar,
-                          targetExam: (targetExam || 'YKS') as any,
-                          targetExamDate: targetExamDate || '2027-06-19',
-                        });
-                        onClose();
-                        return;
+                          avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                          kredi: 10,
+                          maxKredi: 10,
+                          seri: 1,
+                          xp: 0,
+                          isPremium: false,
+                          sinif: '12. Sınıf / Mezun (YKS)',
+                          targetExam: 'YKS',
+                          targetExamDate: '2027-06-19',
+                          lastResetDate: getTurkeyDateString(),
+                          createdAt: new Date().toISOString(),
+                          updatedAt: new Date().toISOString(),
+                        };
+                        setDoc(userDocRef, finalUserData, { merge: true }).catch(() => {});
                       }
 
-                      // Brand new Apple user:
-                      const base = (firebaseUser.email?.split('@')[0] || firebaseUser.displayName || 'apple_user')
-                        .toLowerCase()
-                        .replace(/[^a-z0-9_]/g, '')
-                        .slice(0, 12);
-                      finalUsername = `${base || 'apple_user'}_${Math.floor(100 + Math.random() * 900)}`;
-
-                      setPendingGoogleUser({
-                        uid: firebaseUser.uid,
-                        displayName: userDisplayName,
-                        email: firebaseUser.email || 'ogrenci@privaterelay.appleid.com',
-                        photoURL: userAvatar,
-                        username: finalUsername,
-                      });
-
+                      saveUser(finalUserData, uid);
                       setIsAppleLoading(false);
-                      setMode('google_exam_select');
+                      onLoginSuccess(finalUserData);
+                      onClose();
                       return;
                     }
                   } catch (err: any) {
@@ -627,78 +602,84 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   try {
                     const firebaseUser = await loginWithGoogle();
                     if (firebaseUser) {
-                      let finalUsername = 'ogrenci';
-                      let targetExam = '';
-                      let targetExamDate = '';
-                      let userExistsInDb = false;
-                      let userDisplayName = firebaseUser.displayName || 'Öğrenci';
-                      let userAvatar = firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
+                      const uid = firebaseUser.uid;
+                      const userDocRef = doc(db, 'users', uid);
+                      const cachedUser = getUser(uid);
 
-                      // 1. Check local cached user first for instant recognition
-                      const cachedUser = getUser(firebaseUser.uid);
-                      if (cachedUser && cachedUser.targetExam) {
-                        userExistsInDb = true;
-                        if (cachedUser.ad) userDisplayName = cachedUser.ad;
-                        if (cachedUser.kullaniciAdi) finalUsername = cachedUser.kullaniciAdi;
-                        targetExam = cachedUser.targetExam;
-                        targetExamDate = cachedUser.targetExamDate || '';
-                        if (cachedUser.avatarUrl) userAvatar = cachedUser.avatarUrl;
-                      }
-
-                      // 2. Check Firestore user document with reliable 7s timeout
+                      let userSnap: any = null;
                       try {
-                        const userSnap = await Promise.race([
-                          getDoc(doc(db, 'users', firebaseUser.uid)),
-                          new Promise<null>((r) => setTimeout(() => r(null), 7000)),
+                        userSnap = await Promise.race([
+                          getDoc(userDocRef),
+                          new Promise<null>((r) => setTimeout(() => r(null), 5000)),
                         ]);
-
-                        if (userSnap && userSnap.exists()) {
-                          userExistsInDb = true;
-                          const data = userSnap.data();
-                          if (data?.ad) userDisplayName = data.ad;
-                          if (data?.kullaniciAdi) finalUsername = data.kullaniciAdi;
-                          targetExam = data?.targetExam || targetExam || 'YKS';
-                          targetExamDate = data?.targetExamDate || targetExamDate || '2027-06-19';
-                          if (data?.avatarUrl) userAvatar = data.avatarUrl;
-                        }
                       } catch (e) {
-                        console.warn('User doc check warning:', e);
+                        console.warn('Google user doc check warning:', e);
                       }
 
-                      // If user is already registered (or exists in Firestore/cache), proceed immediately!
-                      if (userExistsInDb) {
-                        setIsGoogleLoading(false);
-                        onLoginSuccess({
-                          id: firebaseUser.uid,
-                          ad: userDisplayName,
-                          kullaniciAdi: finalUsername,
-                          kullaniciAdi_lower: finalUsername.toLowerCase(),
+                      let finalUserData: Kullanici;
+
+                      if (userSnap && userSnap.exists()) {
+                        // 1. Existing registered user -> Restore everything faithfully
+                        const data = userSnap.data() as Partial<Kullanici>;
+                        const currentName = data.ad || firebaseUser.displayName || cachedUser?.ad || 'Öğrenci';
+                        const currentUsername = data.kullaniciAdi || cachedUser?.kullaniciAdi || autoGenerateUsername(firebaseUser.email, currentName);
+
+                        finalUserData = {
+                          ...data,
+                          id: uid,
+                          ad: currentName,
+                          kullaniciAdi: currentUsername,
+                          kullaniciAdi_lower: currentUsername.toLowerCase(),
+                          email: data.email || firebaseUser.email || 'ogrenci@egitimkocum.ai',
+                          avatarUrl: data.avatarUrl || firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                          targetExam: data.targetExam || cachedUser?.targetExam || 'YKS',
+                          targetExamDate: data.targetExamDate || cachedUser?.targetExamDate || '2027-06-19',
+                          kredi: data.kredi ?? cachedUser?.kredi ?? 10,
+                          maxKredi: data.maxKredi ?? 10,
+                          seri: data.seri ?? cachedUser?.seri ?? 1,
+                          xp: data.xp ?? cachedUser?.xp ?? 0,
+                          isPremium: data.isPremium ?? false,
+                          sinif: data.sinif || cachedUser?.sinif || '12. Sınıf / Mezun (YKS)',
+                          lastResetDate: data.lastResetDate || getTurkeyDateString(),
+                        };
+                      } else if (cachedUser && cachedUser.id === uid && cachedUser.targetExam) {
+                        // 2. Found in local cache
+                        finalUserData = {
+                          ...cachedUser,
+                          id: uid,
+                          email: firebaseUser.email || cachedUser.email || 'ogrenci@egitimkocum.ai',
+                        };
+                        setDoc(userDocRef, finalUserData, { merge: true }).catch(() => {});
+                      } else {
+                        // 3. Brand new first-time Google user -> Auto-generate unique username and set default YKS target
+                        const autoName = firebaseUser.displayName || 'Öğrenci';
+                        const autoUsername = autoGenerateUsername(firebaseUser.email, autoName);
+                        finalUserData = {
+                          id: uid,
+                          ad: autoName,
+                          kullaniciAdi: autoUsername,
+                          kullaniciAdi_lower: autoUsername.toLowerCase(),
                           email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
-                          avatarUrl: userAvatar,
-                          targetExam: (targetExam || 'YKS') as any,
-                          targetExamDate: targetExamDate || '2027-06-19',
-                        });
-                        onClose();
-                        return;
+                          avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                          kredi: 10,
+                          maxKredi: 10,
+                          seri: 1,
+                          xp: 0,
+                          isPremium: false,
+                          sinif: '12. Sınıf / Mezun (YKS)',
+                          targetExam: 'YKS',
+                          targetExamDate: '2027-06-19',
+                          lastResetDate: getTurkeyDateString(),
+                          createdAt: new Date().toISOString(),
+                          updatedAt: new Date().toISOString(),
+                        };
+                        setDoc(userDocRef, finalUserData, { merge: true }).catch(() => {});
                       }
 
-                      // ONLY FOR BRAND NEW FIRST TIME GOOGLE USERS:
-                      const base = (firebaseUser.email?.split('@')[0] || firebaseUser.displayName || 'ogrenci')
-                        .toLowerCase()
-                        .replace(/[^a-z0-9_]/g, '')
-                        .slice(0, 12);
-                      finalUsername = `${base || 'ogrenci'}_${Math.floor(100 + Math.random() * 900)}`;
-
-                      setPendingGoogleUser({
-                        uid: firebaseUser.uid,
-                        displayName: userDisplayName,
-                        email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
-                        photoURL: userAvatar,
-                        username: finalUsername,
-                      });
-
+                      saveUser(finalUserData, uid);
                       setIsGoogleLoading(false);
-                      setMode('google_exam_select');
+                      onLoginSuccess(finalUserData);
+                      onClose();
                       return;
                     }
                   } catch (err: any) {
@@ -1280,87 +1261,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         )}
 
-        {/* ----------------- MODE 7: GOOGLE FIRST-TIME ONBOARDING - SELECT TARGET EXAM ----------------- */}
-        {mode === 'google_exam_select' && (
-          <div className="space-y-5 animate-fadeIn py-1">
-            <div className="text-center space-y-2">
-              <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl mx-auto flex items-center justify-center border border-primary/20 shadow-sm">
-                <span className="material-symbols-outlined text-3xl">school</span>
-              </div>
-              <h2 className="font-extrabold text-xl sm:text-2xl text-text-main">
-                Hoş Geldin, {pendingGoogleUser?.displayName?.split(' ')[0] || 'Öğrenci'}! 👋
-              </h2>
-              <p className="text-xs text-text-muted leading-relaxed px-2">
-                Hedeflediğin sınavı seç; yapay zeka çalışma planını, geri sayımını ve pedagojik analizlerini sana özel hazırlasın.
-              </p>
-            </div>
 
-            <form onSubmit={handleGoogleExamSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-text-muted mb-1 ml-1">
-                  🎯 Hazırlandığınız Sınavı Seçin:
-                </label>
-                
-                <div className="grid grid-cols-1 gap-2">
-                  {[
-                    { id: 'YKS', title: '🎓 YKS 2027 (TYT - AYT)', desc: 'Yükseköğretim Kurumları Sınavı (Üniversiteye Hazırlık)', date: '19 Haziran 2027' },
-                    { id: 'LGS', title: '📚 LGS 2027 (Lise Giriş)', desc: 'Liselere Geçiş Sistemi (8. Sınıf)', date: '6 Haziran 2027' },
-                    { id: 'KPSS', title: '💼 KPSS 2027 (Kamu Personeli)', desc: 'Kamu Personel Seçme Sınavı (Lisans / Önlisans)', date: '18 Temmuz 2027' },
-                    { id: 'YDS', title: '🌐 YÖKDİL / YDS 2027', desc: 'Yabancı Dil Bilgisi Seviye Tespit Sınavı', date: '11 Nisan 2027' },
-                    { id: 'Hazırlanmıyorum', title: '✨ Sınava Hazırlanmıyorum', desc: 'Genel Ders, Okul Yazılıları & Kişisel Gelişim', date: 'Süresiz Hedef' },
-                  ].map((item) => {
-                    const isSelected = selectedExam === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setSelectedExam(item.id as any)}
-                        className={`w-full p-3 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                          isSelected
-                            ? 'bg-primary/10 border-primary text-primary shadow-sm ring-1 ring-primary'
-                            : 'bg-surface-container-low border-card-border text-text-main hover:border-primary/40'
-                        }`}
-                      >
-                        <div className="space-y-0.5 min-w-0">
-                          <div className="font-extrabold text-xs flex items-center gap-1.5">
-                            <span>{item.title}</span>
-                          </div>
-                          <p className="text-[10px] text-text-muted truncate">{item.desc}</p>
-                        </div>
-                        <div className="shrink-0 flex items-center gap-1">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-primary text-white' : 'bg-surface-container-high text-text-muted'}`}>
-                            {item.date}
-                          </span>
-                          <span className="material-symbols-outlined text-base">
-                            {isSelected ? 'check_circle' : 'radio_button_unchecked'}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isGoogleExamLoading}
-                className="w-full bg-primary text-white font-extrabold text-sm py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 mt-3"
-              >
-                {isGoogleExamLoading ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Hedef Kaydediliyor...</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-lg">rocket_launch</span>
-                    <span>Başla ve Planımı Oluştur 🚀</span>
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-        )}
 
         {/* EULA and Community Guidelines Modal (Apple Guideline 1.2 Compliant) */}
         {isEulaModalOpen && (

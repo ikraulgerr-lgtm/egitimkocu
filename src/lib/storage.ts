@@ -242,17 +242,6 @@ export const INITIAL_COMMUNITY: ToplulukSoru[] = [
 
 export function resetToCleanState(userId?: string): Kullanici {
   try {
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && (k.startsWith('edumind_') || k.startsWith('active_pomo') || k.startsWith('completed_pomo'))) {
-        // PRESERVE GLOBAL COMMUNITY AND THEME ACROSS LOGOUTS
-        if (k !== BASE_THEME_KEY && k !== BASE_COMMUNITY_KEY) {
-          keysToRemove.push(k);
-        }
-      }
-    }
-    keysToRemove.forEach((k) => localStorage.removeItem(k));
     localStorage.removeItem('active_pomo_group_room');
     localStorage.removeItem('completed_pomodoros_count');
     localStorage.removeItem(BASE_USER_KEY);
