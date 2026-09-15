@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Kullanici } from '../types';
 import { auth, db, loginWithGoogle, loginWithApple, resetPasswordFirebase, loginWithEmailFirebase, registerWithEmailFirebase } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -69,6 +70,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [resendCountdown, setResendCountdown] = useState<number>(0);
+
+  // Apple ile giriş yalnızca iOS ve Web platformlarında gösterilir (Play Store Android sürümünde gösterilmez)
+  const showAppleSignIn = Capacitor.getPlatform() !== 'android';
 
   // Auto clean form inputs when switching mode
   useEffect(() => {
@@ -473,121 +477,123 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             {/* Social SSO Logins (Google & Apple - Apple Guideline 4.8 Compliant) */}
             <div className="space-y-2 select-none">
-              {/* Sign in with Apple */}
-              <button
-                type="button"
-                disabled={!canInteract || isAppleLoading || isGoogleLoading || isEmailLoading}
-                onClick={async (e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (!canInteract || isAppleLoading || isGoogleLoading || isEmailLoading) return;
-                  setErrorMsg(null);
-                  setIsAppleLoading(true);
-                  try {
-                    const firebaseUser = await loginWithApple();
-                    if (firebaseUser) {
-                      const uid = firebaseUser.uid;
-                      const userDocRef = doc(db, 'users', uid);
-                      const cachedUser = getUser(uid);
+              {/* Sign in with Apple (Only on iOS & Web) */}
+              {showAppleSignIn && (
+                <button
+                  type="button"
+                  disabled={!canInteract || isAppleLoading || isGoogleLoading || isEmailLoading}
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!canInteract || isAppleLoading || isGoogleLoading || isEmailLoading) return;
+                    setErrorMsg(null);
+                    setIsAppleLoading(true);
+                    try {
+                      const firebaseUser = await loginWithApple();
+                      if (firebaseUser) {
+                        const uid = firebaseUser.uid;
+                        const userDocRef = doc(db, 'users', uid);
+                        const cachedUser = getUser(uid);
 
-                      let userSnap: any = null;
-                      try {
-                        userSnap = await Promise.race([
-                          getDoc(userDocRef),
-                          new Promise<null>((r) => setTimeout(() => r(null), 5000)),
-                        ]);
-                      } catch (e) {
-                        console.warn('Apple user doc check warning:', e);
+                        let userSnap: any = null;
+                        try {
+                          userSnap = await Promise.race([
+                            getDoc(userDocRef),
+                            new Promise<null>((r) => setTimeout(() => r(null), 5000)),
+                          ]);
+                        } catch (e) {
+                          console.warn('Apple user doc check warning:', e);
+                        }
+
+                        let finalUserData: Kullanici;
+
+                        if (userSnap && userSnap.exists()) {
+                          // 1. Existing registered user -> Restore everything faithfully
+                          const data = userSnap.data() as Partial<Kullanici>;
+                          const currentName = data.ad || firebaseUser.displayName || cachedUser?.ad || 'Apple Kullanıcısı';
+                          const currentUsername = data.kullaniciAdi || cachedUser?.kullaniciAdi || autoGenerateUsername(firebaseUser.email, currentName);
+
+                          finalUserData = {
+                            ...data,
+                            id: uid,
+                            ad: currentName,
+                            kullaniciAdi: currentUsername,
+                            kullaniciAdi_lower: currentUsername.toLowerCase(),
+                            email: data.email || firebaseUser.email || 'ogrenci@privaterelay.appleid.com',
+                            avatarUrl: data.avatarUrl || firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                            targetExam: data.targetExam || cachedUser?.targetExam || 'YKS',
+                            targetExamDate: data.targetExamDate || cachedUser?.targetExamDate || '2027-06-19',
+                            kredi: data.kredi ?? cachedUser?.kredi ?? 10,
+                            maxKredi: data.maxKredi ?? 10,
+                            seri: data.seri ?? cachedUser?.seri ?? 1,
+                            xp: data.xp ?? cachedUser?.xp ?? 0,
+                            isPremium: data.isPremium ?? false,
+                            sinif: data.sinif || cachedUser?.sinif || '12. Sınıf / Mezun (YKS)',
+                            lastResetDate: data.lastResetDate || getTurkeyDateString(),
+                          };
+                        } else if (cachedUser && cachedUser.id === uid && cachedUser.targetExam) {
+                          // 2. Found in local cache
+                          finalUserData = {
+                            ...cachedUser,
+                            id: uid,
+                            email: firebaseUser.email || cachedUser.email || 'ogrenci@privaterelay.appleid.com',
+                          };
+                          setDoc(userDocRef, finalUserData, { merge: true }).catch(() => {});
+                        } else {
+                          // 3. Brand new first-time Apple user -> Auto-generate unique username and set default YKS target
+                          const autoName = firebaseUser.displayName || 'Apple Kullanıcısı';
+                          const autoUsername = autoGenerateUsername(firebaseUser.email, autoName);
+                          finalUserData = {
+                            id: uid,
+                            ad: autoName,
+                            kullaniciAdi: autoUsername,
+                            kullaniciAdi_lower: autoUsername.toLowerCase(),
+                            email: firebaseUser.email || 'ogrenci@privaterelay.appleid.com',
+                            avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                            kredi: 10,
+                            maxKredi: 10,
+                            seri: 1,
+                            xp: 0,
+                            isPremium: false,
+                            sinif: '12. Sınıf / Mezun (YKS)',
+                            targetExam: 'YKS',
+                            targetExamDate: '2027-06-19',
+                            lastResetDate: getTurkeyDateString(),
+                            createdAt: new Date().toISOString(),
+                            updatedAt: new Date().toISOString(),
+                          };
+                          setDoc(userDocRef, finalUserData, { merge: true }).catch(() => {});
+                        }
+
+                        saveUser(finalUserData, uid);
+                        setIsAppleLoading(false);
+                        onLoginSuccess(finalUserData);
+                        onClose();
+                        return;
                       }
-
-                      let finalUserData: Kullanici;
-
-                      if (userSnap && userSnap.exists()) {
-                        // 1. Existing registered user -> Restore everything faithfully
-                        const data = userSnap.data() as Partial<Kullanici>;
-                        const currentName = data.ad || firebaseUser.displayName || cachedUser?.ad || 'Apple Kullanıcısı';
-                        const currentUsername = data.kullaniciAdi || cachedUser?.kullaniciAdi || autoGenerateUsername(firebaseUser.email, currentName);
-
-                        finalUserData = {
-                          ...data,
-                          id: uid,
-                          ad: currentName,
-                          kullaniciAdi: currentUsername,
-                          kullaniciAdi_lower: currentUsername.toLowerCase(),
-                          email: data.email || firebaseUser.email || 'ogrenci@privaterelay.appleid.com',
-                          avatarUrl: data.avatarUrl || firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-                          targetExam: data.targetExam || cachedUser?.targetExam || 'YKS',
-                          targetExamDate: data.targetExamDate || cachedUser?.targetExamDate || '2027-06-19',
-                          kredi: data.kredi ?? cachedUser?.kredi ?? 10,
-                          maxKredi: data.maxKredi ?? 10,
-                          seri: data.seri ?? cachedUser?.seri ?? 1,
-                          xp: data.xp ?? cachedUser?.xp ?? 0,
-                          isPremium: data.isPremium ?? false,
-                          sinif: data.sinif || cachedUser?.sinif || '12. Sınıf / Mezun (YKS)',
-                          lastResetDate: data.lastResetDate || getTurkeyDateString(),
-                        };
-                      } else if (cachedUser && cachedUser.id === uid && cachedUser.targetExam) {
-                        // 2. Found in local cache
-                        finalUserData = {
-                          ...cachedUser,
-                          id: uid,
-                          email: firebaseUser.email || cachedUser.email || 'ogrenci@privaterelay.appleid.com',
-                        };
-                        setDoc(userDocRef, finalUserData, { merge: true }).catch(() => {});
-                      } else {
-                        // 3. Brand new first-time Apple user -> Auto-generate unique username and set default YKS target
-                        const autoName = firebaseUser.displayName || 'Apple Kullanıcısı';
-                        const autoUsername = autoGenerateUsername(firebaseUser.email, autoName);
-                        finalUserData = {
-                          id: uid,
-                          ad: autoName,
-                          kullaniciAdi: autoUsername,
-                          kullaniciAdi_lower: autoUsername.toLowerCase(),
-                          email: firebaseUser.email || 'ogrenci@privaterelay.appleid.com',
-                          avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-                          kredi: 10,
-                          maxKredi: 10,
-                          seri: 1,
-                          xp: 0,
-                          isPremium: false,
-                          sinif: '12. Sınıf / Mezun (YKS)',
-                          targetExam: 'YKS',
-                          targetExamDate: '2027-06-19',
-                          lastResetDate: getTurkeyDateString(),
-                          createdAt: new Date().toISOString(),
-                          updatedAt: new Date().toISOString(),
-                        };
-                        setDoc(userDocRef, finalUserData, { merge: true }).catch(() => {});
-                      }
-
-                      saveUser(finalUserData, uid);
+                    } catch (err: any) {
+                      console.warn('Apple Auth Status:', err);
                       setIsAppleLoading(false);
-                      onLoginSuccess(finalUserData);
-                      onClose();
-                      return;
+                      const msg = err?.message || '';
+                      if (msg.includes('iptal') || msg.includes('cancel')) {
+                        // User cancelled
+                      } else if (err?.code === 'auth/operation-not-allowed') {
+                        setErrorMsg('Firebase Console üzerinde Apple ile Giriş sağlayıcısı henüz etkinleştirilmemiş.');
+                      } else {
+                        setErrorMsg(`Apple ile giriş yapılamadı: ${msg || 'Lütfen tekrar deneyin.'}`);
+                      }
+                    } finally {
+                      setIsAppleLoading(false);
                     }
-                  } catch (err: any) {
-                    console.warn('Apple Auth Status:', err);
-                    setIsAppleLoading(false);
-                    const msg = err?.message || '';
-                    if (msg.includes('iptal') || msg.includes('cancel')) {
-                      // User cancelled
-                    } else if (err?.code === 'auth/operation-not-allowed') {
-                      setErrorMsg('Firebase Console üzerinde Apple ile Giriş sağlayıcısı henüz etkinleştirilmemiş.');
-                    } else {
-                      setErrorMsg(`Apple ile giriş yapılamadı: ${msg || 'Lütfen tekrar deneyin.'}`);
-                    }
-                  } finally {
-                    setIsAppleLoading(false);
-                  }
-                }}
-                className="w-full flex items-center justify-center gap-2.5 bg-black hover:bg-neutral-900 text-white border border-neutral-800 py-3 px-4 rounded-xl text-xs font-bold active:scale-98 transition-all cursor-pointer disabled:opacity-50 select-none shadow-sm"
-              >
-                <svg className="w-4 h-4 shrink-0 fill-current" viewBox="0 0 170 170">
-                  <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.08-7.58-7.8-11.64-14.16-5.87-9.1-10.42-19.14-13.63-30.12-3.21-10.98-4.82-21.61-4.82-31.9 0-14.78 3.84-26.68 11.53-35.7 7.68-9.02 17.2-13.6 28.56-13.75 4.9.11 10.13 1.25 15.69 3.42 5.56 2.18 9.38 3.31 11.45 3.42 1.63-.11 5.62-1.33 11.96-3.66 6.35-2.33 11.77-3.39 16.27-3.18 10.02.66 18.28 4.25 24.78 10.78 6.5 6.53 10.63 14.54 12.38 24.03-9.03 5.44-13.5 13.11-13.41 23.01.09 7.84 2.87 14.48 8.35 19.92 5.48 5.44 11.96 8.71 19.45 9.8-2.61 7.62-5.77 14.69-9.49 21.2zm-28.79-114.72c.11 3.59-.97 7.03-3.24 10.33-2.28 3.3-5.28 5.86-9.01 7.68-1.74.87-3.81 1.41-6.21 1.63-.33-3.48.7-7.03 3.09-10.65 2.39-3.62 5.54-6.32 9.45-8.1 1.74-.76 3.7-1.28 5.92-1.57z"/>
-                </svg>
-                <span>{isAppleLoading ? 'Apple ile Bağlanılıyor...' : 'Apple ile Devam Et'}</span>
-              </button>
+                  }}
+                  className="w-full flex items-center justify-center gap-2.5 bg-black hover:bg-neutral-900 text-white border border-neutral-800 py-3 px-4 rounded-xl text-xs font-bold active:scale-98 transition-all cursor-pointer disabled:opacity-50 select-none shadow-sm"
+                >
+                  <svg className="w-4 h-4 shrink-0 fill-current" viewBox="0 0 170 170">
+                    <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.08-7.58-7.8-11.64-14.16-5.87-9.1-10.42-19.14-13.63-30.12-3.21-10.98-4.82-21.61-4.82-31.9 0-14.78 3.84-26.68 11.53-35.7 7.68-9.02 17.2-13.6 28.56-13.75 4.9.11 10.13 1.25 15.69 3.42 5.56 2.18 9.38 3.31 11.45 3.42 1.63-.11 5.62-1.33 11.96-3.66 6.35-2.33 11.77-3.39 16.27-3.18 10.02.66 18.28 4.25 24.78 10.78 6.5 6.53 10.63 14.54 12.38 24.03-9.03 5.44-13.5 13.11-13.41 23.01.09 7.84 2.87 14.48 8.35 19.92 5.48 5.44 11.96 8.71 19.45 9.8-2.61 7.62-5.77 14.69-9.49 21.2zm-28.79-114.72c.11 3.59-.97 7.03-3.24 10.33-2.28 3.3-5.28 5.86-9.01 7.68-1.74.87-3.81 1.41-6.21 1.63-.33-3.48.7-7.03 3.09-10.65 2.39-3.62 5.54-6.32 9.45-8.1 1.74-.76 3.7-1.28 5.92-1.57z"/>
+                  </svg>
+                  <span>{isAppleLoading ? 'Apple ile Bağlanılıyor...' : 'Apple ile Devam Et'}</span>
+                </button>
+              )}
 
               {/* Sign in with Google */}
               <button
