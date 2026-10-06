@@ -678,22 +678,22 @@ export const SavedNotesSection: React.FC<SavedNotesSectionProps> = ({
 
       {/* Add New Note Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-card-bg border border-card-border w-full max-w-md rounded-2xl p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-card-border pb-3">
+        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 pb-20 sm:pb-4 animate-fadeIn">
+          <div className="bg-card-bg border border-card-border w-full max-w-md rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-card-border pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-amber-500 text-xl">edit_note</span>
                 <h3 className="font-extrabold text-base text-text-main">Yeni Ders Notu Ekle</h3>
               </div>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-text-muted hover:text-text-main p-1 cursor-pointer"
+                className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors shrink-0"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCreateNote} className="space-y-3">
+            <form onSubmit={handleCreateNote} className="space-y-3 overflow-y-auto flex-1 overscroll-contain pr-1">
               {/* Ders Selection */}
               <div>
                 <label className="block text-xs font-bold text-text-muted mb-1">Ders Seçin:</label>
@@ -735,7 +735,7 @@ export const SavedNotesSection: React.FC<SavedNotesSectionProps> = ({
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-card-border shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
@@ -758,9 +758,9 @@ export const SavedNotesSection: React.FC<SavedNotesSectionProps> = ({
 
       {/* Edit Note Modal */}
       {editingNote && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-card-bg border border-card-border w-full max-w-md rounded-2xl p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-card-border pb-3">
+        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 pb-20 sm:pb-4 animate-fadeIn">
+          <div className="bg-card-bg border border-card-border w-full max-w-md rounded-3xl p-5 shadow-2xl space-y-4 max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-card-border pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-xl">edit</span>
                 <h3 className="font-extrabold text-base text-text-main">
@@ -769,37 +769,37 @@ export const SavedNotesSection: React.FC<SavedNotesSectionProps> = ({
               </div>
               <button
                 onClick={() => setEditingNote(null)}
-                className="text-text-muted hover:text-text-main p-1 cursor-pointer"
+                className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors shrink-0"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 overflow-y-auto flex-1 overscroll-contain pr-1">
               <textarea
-                rows={4}
+                rows={5}
                 value={editNoteText}
                 onChange={(e) => setEditNoteText(e.target.value)}
                 className="w-full bg-surface-container-low border border-card-border rounded-xl px-3 py-2 text-xs font-medium text-text-main focus:outline-none focus:border-primary placeholder:text-text-muted resize-none"
               />
+            </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingNote(null)}
-                  className="px-4 py-2 text-xs font-bold text-text-muted hover:text-text-main bg-surface-container-low rounded-xl cursor-pointer"
-                >
-                  İptal
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveEditNote}
-                  disabled={!editNoteText.trim()}
-                  className="px-4 py-2 text-xs font-extrabold bg-primary hover:brightness-110 text-white rounded-xl disabled:opacity-40 cursor-pointer shadow-xs"
-                >
-                  Değişiklikleri Kaydet
-                </button>
-              </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-card-border shrink-0">
+              <button
+                type="button"
+                onClick={() => setEditingNote(null)}
+                className="px-4 py-2 text-xs font-bold text-text-muted hover:text-text-main bg-surface-container-low rounded-xl cursor-pointer"
+              >
+                İptal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEditNote}
+                disabled={!editNoteText.trim()}
+                className="px-4 py-2 text-xs font-extrabold bg-primary hover:brightness-110 text-white rounded-xl disabled:opacity-40 cursor-pointer shadow-xs"
+              >
+                Değişiklikleri Kaydet
+              </button>
             </div>
           </div>
         </div>

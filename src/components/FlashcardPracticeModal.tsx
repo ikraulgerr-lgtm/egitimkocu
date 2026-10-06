@@ -111,8 +111,8 @@ export const FlashcardPracticeModal: React.FC<FlashcardPracticeModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/70 dark:bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
-      <div className="relative w-full max-w-xl bg-card-bg border border-card-border rounded-3xl p-4 sm:p-6 text-text-main shadow-2xl flex flex-col justify-between max-h-[94vh] my-auto overflow-y-auto">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-2.5 sm:p-4 pb-20 sm:pb-4 bg-black/70 dark:bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
+      <div className="relative w-full max-w-xl bg-card-bg border border-card-border rounded-3xl p-4 sm:p-6 text-text-main shadow-2xl flex flex-col justify-between max-h-[85dvh] sm:max-h-[85vh] my-auto overflow-y-auto">
         {/* Modal Header */}
         <div className="relative z-10 flex items-center justify-between border-b border-card-border pb-3 shrink-0">
           <div className="flex items-center gap-2.5">

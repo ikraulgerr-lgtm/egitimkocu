@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ProgramOgesi, SoruKaydi, ActiveTab, Arkadas, Kullanici, Bildirim } from '../types';
 import { LofiAudioWidget } from './LofiAudioWidget';
 import { playPomodoroBellSound } from '../lib/soundUtils';
-import { schedulePomodoroNotification, clearPomodoroLocalNotification } from '../lib/notificationService';
+import { updatePomodoroNotification, schedulePomodoroNotification, clearPomodoroLocalNotification } from '../lib/notificationService';
 import { db, auth } from '../lib/firebase';
 import { doc, getDoc, getDocFromServer, getDocs, collection, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
@@ -841,10 +841,11 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
       interval = setInterval(() => {
         setPomoTimeLeft((prev) => {
           const next = prev - 1;
-          if (next > 0 && next % 60 === 0) {
-            schedulePomodoroNotification({
+          if (next >= 0) {
+            updatePomodoroNotification({
               mode: pomoMode,
               durationSeconds: next,
+              isRunning: true,
               roomTitle: activeGroupRoom?.title,
             });
           }
@@ -940,32 +941,25 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isPomoRunning, pomoTimeLeft, pomoMode, pomoSelectedItemId, scheduleItems, selectedDay, customWorkMinutes, customBreakMinutes, completedPomoCount, onToggleItem, onRewardXp]);
-
-  // Schedule native notification when timer starts or mode changes, clear when paused/stopped
-  useEffect(() => {
-    if (isPomoRunning && pomoTimeLeft > 0) {
-      schedulePomodoroNotification({
-        mode: pomoMode,
-        durationSeconds: pomoTimeLeft,
-        roomTitle: activeGroupRoom?.title,
-      });
-    } else {
-      clearPomodoroLocalNotification();
-    }
-  }, [isPomoRunning, pomoMode]);
+  }, [isPomoRunning, pomoTimeLeft, pomoMode, pomoSelectedItemId, scheduleItems, selectedDay, customWorkMinutes, customBreakMinutes, completedPomoCount, activeGroupRoom, onToggleItem, onRewardXp]);
 
   const handleTogglePomo = () => {
     const nextRunning = !isPomoRunning;
     if (nextRunning) {
       playPomodoroBellSound('start');
-      schedulePomodoroNotification({
+      updatePomodoroNotification({
         mode: pomoMode,
         durationSeconds: pomoTimeLeft,
+        isRunning: true,
         roomTitle: activeGroupRoom?.title,
       });
     } else {
-      clearPomodoroLocalNotification();
+      updatePomodoroNotification({
+        mode: pomoMode,
+        durationSeconds: pomoTimeLeft,
+        isRunning: false,
+        roomTitle: activeGroupRoom?.title,
+      });
     }
     setIsPomoRunning(nextRunning);
   };
@@ -976,6 +970,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     if (pomoMode === 'work') {
       setIsPomoRunning(false);
       setPomoTimeLeft(val * 60);
+      clearPomodoroLocalNotification();
     }
   };
 
@@ -985,6 +980,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     if (pomoMode === 'break') {
       setIsPomoRunning(false);
       setPomoTimeLeft(val * 60);
+      clearPomodoroLocalNotification();
     }
   };
 
@@ -992,12 +988,14 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     setIsPomoRunning(false);
     setPomoMode(mode);
     setPomoTimeLeft(mode === 'work' ? customWorkMinutes * 60 : customBreakMinutes * 60);
+    clearPomodoroLocalNotification();
   };
 
   const handleSelectPomoMode = (mode: 'work' | 'break') => {
     setIsPomoRunning(false);
     setPomoMode(mode);
     setPomoTimeLeft(mode === 'work' ? customWorkMinutes * 60 : customBreakMinutes * 60);
+    clearPomodoroLocalNotification();
   };
 
   // Standard Session Timer Countdown Effect
@@ -1952,14 +1950,15 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
       {/* CREATE ROOM MODAL */}
       {isCreateRoomModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card-bg border border-card-border text-text-main dark:bg-slate-900 dark:border-purple-500/30 dark:text-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-scaleUp">
-            <div className="flex justify-between items-center border-b border-card-border dark:border-white/10 pb-3">
+        <div className="fixed inset-0 z-[70] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto pb-28 sm:pb-4">
+          <div className="bg-card-bg border border-card-border text-text-main dark:bg-slate-900 dark:border-purple-500/30 dark:text-white rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 my-auto max-h-[90dvh] flex flex-col overflow-y-auto animate-scaleUp">
+            <div className="flex justify-between items-center border-b border-card-border dark:border-white/10 pb-3 shrink-0">
               <h3 className="font-extrabold text-base flex items-center gap-2 text-text-main dark:text-purple-200">
                 <span className="material-symbols-outlined text-primary dark:text-purple-400">group_add</span>
                 <span>Yeni Pomodoro Odası Kur</span>
               </h3>
               <button
+                type="button"
                 onClick={() => setIsCreateRoomModalOpen(false)}
                 className="text-text-muted hover:text-text-main dark:text-slate-400 dark:hover:text-white p-1 rounded-full cursor-pointer"
               >
@@ -1967,7 +1966,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 flex-1 overflow-y-auto pr-1">
               <div>
                 <label className="text-xs font-bold text-text-main dark:text-slate-300 block mb-1">Oda Başlığı:</label>
                 <input
@@ -1984,7 +1983,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                   <label className="text-xs font-bold text-text-main dark:text-slate-300 block mb-1.5">
                     Odaya Otomatik Davet Edilecek Arkadaşlar ({Object.values(selectedFriendsForNewRoom).filter(Boolean).length}):
                   </label>
-                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto no-scrollbar">
+                  <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto pr-1">
                     {friends.map((f) => {
                       const isSelected = !!selectedFriendsForNewRoom[f.id];
                       return (
@@ -2016,7 +2015,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               )}
             </div>
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex gap-2 pt-2 shrink-0 border-t border-card-border/50 dark:border-white/10">
               <button
                 type="button"
                 onClick={() => setIsCreateRoomModalOpen(false)}
@@ -2038,9 +2037,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
       {/* JOIN ROOM MODAL */}
       {isJoinRoomModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card-bg border border-card-border text-text-main dark:bg-slate-900 dark:border-purple-500/30 dark:text-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-scaleUp">
-            <div className="flex justify-between items-center border-b border-card-border dark:border-white/10 pb-3">
+        <div className="fixed inset-0 z-[70] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto pb-28 sm:pb-4">
+          <div className="bg-card-bg border border-card-border text-text-main dark:bg-slate-900 dark:border-purple-500/30 dark:text-white rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 my-auto max-h-[90dvh] flex flex-col overflow-y-auto animate-scaleUp">
+            <div className="flex justify-between items-center border-b border-card-border dark:border-white/10 pb-3 shrink-0">
               <h3 className="font-extrabold text-base flex items-center gap-2 text-text-main dark:text-purple-200">
                 <span className="material-symbols-outlined text-primary dark:text-purple-400">key</span>
                 <span>Oda Kodu ile Katıl</span>
@@ -2199,9 +2198,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
       {/* Completion Celebration Modal */}
       {completedSession && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-card-bg w-full max-w-sm rounded-3xl p-6 border border-emerald-500/50 shadow-2xl text-center space-y-4">
-            <div className="w-20 h-20 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto border-2 border-emerald-500 animate-bounce">
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 pb-20 sm:pb-4 animate-fadeIn">
+          <div className="bg-card-bg w-full max-w-sm rounded-3xl p-6 border border-emerald-500/50 shadow-2xl text-center space-y-4 max-h-[85dvh] sm:max-h-[85vh] overflow-y-auto">
+            <div className="w-20 h-20 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto border-2 border-emerald-500 animate-bounce shrink-0">
               <span className="material-symbols-outlined text-4xl">emoji_events</span>
             </div>
 
@@ -2228,9 +2227,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
       {/* Manual Task Addition Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-card-bg w-full max-w-md rounded-3xl p-5 border border-card-border shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-card-border pb-3">
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto pb-28 sm:pb-4 animate-fadeIn">
+          <div className="bg-card-bg w-full max-w-md rounded-3xl p-5 border border-card-border shadow-2xl space-y-4 my-auto max-h-[90dvh] flex flex-col overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-card-border pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">add_task</span>
                 <h3 className="font-extrabold text-base text-text-main">
@@ -2238,6 +2237,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsAddModalOpen(false)}
                 className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors"
               >
@@ -2245,72 +2245,74 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveNewItem} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-extrabold text-text-main block">Ders Seçin:</label>
-                <select
-                  value={formDers}
-                  onChange={(e) => setFormDers(e.target.value)}
-                  className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main focus:outline-none focus:border-primary font-bold"
-                >
-                  <option value="Matematik">Matematik</option>
-                  <option value="Türkçe">Türkçe / Edebiyat</option>
-                  <option value="Tarih">Tarih</option>
-                  <option value="Coğrafya">Coğrafya</option>
-                  <option value="Felsefe">Felsefe</option>
-                  <option value="Din Kültürü">Din Kültürü</option>
-                  <option value="Vatandaşlık">Vatandaşlık & Hukuk</option>
-                  <option value="İngilizce">İngilizce</option>
-                  <option value="Fizik">Fizik</option>
-                  <option value="Kimya">Kimya</option>
-                  <option value="Biyoloji">Biyoloji</option>
-                  <option value="Dinlenme">Dinlenme / Mola</option>
-                  <option value="Serbest Çalışma">Serbest Çalışma</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-extrabold text-text-main block">Konu veya Çalışma Detayı:</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Örn: Masif Araziler & Harita Çözümü (30 Soru)"
-                  value={formKonu}
-                  onChange={(e) => setFormKonu(e.target.value)}
-                  className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary font-medium"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleSaveNewItem} className="space-y-4 flex flex-col flex-1">
+              <div className="space-y-4 flex-1 overflow-y-auto pr-1">
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-text-main block">Saat Aralığı:</label>
+                  <label className="text-xs font-extrabold text-text-main block">Ders Seçin:</label>
+                  <select
+                    value={formDers}
+                    onChange={(e) => setFormDers(e.target.value)}
+                    className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main focus:outline-none focus:border-primary font-bold"
+                  >
+                    <option value="Matematik">Matematik</option>
+                    <option value="Türkçe">Türkçe / Edebiyat</option>
+                    <option value="Tarih">Tarih</option>
+                    <option value="Coğrafya">Coğrafya</option>
+                    <option value="Felsefe">Felsefe</option>
+                    <option value="Din Kültürü">Din Kültürü</option>
+                    <option value="Vatandaşlık">Vatandaşlık & Hukuk</option>
+                    <option value="İngilizce">İngilizce</option>
+                    <option value="Fizik">Fizik</option>
+                    <option value="Kimya">Kimya</option>
+                    <option value="Biyoloji">Biyoloji</option>
+                    <option value="Dinlenme">Dinlenme / Mola</option>
+                    <option value="Serbest Çalışma">Serbest Çalışma</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-extrabold text-text-main block">Konu veya Çalışma Detayı:</label>
                   <input
                     type="text"
-                    placeholder="Örn: 17:00 - 18:30"
-                    value={formSaat}
-                    onChange={(e) => setFormSaat(e.target.value)}
-                    className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main focus:outline-none focus:border-primary font-mono"
+                    required
+                    placeholder="Örn: Masif Araziler & Harita Çözümü (30 Soru)"
+                    value={formKonu}
+                    onChange={(e) => setFormKonu(e.target.value)}
+                    className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary font-medium"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-text-main block">Çalışma Süresi:</label>
-                  <select
-                    value={formSure}
-                    onChange={(e) => setFormSure(e.target.value)}
-                    className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main focus:outline-none focus:border-primary font-bold"
-                  >
-                    <option value="25 dk (Pomodoro)">25 dk (Pomodoro)</option>
-                    <option value="30 dk">30 Dakika</option>
-                    <option value="45 dk">45 Dakika</option>
-                    <option value="60 dk">1 Saat (60 dk)</option>
-                    <option value="90 dk">1.5 Saat (90 dk)</option>
-                    <option value="120 dk">2 Saat (120 dk)</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-text-main block">Saat Aralığı:</label>
+                    <input
+                      type="text"
+                      placeholder="Örn: 17:00 - 18:30"
+                      value={formSaat}
+                      onChange={(e) => setFormSaat(e.target.value)}
+                      className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main focus:outline-none focus:border-primary font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-text-main block">Çalışma Süresi:</label>
+                    <select
+                      value={formSure}
+                      onChange={(e) => setFormSure(e.target.value)}
+                      className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main focus:outline-none focus:border-primary font-bold"
+                    >
+                      <option value="25 dk (Pomodoro)">25 dk (Pomodoro)</option>
+                      <option value="30 dk">30 Dakika</option>
+                      <option value="45 dk">45 Dakika</option>
+                      <option value="60 dk">1 Saat (60 dk)</option>
+                      <option value="90 dk">1.5 Saat (90 dk)</option>
+                      <option value="120 dk">2 Saat (120 dk)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2">
+              <div className="pt-2 flex justify-end gap-2 shrink-0 border-t border-card-border/50">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
@@ -2473,6 +2475,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 onClick={() => {
                   playPomodoroBellSound('start');
                   setIsPomoRunning(true);
+                  updatePomodoroNotification({
+                    mode: pomoMode,
+                    durationSeconds: pomoTimeLeft,
+                    isRunning: true,
+                    roomTitle: activeGroupRoom?.title,
+                  });
                 }}
                 className="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-8 py-3.5 rounded-2xl flex items-center gap-2 text-base cursor-pointer shadow-lg shadow-emerald-600/30 transition-all hover:scale-105 active:scale-95"
               >
@@ -2482,7 +2490,15 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             ) : (
               <button
                 type="button"
-                onClick={() => setIsPomoRunning(false)}
+                onClick={() => {
+                  setIsPomoRunning(false);
+                  updatePomodoroNotification({
+                    mode: pomoMode,
+                    durationSeconds: pomoTimeLeft,
+                    isRunning: false,
+                    roomTitle: activeGroupRoom?.title,
+                  });
+                }}
                 className="bg-amber-600 hover:bg-amber-500 text-white font-black px-8 py-3.5 rounded-2xl flex items-center gap-2 text-base cursor-pointer shadow-lg shadow-amber-600/30 transition-all hover:scale-105 active:scale-95"
               >
                 <span className="material-symbols-outlined text-2xl">pause</span>
@@ -2494,7 +2510,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               type="button"
               onClick={() => {
                 setIsPomoRunning(false);
-                setPomoTimeLeft(pomoMode === 'work' ? WORK_TIME : BREAK_TIME);
+                const resetTime = pomoMode === 'work' ? customWorkMinutes * 60 : customBreakMinutes * 60;
+                setPomoTimeLeft(resetTime);
+                clearPomodoroLocalNotification();
               }}
               className="bg-white/10 hover:bg-white/20 text-slate-200 font-bold px-5 py-3.5 rounded-2xl flex items-center gap-1.5 text-xs sm:text-sm cursor-pointer border border-white/15 transition-all active:scale-95"
             >
@@ -2506,8 +2524,11 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               type="button"
               onClick={() => {
                 const nextMode = pomoMode === 'work' ? 'break' : 'work';
+                setIsPomoRunning(false);
                 setPomoMode(nextMode);
-                setPomoTimeLeft(nextMode === 'work' ? WORK_TIME : BREAK_TIME);
+                const nextTime = nextMode === 'work' ? customWorkMinutes * 60 : customBreakMinutes * 60;
+                setPomoTimeLeft(nextTime);
+                clearPomodoroLocalNotification();
               }}
               className="bg-indigo-600/80 hover:bg-indigo-600 text-white font-bold px-5 py-3.5 rounded-2xl flex items-center gap-1.5 text-xs sm:text-sm cursor-pointer border border-indigo-400/30 transition-all active:scale-95"
             >

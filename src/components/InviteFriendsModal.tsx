@@ -287,11 +287,11 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-      <div className="bg-card-bg w-full max-w-md rounded-3xl p-5 border border-card-border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar relative">
+    <div className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 pb-20 sm:pb-4 animate-fadeIn">
+      <div className="bg-card-bg w-full max-w-md rounded-3xl p-5 border border-card-border shadow-2xl space-y-4 max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-hidden relative">
         
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-card-border pb-3">
+        <div className="flex items-center justify-between border-b border-card-border pb-3 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-2xl">person_add</span>
@@ -303,24 +303,26 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors"
+            className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors shrink-0"
           >
             <span className="material-symbols-outlined text-lg">close</span>
           </button>
         </div>
 
-        {/* Bonus Reward Banner */}
-        <div className="bg-primary/10 border border-primary/20 rounded-2xl p-3.5 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center shrink-0 font-black text-xs shadow-xs">
-              +50
-            </div>
-            <div>
-              <p className="text-xs font-black text-text-main">Her Davette +50 XP Kazan</p>
-              <p className="text-[11px] text-text-muted font-medium">Arkadaşın bağlandığında veya kullanıcı adını yazdığında ikiniz de anında +50 XP kazanırsınız.</p>
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto flex-1 overscroll-contain space-y-4 pr-1">
+          {/* Bonus Reward Banner */}
+          <div className="bg-primary/10 border border-primary/20 rounded-2xl p-3.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center shrink-0 font-black text-xs shadow-xs">
+                +50
+              </div>
+              <div>
+                <p className="text-xs font-black text-text-main">Her Davette +50 XP Kazan</p>
+                <p className="text-[11px] text-text-muted font-medium">Arkadaşın bağlandığında veya kullanıcı adını yazdığında ikiniz de anında +50 XP kazanırsınız.</p>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Username Quick Copy Card */}
         <div className="bg-surface-container-low border border-card-border rounded-2xl p-3 flex items-center justify-between gap-2">
@@ -511,8 +513,20 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
             )}
           </div>
         </div>
-
       </div>
+
+      {/* Modal Footer / Close */}
+      <div className="p-4 border-t border-card-border flex justify-end shrink-0 bg-surface-container-low/50">
+        <button
+          type="button"
+          onClick={onClose}
+          className="py-2.5 px-5 bg-surface-container-low hover:bg-card-border text-text-main font-bold text-xs rounded-xl transition-colors cursor-pointer"
+        >
+          Kapat
+        </button>
+      </div>
+
     </div>
-  );
+  </div>
+);
 };

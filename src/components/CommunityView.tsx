@@ -522,7 +522,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-fadeIn pb-12">
+    <div className="space-y-6 animate-fadeIn pb-32 sm:pb-16">
       {/* Toast Notification for Safety & Moderation Feedback */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-md w-[90%] bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-fadeIn">
@@ -942,9 +942,9 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
 
       {/* Ask Question Modal */}
       {isAskModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-card-bg w-full max-w-lg rounded-3xl p-6 border border-card-border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar relative">
-            <div className="flex items-center justify-between border-b border-card-border pb-3">
+        <div className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 pb-20 sm:pb-4 animate-fadeIn">
+          <div className="bg-card-bg w-full max-w-lg rounded-3xl p-6 border border-card-border shadow-2xl space-y-4 max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-hidden relative">
+            <div className="flex items-center justify-between border-b border-card-border pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
                   <span className="material-symbols-outlined text-lg">add_comment</span>
@@ -956,13 +956,13 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
               </div>
               <button
                 onClick={() => setIsAskModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors"
+                className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors shrink-0"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
 
-            <form onSubmit={handleCreatePost} className="space-y-4">
+            <form onSubmit={handleCreatePost} className="space-y-4 overflow-y-auto flex-1 overscroll-contain pr-1">
               {/* Subject Selection */}
               <div className="space-y-1">
                 <label className="text-xs font-extrabold text-text-main block">Ders Seçin:</label>
@@ -1047,7 +1047,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
               </div>
 
               {/* Form Action Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-card-border">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-card-border shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsAskModalOpen(false)}
@@ -1081,9 +1081,9 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
 
       {/* Report Modal (Apple Guideline 1.2 Compliant) */}
       {reportModalItem && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-card-bg w-full max-w-md rounded-3xl p-6 border border-card-border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
-            <div className="flex items-center justify-between border-b border-card-border pb-3">
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pb-20 sm:pb-4 animate-fadeIn">
+          <div className="bg-card-bg w-full max-w-md rounded-3xl p-6 border border-card-border shadow-2xl space-y-4 max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-y-auto overscroll-contain">
+            <div className="flex items-center justify-between border-b border-card-border pb-3 shrink-0">
               <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
                 <span className="material-symbols-outlined text-2xl">report_problem</span>
                 <h3 className="font-extrabold text-base text-text-main">İçeriği Şikayet Et</h3>
@@ -1091,27 +1091,27 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
               <button
                 type="button"
                 onClick={() => setReportModalItem(null)}
-                className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors"
+                className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors shrink-0"
               >
                 <span className="material-symbols-outlined text-base">close</span>
               </button>
             </div>
 
-            <div className="p-3 bg-surface-container-low rounded-xl border border-card-border text-xs text-text-muted space-y-1">
+            <div className="p-3 bg-surface-container-low rounded-xl border border-card-border text-xs text-text-muted space-y-1 shrink-0">
               <p className="font-bold text-text-main">
                 Yazar: <span className="text-primary">{reportModalItem.authorName}</span>
               </p>
               <p className="line-clamp-2 italic">"{reportModalItem.snippet}"</p>
             </div>
 
-            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-700 dark:text-amber-300 flex items-start gap-2">
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-700 dark:text-amber-300 flex items-start gap-2 shrink-0">
               <span className="material-symbols-outlined text-base shrink-0 mt-0.5">verified_user</span>
               <p className="leading-relaxed">
                 Şikayetiniz moderasyon ekibimize <strong>24 saatlik inceleme garantisi</strong> ile iletilir. İlgili içerik ve kullanıcı anında sizin akışınızdan gizlenecektir.
               </p>
             </div>
 
-            <form onSubmit={handleReportSubmit} className="space-y-3">
+            <form onSubmit={handleReportSubmit} className="space-y-3 shrink-0">
               <div className="space-y-1">
                 <label className="text-xs font-extrabold text-text-main block">Şikayet Nedeni:</label>
                 <select
@@ -1162,9 +1162,9 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
 
       {/* EULA and Community Guidelines Modal (Apple Guideline 1.2 Compliant) */}
       {isEulaModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-card-bg w-full max-w-lg rounded-3xl p-6 border border-card-border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
-            <div className="flex items-center justify-between border-b border-card-border pb-3">
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pb-20 sm:pb-4 animate-fadeIn">
+          <div className="bg-card-bg w-full max-w-lg rounded-3xl p-6 border border-card-border shadow-2xl space-y-4 max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-card-border pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-2xl">gavel</span>
                 <div>
@@ -1175,13 +1175,13 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsEulaModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors"
+                className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors shrink-0"
               >
                 <span className="material-symbols-outlined text-base">close</span>
               </button>
             </div>
 
-            <div className="space-y-3.5 text-xs text-text-muted leading-relaxed">
+            <div className="space-y-3.5 text-xs text-text-muted leading-relaxed overflow-y-auto flex-1 overscroll-contain pr-1">
               <div className="p-3 bg-primary/10 border border-primary/20 rounded-2xl text-primary font-bold">
                 ⚠️ Sıfır Tolerans İlkesi: Eğitim Koçum platformunda uygunsuz içeriklere, hakaret, zorbalık, müstehcenlik veya nefret söylemine kesinlikle sıfır tolerans uygulanır.
               </div>
@@ -1215,7 +1215,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
               </div>
             </div>
 
-            <div className="pt-3 border-t border-card-border flex justify-end">
+            <div className="pt-3 border-t border-card-border flex justify-end shrink-0">
               <button
                 type="button"
                 onClick={() => setIsEulaModalOpen(false)}

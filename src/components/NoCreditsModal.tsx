@@ -55,8 +55,8 @@ export const NoCreditsModal: React.FC<NoCreditsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-      <div className="bg-card-bg w-full max-w-md rounded-3xl p-6 sm:p-7 shadow-2xl border border-card-border relative overflow-hidden text-center space-y-5">
+    <div className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-md flex items-center justify-center p-4 pb-20 sm:pb-4 animate-fadeIn">
+      <div className="bg-card-bg w-full max-w-md rounded-3xl p-6 sm:p-7 shadow-2xl border border-card-border relative overflow-y-auto max-h-[85dvh] sm:max-h-[85vh] text-center space-y-5 overscroll-contain">
         {/* Background Subtle Gradient Glow */}
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />

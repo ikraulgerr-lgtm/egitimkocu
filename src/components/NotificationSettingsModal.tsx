@@ -44,6 +44,14 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
     });
   };
 
+  const updateTime = (key: keyof NotificationSettings, value: string) => {
+    setSettings((prev) => {
+      const updated = { ...prev, [key]: value };
+      saveNotificationSettings(updated);
+      return updated;
+    });
+  };
+
   const handleRequestPermission = async () => {
     const granted = await requestNotificationPermissions();
     setPermissionGranted(granted);
@@ -79,10 +87,10 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-      <div className="bg-card-bg w-full max-w-lg rounded-3xl p-6 border border-card-border space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
+    <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 pb-20 sm:pb-4 animate-fadeIn">
+      <div className="bg-card-bg w-full max-w-lg rounded-3xl p-6 border border-card-border space-y-4 shadow-2xl max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex justify-between items-center border-b border-card-border pb-3">
+        <div className="flex justify-between items-center border-b border-card-border pb-3 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20">
               <span className="material-symbols-outlined text-2xl">notifications_active</span>
@@ -94,11 +102,14 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
           </div>
           <button
             onClick={onClose}
-            className="text-text-muted hover:text-text-main p-1.5 rounded-full hover:bg-surface-container-low cursor-pointer transition-colors"
+            className="text-text-muted hover:text-text-main p-1.5 rounded-full hover:bg-surface-container-low cursor-pointer transition-colors shrink-0"
           >
             <span className="material-symbols-outlined text-lg">close</span>
           </button>
         </div>
+
+        {/* Scrollable Content Body */}
+        <div className="overflow-y-auto flex-1 overscroll-contain space-y-5 pr-1">
 
         {/* Native Notification Permission & Test Trigger Box */}
         <div className="bg-primary/5 dark:bg-primary/10 p-4 rounded-2xl border border-primary/20 space-y-3">
@@ -228,6 +239,42 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
           </h4>
 
           <div className="space-y-2">
+            {/* Daily Study Motivation Notification */}
+            <div className="bg-surface-container-low p-3.5 rounded-2xl border border-card-border space-y-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-lg">hotel_class</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-text-main">🌟 Günlük Ders Motivasyon Bildirimleri</p>
+                    <p className="text-[11px] text-text-muted font-medium">Her gün çalışma azmini artıracak ilham verici ders koçu sözleri ve sınav tavsiyeleri al.</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={settings.dailyMotivation ?? true}
+                  onChange={() => toggle('dailyMotivation')}
+                  className="w-5 h-5 accent-primary rounded-md cursor-pointer shrink-0"
+                />
+              </div>
+
+              {settings.dailyMotivation && (
+                <div className="pt-2 border-t border-card-border/60 flex items-center justify-between text-xs animate-fadeIn">
+                  <span className="text-text-muted font-bold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm text-amber-500">schedule</span>
+                    <span>Bildirim Saati:</span>
+                  </span>
+                  <input
+                    type="time"
+                    value={settings.dailyMotivationTime || '09:30'}
+                    onChange={(e) => updateTime('dailyMotivationTime', e.target.value)}
+                    className="px-2.5 py-1 text-xs bg-card-bg border border-card-border rounded-lg text-text-main font-mono font-bold focus:outline-none focus:border-primary"
+                  />
+                </div>
+              )}
+            </div>
+
             <div className="bg-surface-container-low p-3.5 rounded-2xl border border-card-border flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold text-text-main">🚀 Sınav Hedefi ve Motivasyon İpuçları</p>
@@ -255,9 +302,10 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
             </div>
           </div>
         </section>
+        </div>
 
         {/* Footer */}
-        <div className="pt-2 flex justify-end">
+        <div className="pt-3 border-t border-card-border shrink-0 flex justify-end">
           <button
             type="button"
             onClick={handleSaveAndClose}

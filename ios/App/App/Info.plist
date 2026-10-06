@@ -93,7 +93,7 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Sesli soru sorma özelliğini kullanabilmeniz için konuşma tanıma izni gereklidir.</string>
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<string>ca-app-pub-4497707212444370~8583055765</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Size daha uygun ve kişiselleştirilmiş reklam deneyimi sunabilmek için izniniz gereklidir.</string>
 </dict>

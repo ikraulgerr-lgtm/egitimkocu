@@ -1,12 +1,11 @@
-﻿import { AdMob, RewardAdOptions, AdMobRewardItem } from '@capacitor-community/admob';
+import { AdMob, RewardAdOptions, AdMobRewardItem } from '@capacitor-community/admob';
 import { Capacitor } from '@capacitor/core';
 
 /**
- * Google Official Test Rewarded Ad Unit IDs
- * When going to production, replace with your real AdMob Ad Unit ID (ca-app-pub-XXXXXXXX/YYYYYYYY)
+ * Google AdMob Rewarded Ad Unit IDs
  */
 const ANDROID_TEST_REWARDED_ID = 'ca-app-pub-3940256099942544/5224354917';
-const IOS_TEST_REWARDED_ID = 'ca-app-pub-3940256099942544/1712485313';
+const IOS_REAL_REWARDED_ID = 'ca-app-pub-4497707212444370/3001672002';
 
 let isInitialized = false;
 
@@ -19,8 +18,7 @@ export async function initializeAdMob(): Promise<void> {
 
   try {
     await AdMob.initialize({
-      testingDevices: ['EMULATOR'],
-      initializeForTesting: true,
+      initializeForTesting: false,
     });
     isInitialized = true;
   } catch (err) {
@@ -55,11 +53,11 @@ export async function showRewardedAd(
       await initializeAdMob();
     }
 
-    const adId = Capacitor.getPlatform() === 'ios' ? IOS_TEST_REWARDED_ID : ANDROID_TEST_REWARDED_ID;
+    const adId = Capacitor.getPlatform() === 'ios' ? IOS_REAL_REWARDED_ID : ANDROID_TEST_REWARDED_ID;
 
     const options: RewardAdOptions = {
       adId,
-      isTesting: true,
+      isTesting: false,
     };
 
     // Preload reward video

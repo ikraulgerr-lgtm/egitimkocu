@@ -403,10 +403,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const passwordsMatch = newPassword.length > 0 && newPassword === confirmPassword;
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn ${
+    <div className={`fixed inset-0 z-[70] flex items-center justify-center p-4 pb-16 sm:pb-4 animate-fadeIn ${
       !auth.currentUser ? 'bg-slate-950/95 backdrop-blur-xl' : 'bg-black/75 backdrop-blur-xs'
     }`}>
-      <div className="bg-card-bg w-full max-w-md rounded-3xl p-6 sm:p-8 border border-card-border space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto no-scrollbar">
+      <div className="bg-card-bg w-full max-w-md rounded-3xl p-6 sm:p-8 border border-card-border space-y-6 shadow-2xl relative max-h-[88dvh] sm:max-h-[90vh] overflow-y-auto overscroll-contain">
         {/* Close Button - Rendered ONLY if user is already logged in */}
         {auth.currentUser && (
           <button
@@ -1271,9 +1271,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* EULA and Community Guidelines Modal (Apple Guideline 1.2 Compliant) */}
         {isEulaModalOpen && (
-          <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-            <div className="bg-card-bg w-full max-w-lg rounded-3xl p-6 border border-card-border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
-              <div className="flex items-center justify-between border-b border-card-border pb-3">
+          <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pb-16 sm:pb-4 animate-fadeIn">
+            <div className="bg-card-bg w-full max-w-lg rounded-3xl p-6 border border-card-border shadow-2xl space-y-4 max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between border-b border-card-border pb-3 shrink-0">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary text-2xl">gavel</span>
                   <div>
@@ -1284,13 +1284,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsEulaModalOpen(false)}
-                  className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors"
+                  className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors shrink-0"
                 >
                   <span className="material-symbols-outlined text-base">close</span>
                 </button>
               </div>
 
-              <div className="space-y-3.5 text-xs text-text-muted leading-relaxed">
+              <div className="space-y-3.5 text-xs text-text-muted leading-relaxed overflow-y-auto flex-1 overscroll-contain pr-1">
                 <div className="p-3 bg-primary/10 border border-primary/20 rounded-2xl text-primary font-bold">
                   ⚠️ Sıfır Tolerans İlkesi: Eğitim Koçum platformunda uygunsuz içeriklere, hakaret, zorbalık, müstehcenlik veya nefret söylemine kesinlikle sıfır tolerans uygulanır.
                 </div>
@@ -1324,7 +1324,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-card-border flex justify-end">
+              <div className="pt-3 border-t border-card-border flex justify-end shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsEulaModalOpen(false)}

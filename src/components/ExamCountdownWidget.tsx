@@ -189,8 +189,8 @@ export const ExamCountdownWidget: React.FC<ExamCountdownWidgetProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
-      <div className="bg-card-bg border border-card-border rounded-t-3xl sm:rounded-3xl w-full max-w-lg shadow-2xl text-text-main relative animate-slide-up max-h-[92vh] overflow-y-auto flex flex-col">
+    <div className="fixed inset-0 z-[70] bg-black/60 dark:bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in pb-16 sm:pb-0">
+      <div className="bg-card-bg border border-card-border rounded-t-3xl sm:rounded-3xl w-full max-w-lg shadow-2xl text-text-main relative animate-slide-up max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-hidden">
         {/* Modal Window Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-card-border shrink-0 bg-surface-container-low/80">
           <div className="flex items-center gap-2.5">
@@ -226,7 +226,7 @@ export const ExamCountdownWidget: React.FC<ExamCountdownWidgetProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-4 sm:p-5 space-y-4 overflow-y-auto">
+        <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
           {/* Main Countdown Visual Card */}
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-50 via-purple-50 to-slate-100 dark:from-indigo-950 dark:via-slate-900 dark:to-slate-950 text-slate-900 dark:text-white p-5 sm:p-6 shadow-xl border border-indigo-200 dark:border-indigo-500/30">
             {/* Background Decorative Grids */}

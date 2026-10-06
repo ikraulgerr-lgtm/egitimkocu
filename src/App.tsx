@@ -39,7 +39,7 @@ import { DenemeTakibiView } from './components/DenemeTakibiView';
 
 import { analyzeQuestionService, generateSimilarQuestionService } from './lib/geminiClient';
 import { NotificationSettingsModal } from './components/NotificationSettingsModal';
-import { runSmartNotificationChecks, sendNativeNotification, requestNotificationPermissions } from './lib/notificationService';
+import { runSmartNotificationChecks, sendNativeNotification, requestNotificationPermissions, syncDailyMotivationSchedule, getNotificationSettings } from './lib/notificationService';
 import { initializeAdMob } from './lib/admobService';
 import { NoCreditsModal } from './components/NoCreditsModal';
 import { AuthModal } from './components/AuthModal';
@@ -311,6 +311,7 @@ export function App() {
             // Background smart reminders only go to notification drawer, no intrusive floating banner
           },
         });
+        syncDailyMotivationSchedule(getNotificationSettings(), user).catch(() => {});
       }, 5000);
       return () => clearTimeout(timeout);
     }
@@ -1931,9 +1932,9 @@ export function App() {
 
       {/* Notifications & Room Invitations Modal */}
       {isNotificationsCenterOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-card-bg text-text-main rounded-3xl max-w-md w-full p-5 border border-card-border shadow-2xl space-y-4 relative">
-            <div className="flex justify-between items-center border-b border-card-border pb-3">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 pb-20 sm:pb-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-card-bg text-text-main rounded-3xl max-w-md w-full p-5 border border-card-border shadow-2xl space-y-4 max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-hidden relative">
+            <div className="flex justify-between items-center border-b border-card-border pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold">
                   🔔
@@ -1973,7 +1974,7 @@ export function App() {
               </div>
             </div>
 
-            <div className="max-h-96 overflow-y-auto space-y-3 pr-1">
+            <div className="overflow-y-auto flex-1 overscroll-contain space-y-3 pr-1">
               {notifications.length === 0 ? (
                 <div className="py-8 text-center space-y-2">
                   <span className="material-symbols-outlined text-4xl text-text-muted opacity-40">notifications_off</span>

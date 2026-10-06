@@ -310,7 +310,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
 
               <span className="inline-flex items-center gap-1 bg-white/20 text-white px-2.5 py-0.5 rounded-full text-[10px] font-bold">
-                Standart Plan (Ücretsiz)
+                ✨ Aktif Öğrenci
               </span>
             </div>
 
@@ -460,7 +460,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             { id: 'profile' as const, label: 'Profil', icon: 'person' },
             { id: 'security' as const, label: 'Şifre', icon: 'lock' },
             { id: 'notifications' as const, label: 'Genel', icon: 'tune' },
-            { id: 'account' as const, label: 'Abonelik', icon: 'card_membership' },
+            { id: 'account' as const, label: 'Hesap & Yasal', icon: 'manage_accounts' },
           ].map((tab) => {
             const isActive = activeSettingsTab === tab.id;
             return (
@@ -768,7 +768,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
         )}
 
-        {/* TAB 4: ABONELİK & HESAP */}
+        {/* TAB 4: HESAP & YASAL */}
         {activeSettingsTab === 'account' && (
           <div className="space-y-4 animate-fadeIn">
             {/* Arkadaşlarını Davet Et */}
@@ -789,6 +789,42 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 </span>
               </div>
             )}
+
+            {/* Yasal Bilgiler, EULA ve Gizlilik Politikası (Apple App Store Guideline 3.1.2 & EULA Uyumlu) */}
+            <div className="p-4 bg-surface-container-low rounded-2xl border border-card-border space-y-3">
+              <div className="flex items-center gap-2 text-text-main">
+                <span className="material-symbols-outlined text-primary text-lg">policy</span>
+                <h4 className="font-extrabold text-xs">Yasal Bilgiler ve Sözleşmeler</h4>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <a
+                  href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between p-3 bg-card-bg hover:bg-card-border/30 rounded-xl border border-card-border text-xs font-bold text-text-main transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-base text-primary">gavel</span>
+                    <span>Kullanım Koşulları (EULA)</span>
+                  </span>
+                  <span className="material-symbols-outlined text-sm text-text-muted">open_in_new</span>
+                </a>
+
+                <a
+                  href="/privacy.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between p-3 bg-card-bg hover:bg-card-border/30 rounded-xl border border-card-border text-xs font-bold text-text-main transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-base text-primary">shield</span>
+                    <span>Gizlilik Politikası</span>
+                  </span>
+                  <span className="material-symbols-outlined text-sm text-text-muted">open_in_new</span>
+                </a>
+              </div>
+            </div>
 
             {/* Hesaptan Çıkış Yap */}
             {onLogout && (
@@ -839,9 +875,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
       {/* FULL BADGES DIALOG MODAL */}
       {isBadgesModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-card-bg w-full max-w-2xl rounded-3xl p-6 border border-card-border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-card-border pb-3">
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pb-20 sm:pb-4 animate-fadeIn">
+          <div className="bg-card-bg w-full max-w-2xl rounded-3xl p-6 border border-card-border shadow-2xl space-y-4 max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-card-border pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-amber-500 text-2xl">military_tech</span>
                 <div>
@@ -854,14 +890,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsBadgesModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors"
+                className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors shrink-0"
               >
                 <span className="material-symbols-outlined text-base">close</span>
               </button>
             </div>
 
             {/* Filter Pills */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setBadgeFilter('all')}
@@ -898,7 +934,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
 
             {/* Badges Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 overflow-y-auto flex-1 overscroll-contain pr-1">
               {filteredBadges.map((badge) => (
                 <div
                   key={badge.id}
@@ -956,7 +992,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               ))}
             </div>
 
-            <div className="pt-2 border-t border-card-border flex justify-end">
+            <div className="pt-2 border-t border-card-border flex justify-end shrink-0">
               <button
                 type="button"
                 onClick={() => setIsBadgesModalOpen(false)}
@@ -971,9 +1007,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
       {/* Avatar Selection Modal */}
       {isAvatarModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-card-bg w-full max-w-md rounded-3xl p-5 border border-card-border shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-card-border pb-3">
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pb-20 sm:pb-4 animate-fadeIn">
+          <div className="bg-card-bg w-full max-w-md rounded-3xl p-5 border border-card-border shadow-2xl space-y-4 max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-card-border pb-3 shrink-0">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">face</span>
                 <h3 className="font-extrabold text-base text-text-main">Profil Avatarını Seç</h3>
@@ -981,74 +1017,76 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsAvatarModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors"
+                className="w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer transition-colors shrink-0"
               >
                 <span className="material-symbols-outlined text-base">close</span>
               </button>
             </div>
 
-            <p className="text-xs text-text-muted">
-              Profilinizde ve derece sıralamalarında görünecek fotoğrafınızı yükleyebilir veya hazır avatar seçeneklerinden birini seçebilirsiniz:
-            </p>
+            <div className="overflow-y-auto flex-1 overscroll-contain space-y-4 pr-1">
+              <p className="text-xs text-text-muted">
+                Profilinizde ve derece sıralamalarında görünecek fotoğrafınızı yükleyebilir veya hazır avatar seçeneklerinden birini seçebilirsiniz:
+              </p>
 
-            {/* Custom Photo Upload Card */}
-            <div className="bg-surface-container-low p-3 rounded-2xl border border-card-border flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-xl">add_a_photo</span>
+              {/* Custom Photo Upload Card */}
+              <div className="bg-surface-container-low p-3 rounded-2xl border border-card-border flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-xl">add_a_photo</span>
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-xs text-text-main">Kendi Fotoğrafını Yükle</h4>
+                    <p className="text-[10px] text-text-muted">Galeriden veya kameradan yeni fotoğraf seç</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-extrabold text-xs text-text-main">Kendi Fotoğrafını Yükle</h4>
-                  <p className="text-[10px] text-text-muted">Galeriden veya kameradan yeni fotoğraf seç</p>
-                </div>
+
+                <label className="bg-primary hover:bg-primary/90 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl cursor-pointer transition-all shadow-xs flex items-center gap-1 shrink-0 active:scale-95">
+                  <span className="material-symbols-outlined text-sm">upload</span>
+                  <span>{isUploadingPhoto ? 'Yükleniyor...' : 'Fotoğraf Seç'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleCustomPhotoUpload}
+                    className="hidden"
+                    disabled={isUploadingPhoto}
+                  />
+                </label>
               </div>
 
-              <label className="bg-primary hover:bg-primary/90 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl cursor-pointer transition-all shadow-xs flex items-center gap-1 shrink-0 active:scale-95">
-                <span className="material-symbols-outlined text-sm">upload</span>
-                <span>{isUploadingPhoto ? 'Yükleniyor...' : 'Fotoğraf Seç'}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleCustomPhotoUpload}
-                  className="hidden"
-                  disabled={isUploadingPhoto}
-                />
-              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                {AVATAR_OPTIONS.map((item) => {
+                  const isSelected = user.avatarUrl === item.url;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => handleSelectAvatar(item.url)}
+                      className={`relative p-2.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col items-center gap-2 group ${
+                        isSelected
+                          ? 'border-primary bg-primary/10 ring-2 ring-primary/30 shadow-md scale-105'
+                          : 'border-card-border bg-surface-container-low/50 hover:border-primary/50 hover:scale-102'
+                      }`}
+                    >
+                      <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white/80 shadow-xs relative">
+                        <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-primary/40 backdrop-blur-xs flex items-center justify-center text-white">
+                            <span className="material-symbols-outlined text-xl font-bold">check_circle</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-center space-y-0.5">
+                        <p className="font-extrabold text-[11px] text-text-main line-clamp-1">{item.name}</p>
+                        <span className="text-[9px] font-bold text-text-muted bg-card-bg px-2 py-0.5 rounded-full border border-card-border inline-block">
+                          {item.tag}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              {AVATAR_OPTIONS.map((item) => {
-                const isSelected = user.avatarUrl === item.url;
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => handleSelectAvatar(item.url)}
-                    className={`relative p-2.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col items-center gap-2 group ${
-                      isSelected
-                        ? 'border-primary bg-primary/10 ring-2 ring-primary/30 shadow-md scale-105'
-                        : 'border-card-border bg-surface-container-low/50 hover:border-primary/50 hover:scale-102'
-                    }`}
-                  >
-                    <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white/80 shadow-xs relative">
-                      <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
-                      {isSelected && (
-                        <div className="absolute inset-0 bg-primary/40 backdrop-blur-xs flex items-center justify-center text-white">
-                          <span className="material-symbols-outlined text-xl font-bold">check_circle</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-center space-y-0.5">
-                      <p className="font-extrabold text-[11px] text-text-main line-clamp-1">{item.name}</p>
-                      <span className="text-[9px] font-bold text-text-muted bg-card-bg px-2 py-0.5 rounded-full border border-card-border inline-block">
-                        {item.tag}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="pt-2 border-t border-card-border flex justify-end">
+            <div className="pt-2 border-t border-card-border flex justify-end shrink-0">
               <button
                 type="button"
                 onClick={() => setIsAvatarModalOpen(false)}
@@ -1063,19 +1101,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
       {/* Selected Badge Detail Modal */}
       {selectedBadge && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-card-bg w-full max-w-sm rounded-3xl p-6 border border-card-border shadow-2xl text-center space-y-4 relative overflow-hidden">
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pb-20 sm:pb-4 animate-fadeIn">
+          <div className="bg-card-bg w-full max-w-sm rounded-3xl p-6 border border-card-border shadow-2xl text-center space-y-4 relative max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-y-auto overscroll-contain">
             <button
               type="button"
               onClick={() => setSelectedBadge(null)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer hover:bg-card-border transition-colors"
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-surface-container-low text-text-muted hover:text-text-main flex items-center justify-center cursor-pointer hover:bg-card-border transition-colors z-10"
             >
               <span className="material-symbols-outlined text-base">close</span>
             </button>
 
             {/* Icon */}
             <div
-              className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center text-4xl shadow-md border ${
+              className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center text-4xl shadow-md border shrink-0 ${
                 selectedBadge.unlocked
                   ? `${selectedBadge.bgRenk} ${selectedBadge.renk} ${selectedBadge.borderRenk}`
                   : 'bg-slate-200 dark:bg-slate-800 text-slate-400 grayscale border-slate-300 dark:border-slate-700'
@@ -1100,7 +1138,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
 
             {/* Task Requirement Card */}
-            <div className="bg-surface-container-low p-3.5 rounded-2xl border border-card-border text-left space-y-1.5">
+            <div className="bg-surface-container-low p-3.5 rounded-2xl border border-card-border text-left space-y-1.5 shrink-0">
               <span className="text-[10px] font-black uppercase text-primary tracking-wider block">
                 🎯 KAZANIM GÖREVİ
               </span>
@@ -1127,7 +1165,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
 
             {/* Action button */}
-            <div className="pt-1">
+            <div className="pt-1 shrink-0">
               {!selectedBadge.unlocked ? (
                 <button
                   type="button"
@@ -1168,13 +1206,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
       {/* ACCOUNT DELETION CONFIRMATION MODAL (Apple App Store Guideline 5.1.1 Uyumlu) */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-card-bg w-full max-w-md rounded-3xl p-6 border-2 border-rose-500/30 shadow-2xl space-y-4 text-center">
-            <div className="w-16 h-16 rounded-full bg-rose-500/10 text-rose-500 border-2 border-rose-500/20 flex items-center justify-center mx-auto shadow-xs">
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pb-20 sm:pb-4 animate-fadeIn">
+          <div className="bg-card-bg w-full max-w-md rounded-3xl p-6 border-2 border-rose-500/30 shadow-2xl space-y-4 text-center max-h-[85dvh] sm:max-h-[85vh] flex flex-col overflow-y-auto overscroll-contain">
+            <div className="w-16 h-16 rounded-full bg-rose-500/10 text-rose-500 border-2 border-rose-500/20 flex items-center justify-center mx-auto shadow-xs shrink-0">
               <span className="material-symbols-outlined text-3xl font-bold">delete_forever</span>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 shrink-0">
               <h3 className="font-black text-lg text-text-main">
                 Hesabınızı Silmek Üzeresiniz
               </h3>
@@ -1183,7 +1221,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </p>
             </div>
 
-            <div className="bg-surface-container-low p-3.5 rounded-2xl border border-card-border text-left space-y-2 text-xs text-text-muted font-medium">
+            <div className="bg-surface-container-low p-3.5 rounded-2xl border border-card-border text-left space-y-2 text-xs text-text-muted font-medium shrink-0">
               <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
                 <span className="material-symbols-outlined text-sm shrink-0">close</span>
                 <span>Tüm soru çözümleriniz ve analizleriniz silinir</span>
@@ -1202,7 +1240,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-2 shrink-0">
               <button
                 type="button"
                 disabled={isDeletingAccount}

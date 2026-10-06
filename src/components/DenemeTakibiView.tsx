@@ -172,7 +172,7 @@ export const DenemeTakibiView: React.FC<DenemeTakibiViewProps> = ({ onRewardXp, 
       : null;
 
   return (
-    <div className="space-y-4 sm:space-y-5 pb-20">
+    <div className="space-y-4 sm:space-y-5 pb-36 sm:pb-24">
       {/* Header Banner - Compact & Modern */}
       <div className="bg-gradient-to-r from-indigo-600 via-primary to-purple-600 rounded-2xl p-4 sm:p-5 text-white shadow-md relative overflow-hidden">
         <div className="absolute -right-6 -bottom-6 opacity-10 pointer-events-none">
@@ -417,137 +417,143 @@ export const DenemeTakibiView: React.FC<DenemeTakibiViewProps> = ({ onRewardXp, 
 
       {/* ADD DENEME MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-surface border border-card-border rounded-3xl w-full max-w-2xl shadow-2xl p-4 sm:p-6 space-y-4 sm:space-y-5 my-auto">
-            <div className="flex items-center justify-between border-b border-card-border pb-3 sm:pb-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-surface border border-card-border rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90dvh] sm:max-h-[85vh] my-auto overflow-hidden animate-fadeIn">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-card-border p-4 sm:p-5 shrink-0 bg-surface">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-xl sm:text-2xl">post_add</span>
                 <h3 className="font-black text-base sm:text-lg text-text-main">Yeni Deneme Neti Ekle</h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-text-muted hover:text-text-main p-1 rounded-full cursor-pointer"
+                className="text-text-muted hover:text-text-main p-1.5 rounded-full hover:bg-surface-container-low cursor-pointer transition-colors"
               >
-                <span className="material-symbols-outlined">close</span>
+                <span className="material-symbols-outlined text-xl">close</span>
               </button>
             </div>
 
-            <form onSubmit={handleAddDeneme} className="space-y-4">
-              {/* Exam Type & Publisher */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-extrabold text-text-main mb-1">Sınav Türü</label>
-                  <select
-                    value={sinavTuru}
-                    onChange={(e) => setSinavTuru(e.target.value as any)}
-                    className="w-full bg-surface-container-low border border-card-border rounded-xl p-2.5 text-xs font-bold text-text-main focus:outline-none focus:border-primary"
-                  >
-                    <option value="TYT">TYT (Temel Yeterlilik)</option>
-                    <option value="AYT">AYT (Alan Yeterlilik)</option>
-                    <option value="LGS">LGS (Lise Geçiş)</option>
-                    <option value="YDT">YDT (Yabancı Dil)</option>
-                    <option value="KPSS">KPSS</option>
-                    <option value="Diğer">Diğer Deneme</option>
-                  </select>
-                </div>
+            {/* Modal Form */}
+            <form onSubmit={handleAddDeneme} className="flex flex-col flex-1 overflow-hidden">
+              {/* Scrollable Form Body */}
+              <div className="overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 flex-1 overscroll-contain pr-2">
+                {/* Exam Type & Publisher */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-extrabold text-text-main mb-1">Sınav Türü</label>
+                    <select
+                      value={sinavTuru}
+                      onChange={(e) => setSinavTuru(e.target.value as any)}
+                      className="w-full bg-surface-container-low border border-card-border rounded-xl p-2.5 text-xs font-bold text-text-main focus:outline-none focus:border-primary"
+                    >
+                      <option value="TYT">TYT (Temel Yeterlilik)</option>
+                      <option value="AYT">AYT (Alan Yeterlilik)</option>
+                      <option value="LGS">LGS (Lise Geçiş)</option>
+                      <option value="YDT">YDT (Yabancı Dil)</option>
+                      <option value="KPSS">KPSS</option>
+                      <option value="Diğer">Diğer Deneme</option>
+                    </select>
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-extrabold text-text-main mb-1">Deneme / Yayın Evi Adı</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Örn: 3D Türkiye Geneli-2"
-                    value={yayinEvi}
-                    onChange={(e) => setYayinEvi(e.target.value)}
-                    className="w-full bg-surface-container-low border border-card-border rounded-xl p-2.5 text-xs text-text-main focus:outline-none focus:border-primary"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-xs font-extrabold text-text-main mb-1">Deneme / Yayın Evi Adı</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Örn: 3D Türkiye Geneli-2"
+                      value={yayinEvi}
+                      onChange={(e) => setYayinEvi(e.target.value)}
+                      className="w-full bg-surface-container-low border border-card-border rounded-xl p-2.5 text-xs text-text-main focus:outline-none focus:border-primary"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-extrabold text-text-main mb-1">Tarih</label>
-                  <input
-                    type="date"
-                    value={tarih}
-                    onChange={(e) => setTarih(e.target.value)}
-                    className="w-full bg-surface-container-low border border-card-border rounded-xl p-2.5 text-xs text-text-main focus:outline-none focus:border-primary"
-                  />
-                </div>
-              </div>
-
-              {/* Subject Scores Input Table */}
-              <div className="space-y-2">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                  <span className="text-xs font-black text-text-main">Ders Bazlı Soru Net Tablosu</span>
-                  <div className="inline-flex items-center gap-1.5 bg-primary/10 text-primary font-black text-xs px-3 py-1 rounded-full w-fit">
-                    <span>Toplam Net:</span>
-                    <span className="text-sm">{currentTotalNet.toFixed(2)}</span>
+                  <div>
+                    <label className="block text-xs font-extrabold text-text-main mb-1">Tarih</label>
+                    <input
+                      type="date"
+                      value={tarih}
+                      onChange={(e) => setTarih(e.target.value)}
+                      className="w-full bg-surface-container-low border border-card-border rounded-xl p-2.5 text-xs text-text-main focus:outline-none focus:border-primary"
+                    />
                   </div>
                 </div>
 
-                <div className="bg-surface-container-low rounded-2xl border border-card-border p-2.5 sm:p-3 space-y-2.5 max-h-64 overflow-y-auto">
-                  {dersInputlar.map((ders, idx) => {
-                    const net = calculateNet(ders.dogru, ders.yanlis);
+                {/* Subject Scores Input Table */}
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="text-xs font-black text-text-main">Ders Bazlı Soru Net Tablosu</span>
+                    <div className="inline-flex items-center gap-1.5 bg-primary/10 text-primary font-black text-xs px-3 py-1 rounded-full w-fit">
+                      <span>Toplam Net:</span>
+                      <span className="text-sm">{currentTotalNet.toFixed(2)}</span>
+                    </div>
+                  </div>
 
-                    return (
-                      <div
-                        key={idx}
-                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-surface p-2.5 sm:p-3 rounded-xl border border-card-border"
-                      >
-                        <span className="font-extrabold text-xs text-text-main min-w-[120px]">{ders.dersAdi}</span>
+                  <div className="bg-surface-container-low rounded-2xl border border-card-border p-2.5 sm:p-3 space-y-2.5 max-h-60 sm:max-h-72 overflow-y-auto">
+                    {dersInputlar.map((ders, idx) => {
+                      const net = calculateNet(ders.dogru, ders.yanlis);
 
-                        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-1 sm:pt-0 border-t sm:border-t-0 border-card-border/60">
-                          <div className="flex items-center gap-1">
-                            <span className="text-[11px] font-bold text-emerald-600">D:</span>
-                            <input
-                              type="number"
-                              min={0}
-                              max={ders.maxQ}
-                              value={ders.dogru}
-                              onChange={(e) => handleScoreChange(idx, 'dogru', parseInt(e.target.value))}
-                              className="w-12 sm:w-14 bg-surface-container-low border border-card-border rounded-lg p-1 text-xs text-center font-bold"
-                            />
-                          </div>
+                      return (
+                        <div
+                          key={idx}
+                          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-surface p-2.5 sm:p-3 rounded-xl border border-card-border"
+                        >
+                          <span className="font-extrabold text-xs text-text-main min-w-[120px]">{ders.dersAdi}</span>
 
-                          <div className="flex items-center gap-1">
-                            <span className="text-[11px] font-bold text-rose-500">Y:</span>
-                            <input
-                              type="number"
-                              min={0}
-                              max={ders.maxQ}
-                              value={ders.yanlis}
-                              onChange={(e) => handleScoreChange(idx, 'yanlis', parseInt(e.target.value))}
-                              className="w-12 sm:w-14 bg-surface-container-low border border-card-border rounded-lg p-1 text-xs text-center font-bold"
-                            />
-                          </div>
+                          <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-1 sm:pt-0 border-t sm:border-t-0 border-card-border/60">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[11px] font-bold text-emerald-600">D:</span>
+                              <input
+                                type="number"
+                                min={0}
+                                max={ders.maxQ}
+                                value={ders.dogru}
+                                onChange={(e) => handleScoreChange(idx, 'dogru', parseInt(e.target.value))}
+                                className="w-12 sm:w-14 bg-surface-container-low border border-card-border rounded-lg p-1 text-xs text-center font-bold"
+                              />
+                            </div>
 
-                          <div className="text-[11px] text-text-muted font-bold px-1">
-                            B: {ders.bos}
-                          </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[11px] font-bold text-rose-500">Y:</span>
+                              <input
+                                type="number"
+                                min={0}
+                                max={ders.maxQ}
+                                value={ders.yanlis}
+                                onChange={(e) => handleScoreChange(idx, 'yanlis', parseInt(e.target.value))}
+                                className="w-12 sm:w-14 bg-surface-container-low border border-card-border rounded-lg p-1 text-xs text-center font-bold"
+                              />
+                            </div>
 
-                          <div className="bg-primary/10 text-primary font-black text-xs px-2.5 py-1 rounded-lg shrink-0 ml-auto sm:ml-0">
-                            {net} Net
+                            <div className="text-[11px] text-text-muted font-bold px-1">
+                              B: {ders.bos}
+                            </div>
+
+                            <div className="bg-primary/10 text-primary font-black text-xs px-2.5 py-1 rounded-lg shrink-0 ml-auto sm:ml-0">
+                              {net} Net
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-xs font-extrabold text-text-main mb-1">Deneme Notları & Yorumunuz (İsteğe Bağlı)</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Süre yetiştirme durumu, zorlanılan konular veya sınav stresi hakkındaki notlarınız..."
+                    value={notlar}
+                    onChange={(e) => setNotlar(e.target.value)}
+                    className="w-full bg-surface-container-low border border-card-border rounded-xl p-2.5 text-xs text-text-main focus:outline-none focus:border-primary"
+                  />
                 </div>
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="block text-xs font-extrabold text-text-main mb-1">Deneme Notları & Yorumunuz (İsteğe Bağlı)</label>
-                <textarea
-                  rows={2}
-                  placeholder="Süre yetiştirme durumu, zorlanılan konular veya sınav stresi hakkındaki notlarınız..."
-                  value={notlar}
-                  onChange={(e) => setNotlar(e.target.value)}
-                  className="w-full bg-surface-container-low border border-card-border rounded-xl p-2.5 text-xs text-text-main focus:outline-none focus:border-primary"
-                />
-              </div>
-
-              {/* Action Submit */}
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-card-border">
+              {/* Sticky Action Submit Footer */}
+              <div className="flex items-center justify-end gap-2.5 p-3.5 sm:p-4 border-t border-card-border bg-surface shrink-0 z-10 shadow-xs">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -557,9 +563,10 @@ export const DenemeTakibiView: React.FC<DenemeTakibiViewProps> = ({ onRewardXp, 
                 </button>
                 <button
                   type="submit"
-                  className="px-5 sm:px-6 py-2.5 rounded-xl bg-primary text-white font-extrabold text-xs shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                  className="px-5 sm:px-6 py-2.5 rounded-xl bg-primary text-white font-extrabold text-xs shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  Netleri Kaydet (+40 XP)
+                  <span className="material-symbols-outlined text-base">save</span>
+                  <span>Netleri Kaydet (+40 XP)</span>
                 </button>
               </div>
             </form>

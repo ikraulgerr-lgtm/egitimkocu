@@ -343,8 +343,8 @@ function getDistractorsForSubject(ders: string, exactAnswer: string): string[] {
   const cleanQuestionText = getCleanQuestionText(question.ocrMetin);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
-      <div className="bg-card-bg w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl border border-card-border max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 pb-20 sm:pb-4 animate-fadeIn">
+      <div className="bg-card-bg w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl border border-card-border max-h-[85dvh] sm:max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-card-border flex items-center justify-between bg-card-bg">
           <div className="flex items-center gap-2">
