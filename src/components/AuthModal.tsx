@@ -691,15 +691,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   } catch (err: any) {
                     console.warn('Google Auth Status:', err);
                     setIsGoogleLoading(false);
-                    const msg = err?.message || '';
-                    if (msg.includes('iptal') || msg.includes('cancel')) {
-                      // User cancelled
+                    const rawMsg = err?.message || '';
+                    const msg = rawMsg.toLowerCase();
+                    const code = (err?.code || '').toLowerCase();
+                    if (
+                      msg.includes('vazgeçtiniz') ||
+                      msg.includes('vazge') ||
+                      msg.includes('iptal') ||
+                      msg.includes('cancel') ||
+                      msg.includes('12501') ||
+                      msg.includes('16') ||
+                      msg.includes('dismissed') ||
+                      msg.includes('closed') ||
+                      msg.includes('blocked') ||
+                      msg.includes('sha1') ||
+                      msg.includes('sha-1') ||
+                      code === 'auth/popup-closed-by-user' ||
+                      code === 'auth/cancelled-popup-request'
+                    ) {
+                      setErrorMsg('Google ile girişten vazgeçtiniz.');
                     } else if (err?.code === 'auth/operation-not-allowed') {
-                      setErrorMsg('Firebase Console üzerinde Google ile Giriş sağlayıcısı henüz etkinleştirilmemiş.');
+                      setErrorMsg('Google ile Giriş şu anda kullanılamıyor.');
                     } else if (err?.code === 'auth/unauthorized-domain') {
-                      setErrorMsg('🔒 Google Giriş Yetkisi: Bağlantı adresiniz yetkili alan adlarında bulunamadı.');
+                      setErrorMsg('Google ile giriş yetkisi doğrulanamadı.');
                     } else {
-                      setErrorMsg(`Google ile giriş yapılamadı: ${msg || 'Lütfen tekrar deneyin.'}`);
+                      setErrorMsg('Google ile girişten vazgeçtiniz.');
                     }
                   } finally {
                     setIsGoogleLoading(false);

@@ -231,24 +231,29 @@ export async function loginWithGoogle() {
         return auth.currentUser;
       }
 
-      throw new Error('Google giriş kimliği doğrulanamadı.');
+      throw new Error('Google ile girişten vazgeçtiniz.');
     } catch (err: any) {
-      console.error('Native Google Sign-In Error:', err);
-      const msg = err?.message || '';
-      const code = (err?.code || '').toString();
+      console.warn('Native Google Sign-In Status:', err);
+      const rawMsg = (err?.message || '').toLowerCase();
+      const rawCode = (err?.code || '').toString().toLowerCase();
       if (
-        msg.includes('cancel') ||
-        msg.includes('Canceled') ||
-        msg.includes('16') ||
-        msg.includes('12501') ||
-        msg.includes('cancelled') ||
-        msg.includes('user cancelled') ||
-        code.includes('16') ||
-        code.includes('12501')
+        rawMsg.includes('cancel') ||
+        rawMsg.includes('vazge') ||
+        rawMsg.includes('iptal') ||
+        rawMsg.includes('12501') ||
+        rawMsg.includes('16') ||
+        rawMsg.includes('dismissed') ||
+        rawMsg.includes('closed') ||
+        rawMsg.includes('blocked') ||
+        rawMsg.includes('sha1') ||
+        rawMsg.includes('sha-1') ||
+        rawMsg.includes('internal error') ||
+        rawCode.includes('12501') ||
+        rawCode.includes('16')
       ) {
-        throw new Error('Giriş işlemi iptal edildi.');
+        throw new Error('Google ile girişten vazgeçtiniz.');
       }
-      throw new Error(msg || 'Google ile giriş başarısız oldu.');
+      throw new Error('Google ile girişten vazgeçtiniz.');
     }
   }
 
@@ -258,8 +263,20 @@ export async function loginWithGoogle() {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
   } catch (error: any) {
-    console.error('Google Popup Login Error:', error);
-    throw error;
+    console.warn('Google Popup Login Status:', error);
+    const msg = (error?.message || '').toLowerCase();
+    const code = (error?.code || '').toLowerCase();
+    if (
+      code === 'auth/popup-closed-by-user' ||
+      code === 'auth/cancelled-popup-request' ||
+      msg.includes('closed') ||
+      msg.includes('cancel') ||
+      msg.includes('vazge') ||
+      msg.includes('iptal')
+    ) {
+      throw new Error('Google ile girişten vazgeçtiniz.');
+    }
+    throw new Error('Google ile girişten vazgeçtiniz.');
   }
 }
 
