@@ -841,15 +841,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
       interval = setInterval(() => {
         setPomoTimeLeft((prev) => {
           const next = prev - 1;
-          if (next >= 0) {
-            updatePomodoroNotification({
-              mode: pomoMode,
-              durationSeconds: next,
-              isRunning: true,
-              roomTitle: activeGroupRoom?.title,
-            });
-          }
-          return next;
+          return next >= 0 ? next : 0;
         });
       }, 1000);
     } else if (isPomoRunning && pomoTimeLeft === 0) {

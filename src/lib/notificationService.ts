@@ -427,8 +427,8 @@ function formatPomoSeconds(seconds: number): string {
 }
 
 /**
- * Real-time Pomodoro notification that updates live in the phone notification tray & lockscreen
- * Shows exact countdown (MM:SS) while running, and shows paused state with exact remaining time when paused.
+ * Pomodoro notification that schedules a clean status notification and an exact completion alarm.
+ * Scheduled once when the timer is started, paused, or resumed (no second-by-second spam).
  */
 export async function updatePomodoroNotification({
   mode,
@@ -442,8 +442,6 @@ export async function updatePomodoroNotification({
   roomTitle?: string;
 }) {
   if (!Capacitor.isNativePlatform()) return;
-  if (isUpdatingPomoNotif && isRunning) return;
-  isUpdatingPomoNotif = true;
 
   try {
     const hasPerm = await LocalNotifications.checkPermissions();
@@ -460,18 +458,25 @@ export async function updatePomodoroNotification({
     const formattedTime = formatPomoSeconds(durationSeconds);
     const roomPrefix = roomTitle ? `[${roomTitle}] ` : '';
 
+    // Always clear previous pomo notifications first
+    await LocalNotifications.cancel({
+      notifications: [{ id: POMO_ONGOING_NOTIF_ID }, { id: POMO_END_ALARM_ID }],
+    }).catch(() => {});
+
     if (isRunning) {
+      const targetDate = new Date(Date.now() + durationSeconds * 1000);
+      const targetTimeStr = targetDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+
       const title =
         mode === 'work'
-          ? `🍅 ${formattedTime} - ${roomPrefix}Odaklanma`
-          : `☕ ${formattedTime} - ${roomPrefix}Mola`;
+          ? `🍅 ${roomPrefix}Pomodoro Odaklanma Başladı`
+          : `☕ ${roomPrefix}Mola Başladı`;
 
       const body =
         mode === 'work'
-          ? `⏳ Kalan: ${formattedTime} • Ekran kapalıyken de süreniz burada güncellenir. Odaklanmayı bozmayın! 💪`
-          : `☕ Kalan: ${formattedTime} • Dinlenme zamanı. Zihnini tazele! 🌟`;
+          ? `🎯 Hedef Bitiş: ${targetTimeStr} (${formattedTime}) • Süreniz tamamlandığında sesli alarm çalacaktır. Odaklanmayı sürdürün! 💪`
+          : `☕ Hedef Bitiş: ${targetTimeStr} (${formattedTime}) • Dinlenme zamanı. Zihninizi tazeleyin! 🌟`;
 
-      const targetDate = new Date(Date.now() + durationSeconds * 1000);
       const endTitle = mode === 'work' ? '🍅 Pomodoro Odaklanma Tamamlandı!' : '☕ Mola Süresi Bitti!';
       const endBody =
         mode === 'work'
@@ -506,17 +511,13 @@ export async function updatePomodoroNotification({
         ],
       });
     } else {
-      // Paused State: cancel end alarm, update notification bar to show paused remaining time
-      await LocalNotifications.cancel({
-        notifications: [{ id: POMO_END_ALARM_ID }],
-      }).catch(() => {});
-
+      // Paused State: notification bar shows paused remaining time
       const title =
         mode === 'work'
-          ? `⏸️ ${formattedTime} (Duraklatıldı) - ${roomPrefix}Pomodoro`
-          : `⏸️ ${formattedTime} (Duraklatıldı) - ${roomPrefix}Mola`;
+          ? `⏸️ Pomodoro Duraklatıldı (${formattedTime})`
+          : `⏸️ Mola Duraklatıldı (${formattedTime})`;
 
-      const body = `Sayaç ${formattedTime} seviyesinde duraklatıldı. Devam etmek için dokunun.`;
+      const body = `Sayaç ${formattedTime} seviyesinde duraklatıldı. Devam etmek için uygulamayı açın.`;
 
       await LocalNotifications.schedule({
         notifications: [
@@ -537,8 +538,6 @@ export async function updatePomodoroNotification({
     }
   } catch (e) {
     console.warn('Pomodoro local notification error:', e);
-  } finally {
-    isUpdatingPomoNotif = false;
   }
 }
 
