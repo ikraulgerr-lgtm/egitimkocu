@@ -154,17 +154,33 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
           </h4>
 
           <div className="space-y-2">
-            <div className="bg-surface-container-low p-3.5 rounded-2xl border border-card-border flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold text-text-main">🎯 Günlük Hedef & Çalışma Hatırlatıcı</p>
-                <p className="text-[11px] text-text-muted">Belirlediğin çalışma saatlerinde motive edici bildirim al.</p>
+            <div className="bg-surface-container-low p-3.5 rounded-2xl border border-card-border space-y-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-text-main">🎯 Günlük Hedef & Çalışma Hatırlatıcı</p>
+                  <p className="text-[11px] text-text-muted">Belirlediğin çalışma saatlerinde motive edici bildirim al.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={settings.dailyGoal}
+                  onChange={() => toggle('dailyGoal')}
+                  className="w-5 h-5 accent-primary rounded-md cursor-pointer shrink-0"
+                />
               </div>
-              <input
-                type="checkbox"
-                checked={settings.dailyGoal}
-                onChange={() => toggle('dailyGoal')}
-                className="w-5 h-5 accent-primary rounded-md cursor-pointer shrink-0"
-              />
+              {settings.dailyGoal && (
+                <div className="pt-2 border-t border-card-border/60 flex items-center justify-between text-xs animate-fadeIn">
+                  <span className="text-text-muted font-bold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm text-primary">schedule</span>
+                    <span>Hatırlatıcı Saati:</span>
+                  </span>
+                  <input
+                    type="time"
+                    value={settings.dailyGoalTime || '19:00'}
+                    onChange={(e) => updateTime('dailyGoalTime', e.target.value)}
+                    className="px-2.5 py-1 text-xs bg-card-bg border border-card-border rounded-lg text-text-main font-mono font-bold focus:outline-none focus:border-primary"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="bg-surface-container-low p-3.5 rounded-2xl border border-card-border flex items-center justify-between gap-3">

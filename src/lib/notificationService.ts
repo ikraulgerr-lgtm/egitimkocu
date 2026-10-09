@@ -33,6 +33,17 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
 const STORAGE_KEY = 'edumind_notification_settings';
 const LAST_SENT_KEY = 'edumind_last_notification_timestamps';
 
+// Pre-defined IDs for native scheduled recurring background alarms
+export const DAILY_MOTIVATION_NOTIF_ID = 99980;
+export const DAILY_GOAL_NOTIF_ID = 99981;
+export const STREAK_REMINDER_NOTIF_ID = 99982;
+export const ERROR_POOL_NOTIF_ID = 99983;
+export const WEEKLY_REPORT_NOTIF_ID = 99984;
+export const EXAM_ALERT_NOTIF_ID = 99985;
+
+export const POMO_ONGOING_NOTIF_ID = 99990;
+export const POMO_END_ALARM_ID = 99999;
+
 export const DAILY_MOTIVATION_QUOTES: Array<{ title: string; quote: string }> = [
   {
     title: '🎯 Başarı Disiplin İster',
@@ -86,7 +97,7 @@ export function getNotificationSettings(): NotificationSettings {
   return DEFAULT_NOTIFICATION_SETTINGS;
 }
 
-export function saveNotificationSettings(settings: NotificationSettings) {
+export function saveNotificationSettings(settings: NotificationSettings, user?: Kullanici | null) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
     if (auth.currentUser) {
@@ -96,9 +107,53 @@ export function saveNotificationSettings(settings: NotificationSettings) {
         { merge: true }
       ).catch(() => {});
     }
-    // Automatically synchronize native daily motivation alarms
-    syncDailyMotivationSchedule(settings).catch(() => {});
+    // Automatically pre-schedule all native background alarms
+    scheduleAllBackgroundNotifications(settings, user).catch(() => {});
   } catch (e) {}
+}
+
+/**
+ * Initialize Android notification channels with high importance and vibration
+ */
+export async function initializeNotificationChannels() {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    // 1. Reminders & Goals Channel (High Importance heads-up)
+    await LocalNotifications.createChannel({
+      id: 'edumind_reminders',
+      name: 'Ders ve Hedef Hatırlatıcıları',
+      description: 'Günlük motivasyon, çalışma hedefleri, seri koruma ve soru tekrar hatırlatıcıları',
+      importance: 5,
+      visibility: 1,
+      vibration: true,
+      lights: true,
+      lightColor: '#4338ca',
+    });
+
+    // 2. Pomodoro & Study Timer Channel
+    await LocalNotifications.createChannel({
+      id: 'edumind_pomodoro',
+      name: 'Pomodoro ve Çalışma Sayacı',
+      description: 'Pomodoro odaklanma ve mola bitiş alarmları',
+      importance: 5,
+      visibility: 1,
+      vibration: true,
+      lights: true,
+      lightColor: '#e11d48',
+    });
+
+    // 3. Social & General Channel
+    await LocalNotifications.createChannel({
+      id: 'edumind_general',
+      name: 'Genel ve Sosyal Bildirimler',
+      description: 'Arkadaşlık istekleri, oda davetleri ve sistem bildirimleri',
+      importance: 4,
+      visibility: 1,
+      vibration: true,
+    });
+  } catch (err) {
+    console.warn('Error creating notification channels:', err);
+  }
 }
 
 /**
@@ -107,6 +162,7 @@ export function saveNotificationSettings(settings: NotificationSettings) {
 export async function requestNotificationPermissions(): Promise<boolean> {
   try {
     if (Capacitor.isNativePlatform()) {
+      await initializeNotificationChannels();
       const status = await LocalNotifications.requestPermissions();
       return status.display === 'granted';
     } else if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -127,11 +183,13 @@ export async function sendNativeNotification({
   body,
   id,
   extra,
+  channelId,
 }: {
   title: string;
   body: string;
   id?: number;
   extra?: any;
+  channelId?: string;
 }) {
   try {
     if (Capacitor.isNativePlatform()) {
@@ -141,8 +199,9 @@ export async function sendNativeNotification({
             title,
             body,
             id: id || Math.floor(10000 + Math.random() * 90000),
-            schedule: { at: new Date(Date.now() + 200) },
+            schedule: { at: new Date(Date.now() + 200), allowWhileIdle: true },
             sound: 'default',
+            channelId: channelId || 'edumind_general',
             smallIcon: 'ic_stat_icon',
             largeIcon: 'ic_launcher',
             iconColor: '#4338ca',
@@ -198,6 +257,7 @@ export async function dispatchAppNotification({
     title,
     body: message,
     id: Math.floor(Date.now() % 100000),
+    channelId: type === 'pomo_invite' ? 'edumind_pomodoro' : 'edumind_general',
     extra: { notifId, type },
   });
 
@@ -221,69 +281,207 @@ export async function dispatchAppNotification({
   }
 }
 
-const DAILY_MOTIVATION_NOTIF_ID = 99980;
-
 /**
- * Synchronize repeating daily motivation notification
+ * Pre-schedules all recurring native OS notifications (Daily Motivation, Daily Goal, Streak Protection, Error Pool, Weekly Report, Exam Alert).
+ * Because these are registered with the native OS (Android AlarmManager / iOS UNUserNotificationCenter),
+ * they will trigger precisely on schedule even when the app is completely closed / killed.
  */
-export async function syncDailyMotivationSchedule(settings: NotificationSettings, user?: Kullanici | null) {
+export async function scheduleAllBackgroundNotifications(
+  settingsInput?: NotificationSettings,
+  user?: Kullanici | null
+) {
   if (!Capacitor.isNativePlatform()) return;
+
   try {
     const hasPerm = await LocalNotifications.checkPermissions();
-    if (hasPerm.display !== 'granted') return;
-
-    // If disabled by user, cancel scheduled alarm
-    if (!settings.dailyMotivation) {
-      await LocalNotifications.cancel({
-        notifications: [{ id: DAILY_MOTIVATION_NOTIF_ID }],
-      }).catch(() => {});
-      return;
+    if (hasPerm.display !== 'granted') {
+      const req = await LocalNotifications.requestPermissions();
+      if (req.display !== 'granted') return;
     }
 
-    const dayOfYear = Math.floor(
-      (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
-    );
-    const quoteObj = DAILY_MOTIVATION_QUOTES[dayOfYear % DAILY_MOTIVATION_QUOTES.length];
+    await initializeNotificationChannels();
 
-    const [hourStr, minStr] = (settings.dailyMotivationTime || '09:30').split(':');
-    const targetHour = parseInt(hourStr) || 9;
-    const targetMinute = parseInt(minStr) || 30;
-
+    const settings = settingsInput || getNotificationSettings();
     const studentName = user?.ad ? `${user.ad}, ` : '';
-    const bodyText = `${studentName}${quoteObj.quote}`;
 
-    // Cancel previous scheduled notification first
+    // First, cancel existing scheduled background recurring alarms
+    const idsToCancel = [
+      DAILY_MOTIVATION_NOTIF_ID,
+      DAILY_GOAL_NOTIF_ID,
+      STREAK_REMINDER_NOTIF_ID,
+      ERROR_POOL_NOTIF_ID,
+      WEEKLY_REPORT_NOTIF_ID,
+      EXAM_ALERT_NOTIF_ID,
+    ];
+
     await LocalNotifications.cancel({
-      notifications: [{ id: DAILY_MOTIVATION_NOTIF_ID }],
+      notifications: idsToCancel.map((id) => ({ id })),
     }).catch(() => {});
 
-    // Schedule daily repeating notification
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          id: DAILY_MOTIVATION_NOTIF_ID,
-          title: quoteObj.title,
-          body: bodyText,
-          schedule: {
-            on: { hour: targetHour, minute: targetMinute },
-            repeats: true,
-            every: 'day',
-          },
-          sound: 'default',
-          smallIcon: 'ic_stat_icon',
-          largeIcon: 'ic_launcher',
-          iconColor: '#4338ca',
-          extra: { type: 'daily_motivation' },
+    const notificationsToSchedule: any[] = [];
+
+    // 1. Günlük Ders Motivasyonu
+    if (settings.dailyMotivation) {
+      const dayOfYear = Math.floor(
+        (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
+      );
+      const quoteObj = DAILY_MOTIVATION_QUOTES[dayOfYear % DAILY_MOTIVATION_QUOTES.length];
+      const [hourStr, minStr] = (settings.dailyMotivationTime || '09:30').split(':');
+      const targetHour = parseInt(hourStr, 10) || 9;
+      const targetMinute = parseInt(minStr, 10) || 30;
+
+      notificationsToSchedule.push({
+        id: DAILY_MOTIVATION_NOTIF_ID,
+        title: quoteObj.title,
+        body: `${studentName}${quoteObj.quote}`,
+        schedule: {
+          on: { hour: targetHour, minute: targetMinute },
+          repeats: true,
+          every: 'day',
+          allowWhileIdle: true,
         },
-      ],
-    });
+        channelId: 'edumind_reminders',
+        sound: 'default',
+        smallIcon: 'ic_stat_icon',
+        largeIcon: 'ic_launcher',
+        iconColor: '#4338ca',
+        extra: { type: 'daily_motivation' },
+      });
+    }
+
+    // 2. Günlük Hedef ve Çalışma Hatırlatıcı
+    if (settings.dailyGoal) {
+      const [goalHStr, goalMStr] = (settings.dailyGoalTime || '19:00').split(':');
+      const goalHour = parseInt(goalHStr, 10) || 19;
+      const goalMinute = parseInt(goalMStr, 10) || 0;
+
+      notificationsToSchedule.push({
+        id: DAILY_GOAL_NOTIF_ID,
+        title: '🎯 Günlük Hedef & Çalışma Zamanı',
+        body: `${studentName}Bugünkü ders hedeflerine ulaşmak için harika bir zaman! Hemen masanın başına geç ve çalışmaya başla. 📚`,
+        schedule: {
+          on: { hour: goalHour, minute: goalMinute },
+          repeats: true,
+          every: 'day',
+          allowWhileIdle: true,
+        },
+        channelId: 'edumind_reminders',
+        sound: 'default',
+        smallIcon: 'ic_stat_icon',
+        largeIcon: 'ic_launcher',
+        iconColor: '#4338ca',
+        extra: { type: 'daily_goal' },
+      });
+    }
+
+    // 3. Seri (Streak) Koruma Hatırlatıcısı (21:00)
+    if (settings.streakReminder) {
+      notificationsToSchedule.push({
+        id: STREAK_REMINDER_NOTIF_ID,
+        title: '🔥 Serini Kaybetme!',
+        body: `${studentName}Günlük çalışma serini korumak ve puan kazanmak için gün bitmeden soru çöz veya Pomodoro yap! ⏳`,
+        schedule: {
+          on: { hour: 21, minute: 0 },
+          repeats: true,
+          every: 'day',
+          allowWhileIdle: true,
+        },
+        channelId: 'edumind_reminders',
+        sound: 'default',
+        smallIcon: 'ic_stat_icon',
+        largeIcon: 'ic_launcher',
+        iconColor: '#f97316',
+        extra: { type: 'streak' },
+      });
+    }
+
+    // 4. Hata Havuzu ve Soru Tekrarı (17:30)
+    if (settings.errorPoolReview) {
+      notificationsToSchedule.push({
+        id: ERROR_POOL_NOTIF_ID,
+        title: '🧠 Hata Havuzu ve Soru Tekrarı',
+        body: `${studentName}Hata havuzunda ve Ebbinghaus tekrar eğrinde bekleyen soruların var. Bilgilerini pekiştirmek için tekrar et! 💡`,
+        schedule: {
+          on: { hour: 17, minute: 30 },
+          repeats: true,
+          every: 'day',
+          allowWhileIdle: true,
+        },
+        channelId: 'edumind_reminders',
+        sound: 'default',
+        smallIcon: 'ic_stat_icon',
+        largeIcon: 'ic_launcher',
+        iconColor: '#8b5cf6',
+        extra: { type: 'error_pool' },
+      });
+    }
+
+    // 5. Haftalık Gelişim ve Başarı Raporu (Pazar 20:30)
+    if (settings.weeklyReport) {
+      notificationsToSchedule.push({
+        id: WEEKLY_REPORT_NOTIF_ID,
+        title: '📊 Haftalık Gelişim ve Başarı Raporu',
+        body: `${studentName}Bu haftaki netlerin, ders dağılımın ve Pomodoro istatistiklerin hazır! Haftalık karneni incele. 🌟`,
+        schedule: {
+          on: { weekday: 1, hour: 20, minute: 30 }, // 1 = Sunday
+          repeats: true,
+          every: 'week',
+          allowWhileIdle: true,
+        },
+        channelId: 'edumind_reminders',
+        sound: 'default',
+        smallIcon: 'ic_stat_icon',
+        largeIcon: 'ic_launcher',
+        iconColor: '#0ea5e9',
+        extra: { type: 'weekly_report' },
+      });
+    }
+
+    // 6. Sınav Hedefi ve Motivasyon İpuçları (14:00)
+    if (settings.campaigns) {
+      const examTitle =
+        user?.targetExam && user.targetExam !== 'Hazırlanmıyorum'
+          ? `🚀 ${user.targetExam} Hedefin Seni Bekliyor!`
+          : '🚀 Hedefine Bir Adım Daha Yaklaş!';
+
+      notificationsToSchedule.push({
+        id: EXAM_ALERT_NOTIF_ID,
+        title: examTitle,
+        body: `${studentName}Dereceye giden yol disiplinli çalışmadan geçer. Bugün yapacağın her soru seni hedefine yaklaştıracak! 💪`,
+        schedule: {
+          on: { hour: 14, minute: 0 },
+          repeats: true,
+          every: 'day',
+          allowWhileIdle: true,
+        },
+        channelId: 'edumind_reminders',
+        sound: 'default',
+        smallIcon: 'ic_stat_icon',
+        largeIcon: 'ic_launcher',
+        iconColor: '#6366f1',
+        extra: { type: 'exam_alert' },
+      });
+    }
+
+    if (notificationsToSchedule.length > 0) {
+      await LocalNotifications.schedule({
+        notifications: notificationsToSchedule,
+      });
+    }
   } catch (err) {
-    console.warn('Error syncing daily motivation notification:', err);
+    console.warn('Error scheduling all background notifications:', err);
   }
 }
 
 /**
- * Run smart notification checks based on user study habits, error pool, streak, and target exam
+ * Backward compatible alias for syncDailyMotivationSchedule
+ */
+export async function syncDailyMotivationSchedule(settings: NotificationSettings, user?: Kullanici | null) {
+  return scheduleAllBackgroundNotifications(settings, user);
+}
+
+/**
+ * Run in-app notification checks (creates in-app notifications in drawer if conditions met)
  */
 export async function runSmartNotificationChecks({
   user,
@@ -308,8 +506,8 @@ export async function runSmartNotificationChecks({
     if (rawGlobal) lastGlobalSentMs = Number(rawGlobal) || 0;
   } catch (e) {}
 
-  // Sync native daily repeating motivation
-  syncDailyMotivationSchedule(settings, user).catch(() => {});
+  // Automatically ensure background native alarms are synced
+  scheduleAllBackgroundNotifications(settings, user).catch(() => {});
 
   // Global quiet-time throttle: at least 6 hours between automatic pop reminders
   if (nowMs - lastGlobalSentMs < 6 * 60 * 60 * 1000) {
@@ -328,25 +526,7 @@ export async function runSmartNotificationChecks({
     } catch (e) {}
   };
 
-  // 1. Daily Study Motivation Quote (Morning / Noon, if enabled)
-  if (settings.dailyMotivation && nowHour >= 9 && nowHour <= 14 && canSendToday('daily_motivation')) {
-    const dayOfYear = Math.floor(
-      (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
-    );
-    const quoteObj = DAILY_MOTIVATION_QUOTES[dayOfYear % DAILY_MOTIVATION_QUOTES.length];
-    const studentName = user.ad ? `${user.ad}, ` : '';
-    await dispatchAppNotification({
-      type: 'exam_alert',
-      title: quoteObj.title,
-      message: `${studentName}${quoteObj.quote}`,
-      user,
-      onAddInAppNotification,
-    });
-    markSentToday('daily_motivation');
-    return;
-  }
-
-  // 2. Error Pool & Ebbinghaus Repetition Reminder (Only in the evening between 18:00 and 21:00)
+  // 1. Error Pool & Ebbinghaus Repetition Reminder (In-App notification)
   if (settings.errorPoolReview && nowHour >= 18 && nowHour <= 21 && canSendToday('error_pool')) {
     const unsolvedErrors = questions.filter((q) => !q.isSolved);
     if (unsolvedErrors.length > 0) {
@@ -362,7 +542,7 @@ export async function runSmartNotificationChecks({
     }
   }
 
-  // 3. Daily Study Goal Reminder (Only in the afternoon/evening)
+  // 2. Daily Study Goal Reminder (In-App notification)
   if (settings.dailyGoal && nowHour >= 17 && nowHour <= 21 && canSendToday('daily_goal')) {
     await dispatchAppNotification({
       type: 'daily_goal',
@@ -375,7 +555,7 @@ export async function runSmartNotificationChecks({
     return;
   }
 
-  // 4. Streak Protection Alert (Only late evening 20:00 - 22:00)
+  // 3. Streak Protection Alert (In-App notification)
   if (settings.streakReminder && user.seri > 0 && nowHour >= 20 && canSendToday('streak')) {
     await dispatchAppNotification({
       type: 'streak',
@@ -385,40 +565,8 @@ export async function runSmartNotificationChecks({
       onAddInAppNotification,
     });
     markSentToday('streak');
-    return;
-  }
-
-  // 5. Weekly Report & Performance Analysis (Strictly on Sunday night at 23:59)
-  const dayOfWeek = new Date().getDay(); // 0 is Sunday
-  const nowMinute = new Date().getMinutes();
-  if (settings.weeklyReport && dayOfWeek === 0 && nowHour === 23 && nowMinute >= 50 && canSendToday('weekly_report')) {
-    await dispatchAppNotification({
-      type: 'weekly_report',
-      title: '📊 Haftalık Gelişim Raporu',
-      message: `Tebrikler! Bu hafta çözdüğün sorular ve Pomodoro odaklanmaların başarı raporuna yansıdı. İncelemek için tıkla.`,
-      user,
-      onAddInAppNotification,
-    });
-    markSentToday('weekly_report');
-    return;
-  }
-
-  // 6. Target Exam Motivation & Countdown Alert
-  if (settings.campaigns && user.targetExam && user.targetExam !== 'Hazırlanmıyorum' && canSendToday('exam_alert')) {
-    await dispatchAppNotification({
-      type: 'exam_alert',
-      title: `🚀 ${user.targetExam} Hedefin Seni Bekliyor!`,
-      message: `Dereceye giden yol disiplinli çalışmadan geçer. Bugün yapacağın her soru seni hedefine bir adım daha yaklaştıracak! 💪`,
-      user,
-      onAddInAppNotification,
-    });
-    markSentToday('exam_alert');
   }
 }
-
-const POMO_ONGOING_NOTIF_ID = 99990;
-const POMO_END_ALARM_ID = 99999;
-let isUpdatingPomoNotif = false;
 
 function formatPomoSeconds(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -490,6 +638,7 @@ export async function updatePomodoroNotification({
             title,
             body,
             schedule: { at: new Date(Date.now() + 50) },
+            channelId: 'edumind_pomodoro',
             sound: undefined,
             smallIcon: 'ic_stat_icon',
             largeIcon: 'ic_launcher',
@@ -501,7 +650,8 @@ export async function updatePomodoroNotification({
             id: POMO_END_ALARM_ID,
             title: endTitle,
             body: endBody,
-            schedule: { at: targetDate },
+            schedule: { at: targetDate, allowWhileIdle: true },
+            channelId: 'edumind_pomodoro',
             sound: 'default',
             smallIcon: 'ic_stat_icon',
             largeIcon: 'ic_launcher',
@@ -526,6 +676,7 @@ export async function updatePomodoroNotification({
             title,
             body,
             schedule: { at: new Date(Date.now() + 50) },
+            channelId: 'edumind_pomodoro',
             sound: undefined,
             smallIcon: 'ic_stat_icon',
             largeIcon: 'ic_launcher',

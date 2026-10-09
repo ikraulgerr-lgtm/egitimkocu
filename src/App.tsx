@@ -39,7 +39,14 @@ import { DenemeTakibiView } from './components/DenemeTakibiView';
 
 import { analyzeQuestionService, generateSimilarQuestionService } from './lib/geminiClient';
 import { NotificationSettingsModal } from './components/NotificationSettingsModal';
-import { runSmartNotificationChecks, sendNativeNotification, requestNotificationPermissions, syncDailyMotivationSchedule, getNotificationSettings } from './lib/notificationService';
+import {
+  runSmartNotificationChecks,
+  sendNativeNotification,
+  requestNotificationPermissions,
+  scheduleAllBackgroundNotifications,
+  syncDailyMotivationSchedule,
+  getNotificationSettings,
+} from './lib/notificationService';
 import { initializeAdMob } from './lib/admobService';
 import { NoCreditsModal } from './components/NoCreditsModal';
 import { AuthModal } from './components/AuthModal';
@@ -56,6 +63,7 @@ import { auth, db, handleFirestoreError, OperationType, logoutFirebase, deleteAc
 import { onAuthStateChanged, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { App as CapApp, URLOpenListenerEvent } from '@capacitor/app';
 
@@ -146,10 +154,33 @@ export function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Request notification permissions and initialize AdMob on app mount
+  // Request notification permissions, pre-schedule native OS background alarms, and initialize AdMob on app mount
   useEffect(() => {
-    requestNotificationPermissions();
+    requestNotificationPermissions().then(() => {
+      scheduleAllBackgroundNotifications(getNotificationSettings(), user).catch(() => {});
+    });
     initializeAdMob();
+
+    if (Capacitor.isNativePlatform()) {
+      const handlePromise = LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+        try {
+          const type = action.notification?.extra?.type;
+          if (type === 'error_pool') {
+            setActiveTab('error_pool');
+          } else if (type === 'weekly_report' || type === 'stats') {
+            setActiveTab('stats');
+          } else if (type === 'pomodoro_ongoing' || type === 'pomodoro_alarm') {
+            setActiveTab('schedule');
+          } else if (type === 'daily_motivation' || type === 'daily_goal' || type === 'streak' || type === 'exam_alert') {
+            setActiveTab('home');
+          }
+        } catch (e) {}
+      });
+
+      return () => {
+        handlePromise.then((h) => h.remove()).catch(() => {});
+      };
+    }
   }, []);
 
   // Listen to Firestore real-time notifications, pomo_invites, friend_invites & real-time friends
@@ -311,7 +342,7 @@ export function App() {
             // Background smart reminders only go to notification drawer, no intrusive floating banner
           },
         });
-        syncDailyMotivationSchedule(getNotificationSettings(), user).catch(() => {});
+        scheduleAllBackgroundNotifications(getNotificationSettings(), user).catch(() => {});
       }, 5000);
       return () => clearTimeout(timeout);
     }
