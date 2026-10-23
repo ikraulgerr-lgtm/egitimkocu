@@ -18,6 +18,12 @@ interface ScheduleViewProps {
   currentUser?: Kullanici;
   autoJoinRoomCode?: string | null;
   onClearAutoJoin?: () => void;
+  onPomodoroStatusChange?: (status: {
+    isRunning: boolean;
+    timeLeft: number;
+    mode: 'work' | 'break';
+    totalSeconds: number;
+  }) => void;
 }
 
 // Helper: get current week's days array dynamically
@@ -63,6 +69,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   currentUser,
   autoJoinRoomCode,
   onClearAutoJoin,
+  onPomodoroStatusChange,
 }) => {
   const [selectedDay, setSelectedDay] = useState<string>(todayAbbrev);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -132,10 +139,22 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   const [invitedFriendsMap, setInvitedFriendsMap] = useState<Record<string, boolean>>({});
   const [selectedFriendsForNewRoom, setSelectedFriendsForNewRoom] = useState<Record<string, boolean>>({});
   const [cheerMessageBanner, setCheerMessageBanner] = useState<string | null>(null);
+  const [isGroupRoomExpanded, setIsGroupRoomExpanded] = useState<boolean>(() => !!activeGroupRoom);
+
+  // Synchronize live Pomodoro status with App root so persistent floating button shows in other views
+  useEffect(() => {
+    onPomodoroStatusChange?.({
+      isRunning: isPomoRunning,
+      timeLeft: pomoTimeLeft,
+      mode: pomoMode,
+      totalSeconds: pomoMode === 'work' ? customWorkMinutes * 60 : customBreakMinutes * 60,
+    });
+  }, [isPomoRunning, pomoTimeLeft, pomoMode, customWorkMinutes, customBreakMinutes, onPomodoroStatusChange]);
 
   useEffect(() => {
     if (activeGroupRoom) {
       localStorage.setItem('active_pomo_group_room', JSON.stringify(activeGroupRoom));
+      setIsGroupRoomExpanded(true);
     } else {
       localStorage.removeItem('active_pomo_group_room');
     }
@@ -1301,6 +1320,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                             setPomoSelectedItemId(item.id);
                             handleSelectPomoMode('work');
                             setIsPomoRunning(true);
+                            updatePomodoroNotification({
+                              mode: 'work',
+                              durationSeconds: customWorkMinutes * 60,
+                              isRunning: true,
+                              roomTitle: activeGroupRoom?.title,
+                            });
                             document.getElementById('pomodoro-section')?.scrollIntoView({ behavior: 'smooth' });
                           }}
                           className="px-2.5 py-1 rounded-lg bg-rose-600/10 text-rose-500 hover:bg-rose-600 hover:text-white font-bold text-[11px] flex items-center gap-0.5 transition-all cursor-pointer border border-rose-500/20"
@@ -1390,42 +1415,34 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         </div>
       </section>
 
-      {/* POMODORO FOCUS TIMER SECTION - Compact & Modern */}
-      <section id="pomodoro-section" className="bg-card-bg text-text-main p-3.5 sm:p-4 rounded-2xl shadow-md border border-card-border space-y-3 relative overflow-hidden dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-950 dark:to-indigo-950 dark:text-white dark:border-indigo-500/30">
-        {/* Card Header & Mode Switcher */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-card-border dark:border-white/10 pb-2.5">
-          <div className="flex items-center gap-1.5">
-            <span className="text-base">🍅</span>
-            <div>
-              <h3 className="font-extrabold text-xs sm:text-sm text-text-main dark:text-white">
-                Pomodoro Odaklanma Zamanlayıcısı
-              </h3>
-              <p className="text-[10px] text-text-muted dark:text-slate-300">Esnek Çalışma & Mola</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 bg-surface-container-low dark:bg-slate-800/80 p-0.5 rounded-xl border border-card-border dark:border-white/10">
+      {/* POMODORO FOCUS TIMER SECTION - Clean, Minimalist & Focused */}
+      <section id="pomodoro-section" className="bg-card-bg text-text-main p-4 sm:p-5 rounded-3xl shadow-lg border border-card-border space-y-4 relative overflow-hidden dark:bg-slate-900/90 dark:border-white/10">
+        {/* Header: Mode & Fullscreen */}
+        <div className="flex items-center justify-between gap-2 border-b border-card-border/60 dark:border-white/10 pb-3">
+          <div className="flex items-center gap-1.5 p-1 bg-surface-container-low dark:bg-slate-800/80 rounded-2xl border border-card-border/50 dark:border-white/5">
             <button
               type="button"
               onClick={() => handleSelectPomoMode('work')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center gap-0.5 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
                 pomoMode === 'work'
-                  ? 'bg-rose-600 text-white shadow-xs'
-                  : 'text-text-muted dark:text-slate-400 hover:text-text-main dark:hover:text-white'
+                  ? 'bg-rose-600 text-white shadow-md'
+                  : 'text-text-muted hover:text-text-main dark:text-slate-400'
               }`}
             >
-              <span>🍅 {customWorkMinutes} dk Çalış</span>
+              <span>🍅</span>
+              <span>Odaklan ({customWorkMinutes} dk)</span>
             </button>
             <button
               type="button"
               onClick={() => handleSelectPomoMode('break')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center gap-0.5 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
                 pomoMode === 'break'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-text-muted dark:text-slate-400 hover:text-text-main dark:hover:text-white'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'text-text-muted hover:text-text-main dark:text-slate-400'
               }`}
             >
-              <span>☕ {customBreakMinutes} dk Mola</span>
+              <span>☕</span>
+              <span>Mola ({customBreakMinutes} dk)</span>
             </button>
           </div>
 
@@ -1437,32 +1454,70 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 document.documentElement.requestFullscreen().catch(() => {});
               }
             }}
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 text-white font-extrabold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all shadow-md active:scale-95"
+            className="p-2 rounded-xl bg-surface-container-low hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-text-muted hover:text-text-main dark:text-slate-300 transition-all cursor-pointer border border-card-border/50"
+            title="Tam Ekran Odaklanma Modu"
           >
-            <span className="material-symbols-outlined text-sm">fullscreen</span>
-            <span>Tam Ekran Odaklanma</span>
+            <span className="material-symbols-outlined text-base">fullscreen</span>
           </button>
         </div>
 
-        {/* Custom Duration Selector Strip */}
-        <div className="flex flex-wrap items-center justify-between gap-1.5 bg-surface-container-low dark:bg-slate-900/80 p-2 rounded-xl border border-card-border dark:border-white/10">
-          <div className="flex items-center gap-1 flex-wrap text-xs">
-            <span className="text-[10px] font-extrabold text-primary dark:text-indigo-200 mr-0.5">
-              {pomoMode === 'work' ? '⏱️ Süre:' : '☕ Mola:'}
-            </span>
+        {/* Central Clean Timer Display */}
+        <div className="flex flex-col items-center justify-center py-2 space-y-3">
+          {/* Circular Countdown Ring */}
+          <div className="relative w-44 h-44 sm:w-48 sm:h-48 flex items-center justify-center">
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+              <circle
+                cx="50"
+                cy="50"
+                r="42"
+                stroke="currentColor"
+                strokeWidth="4"
+                className="text-slate-200 dark:text-slate-800"
+                fill="transparent"
+              />
+              <circle
+                cx="50"
+                cy="50"
+                r="42"
+                stroke="currentColor"
+                strokeWidth="5"
+                className={pomoMode === 'work' ? 'text-rose-500' : 'text-emerald-500'}
+                fill="transparent"
+                strokeDasharray={263.89}
+                strokeDashoffset={263.89 - (263.89 * pomoProgressPct) / 100}
+                strokeLinecap="round"
+                style={{ transition: 'stroke-dashoffset 1s linear' }}
+              />
+            </svg>
+
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+              <span className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-text-main dark:text-white">
+                {formatTime(pomoTimeLeft)}
+              </span>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className={`w-2 h-2 rounded-full ${isPomoRunning ? 'bg-emerald-500 animate-ping' : 'bg-amber-400'}`} />
+                <span className="text-[11px] font-extrabold text-text-muted dark:text-slate-400 uppercase tracking-wider">
+                  {isPomoRunning ? (pomoMode === 'work' ? 'Odaklanıyor' : 'Molada') : 'Duraklatıldı'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Duration Pills */}
+          <div className="flex items-center gap-1.5 flex-wrap justify-center pt-1">
             {pomoMode === 'work' ? (
-              [15, 25, 35, 45, 60].map((m) => (
+              [15, 25, 45, 60].map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => handleSetWorkMinutes(m)}
-                  className={`px-2 py-0.5 rounded-lg font-bold transition-all text-[11px] cursor-pointer border ${
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                     customWorkMinutes === m
-                      ? 'bg-rose-500 text-white border-rose-600 shadow-2xs'
-                      : 'bg-card-bg dark:bg-slate-800 text-text-main dark:text-slate-300 border-card-border dark:border-transparent hover:border-rose-400'
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                      : 'bg-surface-container-low text-text-muted border-card-border/60 hover:border-primary/40'
                   }`}
                 >
-                  {m}dk
+                  {m} dk
                 </button>
               ))
             ) : (
@@ -1471,114 +1526,24 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                   key={m}
                   type="button"
                   onClick={() => handleSetBreakMinutes(m)}
-                  className={`px-2 py-0.5 rounded-lg font-bold transition-all text-[11px] cursor-pointer border ${
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                     customBreakMinutes === m
-                      ? 'bg-emerald-500 text-white border-emerald-600 shadow-2xs'
-                      : 'bg-card-bg dark:bg-slate-800 text-text-main dark:text-slate-300 border-card-border dark:border-transparent hover:border-emerald-400'
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                      : 'bg-surface-container-low text-text-muted border-card-border/60 hover:border-emerald-400'
                   }`}
                 >
-                  {m}dk
+                  {m} dk
                 </button>
               ))
             )}
           </div>
 
-          {/* Custom Minute Input Box */}
-          <div className="flex items-center gap-1">
-            <span className="text-[9px] text-text-muted dark:text-slate-400 font-bold">Özel:</span>
-            <input
-              type="number"
-              min="1"
-              max="180"
-              value={pomoMode === 'work' ? customWorkMinutes : customBreakMinutes}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10) || 1;
-                if (pomoMode === 'work') handleSetWorkMinutes(val);
-                else handleSetBreakMinutes(val);
-              }}
-              className="w-12 bg-surface dark:bg-slate-950 border border-card-border dark:border-slate-700 rounded-md px-1.5 py-0.5 text-[11px] text-center font-bold text-text-main dark:text-white focus:outline-none focus:border-primary"
-            />
-            <span className="text-[9px] text-text-muted dark:text-slate-400">dk</span>
-          </div>
-        </div>
-
-        {/* Linked Task Selector */}
-        <div className="space-y-0.5">
-          <label className="text-[10px] font-bold text-text-main dark:text-indigo-200 flex items-center justify-between">
-            <span>Odaklanılacak Çalışma:</span>
-            <span className="text-[9px] text-text-muted dark:text-slate-400 font-mono">
-              Bugün: {completedPomoCount} 🍅 ({completedPomoCount * customWorkMinutes} dk)
-            </span>
-          </label>
-          <select
-            value={pomoSelectedItemId}
-            onChange={(e) => setPomoSelectedItemId(e.target.value)}
-            className="w-full bg-surface-container-low dark:bg-slate-900 border border-card-border dark:border-slate-700 rounded-lg p-2 text-[11px] text-text-main dark:text-white focus:outline-none focus:border-primary font-bold"
-          >
-            <option value="free">🚀 Serbest Çalışma (Görevsiz)</option>
-            {uncompletedItems.map((item) => (
-              <option key={item.id} value={item.id}>
-                📌 {item.ders} - {item.konu} ({item.saat})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Circular Display & Digital Counter */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-surface-container-low dark:bg-slate-950/70 p-3 rounded-xl border border-card-border dark:border-white/5">
-          <div className="flex items-center gap-3">
-            {/* Visual Progress Dial Ring */}
-            <div className="relative w-18 h-18 sm:w-20 sm:h-20 flex items-center justify-center shrink-0">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 80 80">
-                <circle
-                  cx="40"
-                  cy="40"
-                  r="34"
-                  stroke="currentColor"
-                  strokeWidth="5"
-                  className="text-slate-200 dark:text-slate-800"
-                  fill="transparent"
-                />
-                <circle
-                  cx="40"
-                  cy="40"
-                  r="34"
-                  stroke="currentColor"
-                  strokeWidth="5"
-                  className={pomoMode === 'work' ? 'text-rose-500' : 'text-emerald-500'}
-                  fill="transparent"
-                  strokeDasharray={213.6}
-                  strokeDashoffset={213.6 - (213.6 * pomoProgressPct) / 100}
-                  strokeLinecap="round"
-                  style={{ transition: 'stroke-dashoffset 1s linear' }}
-                />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-sm sm:text-base font-black font-mono tracking-tight text-text-main dark:text-white pointer-events-none">
-                {formatTime(pomoTimeLeft)}
-              </span>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${isPomoRunning ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'}`} />
-                <span className="text-[10px] font-black uppercase tracking-wider text-text-muted dark:text-slate-300">
-                  {pomoMode === 'work' ? 'ODAKLANMA' : 'MOLA'}
-                </span>
-              </div>
-              <p className="text-xs font-extrabold text-text-main dark:text-white mt-0.5">
-                {pomoMode === 'work'
-                  ? `🎯 ${customWorkMinutes} Dk Çalışma`
-                  : `☕ ${customBreakMinutes} Dk Mola`}
-              </p>
-            </div>
-          </div>
-
-          {/* Action Control Buttons */}
-          <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+          {/* Action Buttons: Big Play/Pause + Reset */}
+          <div className="flex items-center gap-3 w-full max-w-xs pt-1">
             <button
               type="button"
               onClick={handleTogglePomo}
-              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl font-black text-xs flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer ${
+              className={`flex-1 py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer ${
                 isPomoRunning
                   ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
                   : pomoMode === 'work'
@@ -1586,7 +1551,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                   : 'bg-emerald-600 hover:bg-emerald-500 text-white'
               }`}
             >
-              <span className="material-symbols-outlined text-base">
+              <span className="material-symbols-outlined text-lg">
                 {isPomoRunning ? 'pause' : 'play_arrow'}
               </span>
               <span>{isPomoRunning ? 'Duraklat' : 'Başlat'}</span>
@@ -1595,29 +1560,36 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             <button
               type="button"
               onClick={() => handleResetPomo()}
-              className="p-2 rounded-xl bg-surface-container-low dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-text-muted dark:text-slate-300 cursor-pointer border border-card-border dark:border-white/10"
-              title="Sıfırla"
+              className="p-3 rounded-2xl bg-surface-container-low hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-text-muted hover:text-text-main cursor-pointer border border-card-border/60 transition-all active:scale-95"
+              title="Sayacı Sıfırla"
             >
-              <span className="material-symbols-outlined text-sm">restart_alt</span>
+              <span className="material-symbols-outlined text-lg">restart_alt</span>
             </button>
           </div>
         </div>
-        {/* Pomodoro Progress Bar */}
-        <div className="space-y-0.5">
-          <div className="w-full bg-slate-200 dark:bg-slate-950 h-1.5 rounded-full overflow-hidden border border-card-border dark:border-white/5">
-            <div
-              className={`h-full transition-all duration-1000 rounded-full ${
-                pomoMode === 'work'
-                  ? 'bg-gradient-to-r from-rose-500 to-amber-400'
-                  : 'bg-gradient-to-r from-emerald-500 to-teal-400'
-              }`}
-              style={{ width: `${pomoProgressPct}%` }}
-            />
-          </div>
+
+        {/* Minimal Task Link */}
+        <div className="pt-2 border-t border-card-border/60 dark:border-white/10 flex items-center justify-between gap-2 text-xs">
+          <span className="text-text-muted text-[11px] font-bold shrink-0">🎯 Görev:</span>
+          <select
+            value={pomoSelectedItemId}
+            onChange={(e) => setPomoSelectedItemId(e.target.value)}
+            className="flex-1 max-w-xs bg-surface-container-low dark:bg-slate-800 border border-card-border dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-text-main dark:text-white font-semibold focus:outline-none focus:border-primary truncate"
+          >
+            <option value="free">🚀 Serbest Çalışma</option>
+            {uncompletedItems.map((item) => (
+              <option key={item.id} value={item.id}>
+                📌 {item.ders} - {item.konu}
+              </option>
+            ))}
+          </select>
+          <span className="text-[11px] text-text-muted font-mono font-bold shrink-0">
+            {completedPomoCount} 🍅
+          </span>
         </div>
       </section>
 
-      {/* GROUP POMODORO & SHARED STUDY ROOM SECTION - Compact */}
+      {/* GROUP POMODORO & SHARED STUDY ROOM SECTION - Collapsible & Clean */}
       <section className="bg-card-bg text-text-main p-3.5 sm:p-4 rounded-2xl shadow-md border border-card-border space-y-3 relative overflow-hidden dark:bg-gradient-to-br dark:from-indigo-950 dark:via-slate-900 dark:to-purple-950 dark:text-white dark:border-purple-500/30">
         {/* Floating Cheer Pop Banner */}
         {cheerMessageBanner && (
@@ -1626,58 +1598,77 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           </div>
         )}
 
-        {/* Section Header */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-card-border dark:border-white/10 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-500/30 flex items-center justify-center font-bold">
-              <span className="material-symbols-outlined text-xl">groups</span>
+        {/* Section Header with Collapsible Toggle */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-card-border dark:border-white/10 pb-2.5">
+          <button
+            type="button"
+            onClick={() => setIsGroupRoomExpanded(!isGroupRoomExpanded)}
+            className="flex items-center gap-2 text-left cursor-pointer group"
+          >
+            <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-500/30 flex items-center justify-center font-bold">
+              <span className="material-symbols-outlined text-lg">groups</span>
             </div>
             <div>
-              <h3 className="font-black text-sm text-text-main dark:text-white flex items-center gap-2">
-                <span>Ortak Pomodoro Çalışma Odası</span>
-                {activeGroupRoom && (
-                  <span className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-emerald-500/30">
-                    🟢 CANLI ODA
+              <h3 className="font-black text-xs sm:text-sm text-text-main dark:text-white flex items-center gap-1.5">
+                <span>Ortak Pomodoro Odası</span>
+                {activeGroupRoom ? (
+                  <span className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border border-emerald-500/30">
+                    🟢 CANLI
+                  </span>
+                ) : (
+                  <span className="text-text-muted text-[10px] font-normal">
+                    (Arkadaşlarınla Çalış)
                   </span>
                 )}
               </h3>
-              <p className="text-[11px] text-text-muted dark:text-purple-200/80">Arkadaşlarınla oda kurun, birlikte Pomodoro yapın!</p>
             </div>
-          </div>
+            <span className="material-symbols-outlined text-sm text-text-muted group-hover:text-text-main transition-transform ml-1">
+              {isGroupRoomExpanded ? 'expand_less' : 'expand_more'}
+            </span>
+          </button>
 
           {!activeGroupRoom ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => setIsCreateRoomModalOpen(true)}
-                className="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-xl font-extrabold text-xs flex items-center gap-1 shadow-md transition-all cursor-pointer active:scale-95"
+                onClick={() => {
+                  setIsCreateRoomModalOpen(true);
+                  setIsGroupRoomExpanded(true);
+                }}
+                className="bg-purple-600 hover:bg-purple-500 text-white px-2.5 py-1 rounded-xl font-extrabold text-[11px] flex items-center gap-1 shadow-sm transition-all cursor-pointer active:scale-95"
               >
-                <span className="material-symbols-outlined text-sm">add_circle</span>
+                <span className="material-symbols-outlined text-xs">add_circle</span>
                 <span>Oda Kur</span>
               </button>
               <button
                 type="button"
-                onClick={() => setIsJoinRoomModalOpen(true)}
-                className="bg-surface-container-low hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-text-main dark:text-purple-200 px-3 py-1.5 rounded-xl font-extrabold text-xs border border-card-border dark:border-white/10 flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+                onClick={() => {
+                  setIsJoinRoomModalOpen(true);
+                  setIsGroupRoomExpanded(true);
+                }}
+                className="bg-surface-container-low hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-text-main dark:text-purple-200 px-2.5 py-1 rounded-xl font-extrabold text-[11px] border border-card-border dark:border-white/10 flex items-center gap-1 transition-all cursor-pointer active:scale-95"
               >
-                <span className="material-symbols-outlined text-sm">key</span>
-                <span>Koda Katıl</span>
+                <span className="material-symbols-outlined text-xs">key</span>
+                <span>Katıl</span>
               </button>
             </div>
           ) : (
             <button
               type="button"
               onClick={handleLeaveGroupRoom}
-              className="bg-rose-600/20 text-rose-600 dark:text-rose-300 hover:bg-rose-600 hover:text-white px-3 py-1.5 rounded-xl font-bold text-xs border border-rose-500/30 flex items-center gap-1 transition-all cursor-pointer"
+              className="bg-rose-600/20 text-rose-600 dark:text-rose-300 hover:bg-rose-600 hover:text-white px-2.5 py-1 rounded-xl font-bold text-[11px] border border-rose-500/30 flex items-center gap-1 transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-sm">logout</span>
-              <span>Odadan Ayrıl</span>
+              <span className="material-symbols-outlined text-xs">logout</span>
+              <span>Ayrıl</span>
             </button>
           )}
         </div>
 
-        {/* ACTIVE ROOM VIEW */}
-        {activeGroupRoom ? (
+        {/* Collapsible Content */}
+        {isGroupRoomExpanded && (
+          <div className="space-y-3 pt-1 animate-fadeIn">
+            {/* ACTIVE ROOM VIEW */}
+            {activeGroupRoom ? (
           <div className="space-y-4">
             {/* Room Banner */}
             <div className="bg-surface-container-low dark:bg-slate-950/80 p-3.5 rounded-2xl border border-card-border dark:border-purple-500/20 flex flex-wrap items-center justify-between gap-2">
@@ -1936,6 +1927,8 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 </div>
               </div>
             )}
+          </div>
+        )}
           </div>
         )}
       </section>

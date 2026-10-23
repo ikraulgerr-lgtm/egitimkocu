@@ -617,13 +617,13 @@ export async function updatePomodoroNotification({
 
       const title =
         mode === 'work'
-          ? `🍅 ${roomPrefix}Pomodoro Odaklanma Başladı`
-          : `☕ ${roomPrefix}Mola Başladı`;
+          ? `🍅 ${roomPrefix}Pomodoro Çalışıyor (${formattedTime})`
+          : `☕ ${roomPrefix}Mola Çalışıyor (${formattedTime})`;
 
       const body =
         mode === 'work'
-          ? `🎯 Hedef Bitiş: ${targetTimeStr} (${formattedTime}) • Süreniz tamamlandığında sesli alarm çalacaktır. Odaklanmayı sürdürün! 💪`
-          : `☕ Hedef Bitiş: ${targetTimeStr} (${formattedTime}) • Dinlenme zamanı. Zihninizi tazeleyin! 🌟`;
+          ? `🎯 Yeni Bitiş Saati: ${targetTimeStr} • Kalan: ${formattedTime}. Süre tamamlandığında sesli alarm çalacaktır. 💪`
+          : `☕ Yeni Bitiş Saati: ${targetTimeStr} • Kalan: ${formattedTime}. Dinlenme zamanı! 🌟`;
 
       const endTitle = mode === 'work' ? '🍅 Pomodoro Odaklanma Tamamlandı!' : '☕ Mola Süresi Bitti!';
       const endBody =
@@ -661,13 +661,13 @@ export async function updatePomodoroNotification({
         ],
       });
     } else {
-      // Paused State: notification bar shows paused remaining time
+      // Paused State: notification bar shows paused remaining time and clarifies finish time is suspended
       const title =
         mode === 'work'
-          ? `⏸️ Pomodoro Duraklatıldı (${formattedTime})`
-          : `⏸️ Mola Duraklatıldı (${formattedTime})`;
+          ? `⏸️ Pomodoro Duraklatıldı (${formattedTime} Kaldı)`
+          : `⏸️ Mola Duraklatıldı (${formattedTime} Kaldı)`;
 
-      const body = `Sayaç ${formattedTime} seviyesinde duraklatıldı. Devam etmek için uygulamayı açın.`;
+      const body = `⏱️ Bitiş süresi donduruldu. Devam ettirdiğinizde yeni bitiş saati ${formattedTime} sonrasına ayarlanacaktır.`;
 
       await LocalNotifications.schedule({
         notifications: [

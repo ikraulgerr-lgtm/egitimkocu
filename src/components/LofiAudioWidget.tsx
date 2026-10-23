@@ -86,77 +86,97 @@ export const LofiAudioWidget: React.FC<LofiAudioWidgetProps> = ({
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   // Draggable Floating Widget State
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
-  const [isDragging, setIsDragging] = useState<boolean>(false);
-  const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number; moved: boolean }>({
-    startX: 0,
-    startY: 0,
-    initialX: 0,
-    initialY: 0,
-    moved: false,
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const saved = localStorage.getItem('lofi_widget_pos');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
   });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const dragJustFinishedRef = useRef<boolean>(false);
   const widgetRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
-    if (!widgetRef.current) return;
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (isEmbedded) return;
+    // Only handle primary click / touch
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
 
-    const rect = widgetRef.current.getBoundingClientRect();
-    dragRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      initialX: rect.left,
-      initialY: rect.top,
-      moved: false,
+    const btnEl = buttonRef.current;
+    if (!btnEl) return;
+    const rect = btnEl.getBoundingClientRect();
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initX = rect.left;
+    const initY = rect.top;
+    let hasMoved = false;
+
+    const onPointerMove = (moveEvt: PointerEvent) => {
+      const dx = moveEvt.clientX - startX;
+      const dy = moveEvt.clientY - startY;
+
+      if (!hasMoved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+        hasMoved = true;
+        setIsDragging(true);
+      }
+
+      if (hasMoved) {
+        const btnW = rect.width || 120;
+        const btnH = rect.height || 44;
+        const minX = 8;
+        const maxX = Math.max(minX, window.innerWidth - btnW - 8);
+        const minY = 50; // below top bar
+        const maxY = Math.max(minY, window.innerHeight - btnH - 65); // above bottom nav
+
+        const newX = Math.max(minX, Math.min(maxX, initX + dx));
+        const newY = Math.max(minY, Math.min(maxY, initY + dy));
+
+        setPosition({ x: newX, y: newY });
+      }
     };
 
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch {}
-    setIsDragging(true);
-  };
+    const onPointerUp = (upEvt: PointerEvent) => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
 
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging || !widgetRef.current) return;
-    const dx = e.clientX - dragRef.current.startX;
-    const dy = e.clientY - dragRef.current.startY;
-
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
-      dragRef.current.moved = true;
-    }
-
-    if (dragRef.current.moved) {
-      const rect = widgetRef.current.getBoundingClientRect();
-      const width = rect.width || 130;
-      const height = rect.height || 48;
-      const maxX = Math.max(10, window.innerWidth - width - 12);
-      const maxY = Math.max(10, window.innerHeight - height - 12);
-
-      let newX = dragRef.current.initialX + dx;
-      let newY = dragRef.current.initialY + dy;
-
-      newX = Math.max(12, Math.min(maxX, newX));
-      newY = Math.max(12, Math.min(maxY, newY));
-
-      setPosition({ x: newX, y: newY });
-    }
-  };
-
-  const handlePointerUp = (e: React.PointerEvent) => {
-    if (isDragging) {
       setIsDragging(false);
-      try {
-        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch {}
-    }
+
+      if (hasMoved) {
+        dragJustFinishedRef.current = true;
+        const dx = upEvt.clientX - startX;
+        const dy = upEvt.clientY - startY;
+        const btnW = rect.width || 120;
+        const btnH = rect.height || 44;
+        const finalX = Math.max(8, Math.min(window.innerWidth - btnW - 8, initX + dx));
+        const finalY = Math.max(50, Math.min(window.innerHeight - btnH - 65, initY + dy));
+        const finalPos = { x: finalX, y: finalY };
+        setPosition(finalPos);
+        try {
+          localStorage.setItem('lofi_widget_pos', JSON.stringify(finalPos));
+        } catch (e) {}
+
+        setTimeout(() => {
+          dragJustFinishedRef.current = false;
+        }, 150);
+      } else {
+        setIsExpanded((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
   };
 
-  const handleButtonClick = () => {
-    if (dragRef.current.moved) {
-      dragRef.current.moved = false;
+  const handleButtonClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (dragJustFinishedRef.current) {
+      dragJustFinishedRef.current = false;
       return;
     }
-    setIsExpanded((prev) => !prev);
   };
 
   // Web Audio Refs
@@ -642,13 +662,12 @@ export const LofiAudioWidget: React.FC<LofiAudioWidgetProps> = ({
 
       {/* Floating Draggable Pill Button */}
       <button
+        ref={buttonRef}
         type="button"
         onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
         onClick={handleButtonClick}
         title="Tıkla: Menüyü Aç / Basılı Tutarak Sürükle & Taşı"
+        style={{ touchAction: 'none' }}
         className={`px-3 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 shadow-xl border cursor-grab active:cursor-grabbing touch-none select-none transition-shadow ${
           isPlaying
             ? 'bg-primary text-white border-primary/50 shadow-primary/20'

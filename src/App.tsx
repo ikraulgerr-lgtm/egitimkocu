@@ -105,6 +105,12 @@ export function App() {
   const [isNotificationsCenterOpen, setIsNotificationsCenterOpen] = useState(false);
   const [pendingJoinRoomCode, setPendingJoinRoomCode] = useState<string | null>(null);
   const [activeBannerNotif, setActiveBannerNotif] = useState<Bildirim | null>(null);
+  const [livePomodoroState, setLivePomodoroState] = useState<{
+    isRunning: boolean;
+    timeLeft: number;
+    mode: 'work' | 'break';
+    totalSeconds: number;
+  } | null>(null);
   const deliveredNativeNotifsRef = useRef<Set<string>>(new Set());
 
   const cleanDeleteNotification = async (notifId: string) => {
@@ -1787,7 +1793,7 @@ export function App() {
           />
         )}
 
-        {activeTab === 'schedule' && (
+        <div style={{ display: activeTab === 'schedule' ? 'block' : 'none' }}>
           <ScheduleView
             scheduleItems={schedule}
             questions={questions}
@@ -1806,8 +1812,9 @@ export function App() {
               syncUserToFirestore(updatedUser);
               showToast(`🎉 Tebrikler! Çalışma seansı başarıyla tamamlandı (+${amount} XP)`);
             }}
+            onPomodoroStatusChange={setLivePomodoroState}
           />
-        )}
+        </div>
 
         {activeTab === 'profile' && (
           <ProfileView
@@ -2230,6 +2237,33 @@ export function App() {
 
       {/* Global Floating Lo-Fi Audio Widget */}
       <LofiAudioWidget />
+
+      {/* Global Floating Pomodoro Return Widget (Active when navigating other tabs while session is running/active) */}
+      {activeTab !== 'schedule' && livePomodoroState && (livePomodoroState.isRunning || (livePomodoroState.timeLeft > 0 && livePomodoroState.timeLeft < livePomodoroState.totalSeconds)) && (
+        <div className="fixed bottom-20 sm:bottom-24 left-1/2 -translate-x-1/2 z-40 animate-slideUp">
+          <button
+            onClick={() => setActiveTab('schedule')}
+            className="group flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-slate-900/95 dark:bg-zinc-900/95 text-white shadow-2xl border border-red-500/40 backdrop-blur-xl hover:border-red-400 hover:scale-105 active:scale-95 transition-all cursor-pointer ring-4 ring-red-500/10"
+            title="Pomodoro Sayacına Dön"
+          >
+            <span className={`flex items-center justify-center w-7 h-7 rounded-full text-base ${livePomodoroState.isRunning ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-amber-500/20 text-amber-400'}`}>
+              🍅
+            </span>
+            <div className="flex flex-col text-left">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-red-400/90 leading-none">
+                {livePomodoroState.isRunning ? (livePomodoroState.mode === 'work' ? 'Odaklanma Devam Ediyor' : 'Mola Devam Ediyor') : 'Pomodoro Duraklatıldı'}
+              </span>
+              <span className="text-sm font-black font-mono tracking-tight text-white leading-tight">
+                {String(Math.floor(livePomodoroState.timeLeft / 60)).padStart(2, '0')}:{String(livePomodoroState.timeLeft % 60).padStart(2, '0')}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 pl-1 text-xs font-bold text-slate-300 group-hover:text-white transition-colors">
+              <span className="hidden sm:inline">Dön</span>
+              <span className="material-symbols-outlined text-base">arrow_forward</span>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* Target Exam Countdown Modal Window */}
       <ExamCountdownWidget
