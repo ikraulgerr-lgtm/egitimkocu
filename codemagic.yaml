@@ -35,11 +35,11 @@ workflows:
         script: |
           LATEST_BUILD_NUM=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
           if [ -z "$LATEST_BUILD_NUM" ] || [ "$LATEST_BUILD_NUM" = "0" ] 2>/dev/null; then
-            BUILD_NUM=$((150 + ${BUILD_NUMBER:-1}))
+            BUILD_NUM=$((154 + ${BUILD_NUMBER:-1}))
           else
             BUILD_NUM=$((LATEST_BUILD_NUM + 1))
           fi
-          MARKETING_VER=$(node -p "require('./package.json').version" 2>/dev/null || echo "1.0.5")
+          MARKETING_VER=$(node -p "require('./package.json').version" 2>/dev/null || echo "1.0.7")
           echo "Setting dynamic build number to: $BUILD_NUM and marketing version to: $MARKETING_VER"
           sed -i '' "s/CURRENT_PROJECT_VERSION = .*;/CURRENT_PROJECT_VERSION = $BUILD_NUM;/g" ios/App/App.xcodeproj/project.pbxproj
           sed -i '' "s/MARKETING_VERSION = .*;/MARKETING_VERSION = $MARKETING_VER;/g" ios/App/App.xcodeproj/project.pbxproj
