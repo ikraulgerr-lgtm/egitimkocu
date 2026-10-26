@@ -36,6 +36,7 @@ import { LeaderboardView } from './components/LeaderboardView';
 import { ScheduleView } from './components/ScheduleView';
 import { ProfileView } from './components/ProfileView';
 import { DenemeTakibiView } from './components/DenemeTakibiView';
+import { ParentDashboardView } from './components/ParentDashboardView';
 
 import { analyzeQuestionService, generateSimilarQuestionService } from './lib/geminiClient';
 import { NotificationSettingsModal } from './components/NotificationSettingsModal';
@@ -440,6 +441,13 @@ export function App() {
               kullaniciAdi_lower: currentUsername.toLowerCase(),
               email: data.email || firebaseUser.email || 'ogrenci@egitimkocum.ai',
               avatarUrl: finalAvatar,
+              role: (data.role as any) || cachedUser?.role || 'student',
+              parentInviteCode: data.parentInviteCode || cachedUser?.parentInviteCode,
+              linkedStudentId: data.linkedStudentId || cachedUser?.linkedStudentId,
+              linkedStudentName: data.linkedStudentName || cachedUser?.linkedStudentName,
+              linkedStudentCode: data.linkedStudentCode || cachedUser?.linkedStudentCode,
+              parentConnected: data.parentConnected ?? cachedUser?.parentConnected ?? false,
+              parentName: data.parentName || cachedUser?.parentName,
               targetExam: data.targetExam || cachedUser?.targetExam || 'YKS',
               targetExamDate: data.targetExamDate || cachedUser?.targetExamDate || '2027-06-19',
               kredi: userKredi,
@@ -1588,6 +1596,13 @@ export function App() {
       kullaniciAdi_lower: (incomingUser.kullaniciAdi || cachedUser?.kullaniciAdi || 'ogrenci').toLowerCase(),
       email: incomingUser.email || cachedUser?.email || 'ogrenci@egitimkocum.ai',
       avatarUrl: incomingUser.avatarUrl || cachedUser?.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+      role: (incomingUser.role as any) || cachedUser?.role || 'student',
+      parentInviteCode: incomingUser.parentInviteCode || cachedUser?.parentInviteCode,
+      linkedStudentId: incomingUser.linkedStudentId || cachedUser?.linkedStudentId,
+      linkedStudentName: incomingUser.linkedStudentName || cachedUser?.linkedStudentName,
+      linkedStudentCode: incomingUser.linkedStudentCode || cachedUser?.linkedStudentCode,
+      parentConnected: incomingUser.parentConnected ?? cachedUser?.parentConnected ?? false,
+      parentName: incomingUser.parentName || cachedUser?.parentName,
       targetExam: incomingUser.targetExam || cachedUser?.targetExam || 'YKS',
       targetExamDate: incomingUser.targetExamDate || cachedUser?.targetExamDate || '2027-06-19',
       kredi: incomingUser.kredi ?? cachedUser?.kredi ?? 10,
@@ -1646,6 +1661,67 @@ export function App() {
 
     showToast(`👋 Hoş geldiniz, ${fullUser.ad}!`);
   };
+
+  const handleLogout = async () => {
+    isLoggingOutRef.current = true;
+    const currentUid = user?.id;
+
+    // 1. Immediately reset storage and local state
+    resetToCleanState(currentUid);
+    setUserState(INITIAL_USER);
+    setQuestionsState([]);
+    setScheduleState([]);
+    setFriendsState([]);
+    setNotifications([]);
+    setSelectedQuestion(null);
+    setActiveBannerNotif(null);
+    setActiveTab('home');
+    setIsAuthModalOpen(true);
+    setToastMessage('👋 Hesabınızdan başarıyla çıkış yapıldı.');
+    setTimeout(() => setToastMessage(null), 3000);
+
+    // 2. Perform native and JS Firebase signOut
+    try {
+      await logoutFirebase();
+    } catch (e) {
+      console.warn('Logout error:', e);
+    }
+
+    // 3. Re-verify clean state after async signOut
+    resetToCleanState(currentUid);
+    setUserState(INITIAL_USER);
+    setIsAuthModalOpen(true);
+
+    setTimeout(() => {
+      isLoggingOutRef.current = false;
+    }, 2000);
+  };
+
+  // Dedicated Parent Tracking Portal View
+  if (user?.role === 'parent') {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white font-sans transition-colors duration-200">
+        {isSplashActive && <SplashScreen theme={theme} />}
+        <ParentDashboardView
+          currentUser={user}
+          onLogout={handleLogout}
+          showToast={showToast}
+          onUpdateUser={handleUpdateUser}
+        />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onLoginSuccess={handleLoginSuccess}
+        />
+        {toastMessage && (
+          <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white font-bold text-xs px-5 py-3 rounded-full shadow-2xl border border-white/20 animate-fadeIn flex items-center gap-2">
+            <span className="material-symbols-outlined text-base text-primary">auto_awesome</span>
+            <span>{toastMessage}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-text-main font-sans transition-colors duration-200">
@@ -1888,39 +1964,7 @@ export function App() {
               syncUserToFirestore(updatedUser);
               showToast('Profil ve ayarlarınız başarıyla güncellendi!');
             }}
-            onLogout={async () => {
-              isLoggingOutRef.current = true;
-              const currentUid = user?.id;
-              // 1. Immediately reset storage and React states
-              resetToCleanState(currentUid);
-              setUserState(INITIAL_USER);
-              setQuestionsState([]);
-              setScheduleState([]);
-              setFriendsState([]);
-              setNotifications([]);
-              setSelectedQuestion(null);
-              setActiveBannerNotif(null);
-              setActiveTab('home');
-              setIsAuthModalOpen(true);
-              setToastMessage('👋 Hesabınızdan başarıyla çıkış yapıldı.');
-              setTimeout(() => setToastMessage(null), 3000);
-
-              // 2. Perform native and JS Firebase signOut
-              try {
-                await logoutFirebase();
-              } catch (e) {
-                console.warn('Logout error:', e);
-              }
-
-              // 3. Re-verify clean state after async signOut
-              resetToCleanState(currentUid);
-              setUserState(INITIAL_USER);
-              setIsAuthModalOpen(true);
-
-              setTimeout(() => {
-                isLoggingOutRef.current = false;
-              }, 2000);
-            }}
+            onLogout={handleLogout}
             onDeleteAccount={async () => {
               isLoggingOutRef.current = true;
               const currentUid = user?.id;

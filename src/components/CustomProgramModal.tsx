@@ -23,7 +23,8 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
 }) => {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
-  // Step 1: Selected Exam
+  // Step 1: Category filter & Selected Exam/Grade
+  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'EXAM' | 'SINIF'>('ALL');
   const [selectedExamId, setSelectedExamId] = useState<string>('yks_tyt_ayt');
 
   // Step 2: Selected Topics (ders -> set of konu titles)
@@ -41,8 +42,8 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
 
   const [startDate, setStartDate] = useState<string>(todayStr);
   const [targetEndDate, setTargetEndDate] = useState<string>(defaultTargetStr);
-  const [dailyHours, setDailyHours] = useState<number>(3);
-  const [preferredTimeSlot, setPreferredTimeSlot] = useState<string>('19:00 - 22:00');
+  const [dailyHours, setDailyHours] = useState<number>(2);
+  const [preferredTimeSlot, setPreferredTimeSlot] = useState<string>('evening');
 
   const currentExam = useMemo(() => {
     return EXAM_CURRICULUM_DATA.find((e) => e.id === selectedExamId) || EXAM_CURRICULUM_DATA[0];
@@ -196,14 +197,59 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
           ))}
         </div>
 
-        {/* Step 1: Exam Selection */}
+        {/* Step 1: Exam & Grade Curriculum Selection */}
         {step === 1 && (
-          <div className="space-y-4 overflow-y-auto pr-1">
-            <h4 className="text-xs font-extrabold text-text-muted uppercase tracking-wider">
-              1. Hazırlandığınız Sınavı veya Seviyeyi Seçin:
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {EXAM_CURRICULUM_DATA.map((exam) => {
+          <div className="space-y-3.5 overflow-y-auto pr-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h4 className="text-xs font-extrabold text-text-muted uppercase tracking-wider">
+                1. Sınavınızı veya Sınıfınızı Seçin:
+              </h4>
+
+              {/* Category Filter Tabs */}
+              <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-xl border border-card-border shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter('ALL')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    categoryFilter === 'ALL'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'text-text-muted hover:text-text-main'
+                  }`}
+                >
+                  Tümü
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter('EXAM')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    categoryFilter === 'EXAM'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'text-text-muted hover:text-text-main'
+                  }`}
+                >
+                  🎯 Sınavlar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCategoryFilter('SINIF')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    categoryFilter === 'SINIF'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'text-text-muted hover:text-text-main'
+                  }`}
+                >
+                  🏫 Sınıf Müfredatı
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {EXAM_CURRICULUM_DATA.filter((e) => {
+                if (categoryFilter === 'ALL') return true;
+                if (categoryFilter === 'EXAM') return e.category === 'YKS' || e.category === 'KPSS' || e.category === 'LGS';
+                if (categoryFilter === 'SINIF') return e.category === 'SINIF';
+                return true;
+              }).map((exam) => {
                 const isSelected = selectedExamId === exam.id;
                 return (
                   <div
@@ -212,7 +258,7 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
                       setSelectedExamId(exam.id);
                       setSelectedTopics({});
                     }}
-                    className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between space-y-2 group ${
+                    className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between space-y-2 group ${
                       isSelected
                         ? 'border-primary bg-primary/5 shadow-md ring-2 ring-primary/20'
                         : 'border-card-border bg-surface-container-low hover:border-primary/50'
@@ -220,22 +266,27 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-2xl">
-                        {exam.category === 'YKS' ? '🎓' : exam.category === 'KPSS' ? '🏛️' : exam.category === 'LGS' ? '🚀' : '📚'}
+                        {exam.category === 'YKS' ? '🎓' : exam.category === 'KPSS' ? '🏛️' : exam.category === 'LGS' ? '🚀' : '🏫'}
                       </span>
-                      {isSelected && (
+                      {isSelected ? (
                         <span className="material-symbols-outlined text-primary text-xl">check_circle</span>
+                      ) : (
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-card-bg border border-card-border text-text-muted">
+                          {exam.category === 'SINIF' ? 'MEB Müfredatı' : 'Sınav Kampı'}
+                        </span>
                       )}
                     </div>
                     <div>
                       <h5 className="font-extrabold text-sm text-text-main group-hover:text-primary transition-colors">
                         {exam.name}
                       </h5>
-                      <p className="text-xs text-text-muted mt-1 leading-relaxed">
+                      <p className="text-xs text-text-muted mt-0.5 leading-relaxed line-clamp-2">
                         {exam.description}
                       </p>
                     </div>
-                    <div className="pt-2 border-t border-card-border text-[11px] font-bold text-primary">
-                      {exam.dersler.length} Farklı Branş & Tüm Konular
+                    <div className="pt-2 border-t border-card-border text-[11px] font-bold text-primary flex items-center justify-between">
+                      <span>{exam.dersler.length} Branş Ders</span>
+                      <span className="text-text-muted text-[10px]">Tüm Konular Listeli →</span>
                     </div>
                   </div>
                 );
@@ -419,42 +470,46 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
             {/* Daily Hours & Slots */}
             <div className="bg-surface-container-low p-4 sm:p-5 rounded-2xl border border-card-border space-y-3">
               <label className="block text-xs font-bold text-text-main flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-base text-primary">schedule</span>
-                <span>Günde Ayrılacak Ortalama Çalışma Süresi:</span>
+                <span className="material-symbols-outlined text-base text-primary">fitness_center</span>
+                <span>Günlük Hedef Çalışma Temposu:</span>
               </label>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {[
-                  { hours: 1.5, label: '1.5 Saat (Hafif)' },
-                  { hours: 2.5, label: '2.5 Saat (Dengeli)' },
-                  { hours: 4, label: '4 Saat (Yoğun Kamp)' },
-                  { hours: 6, label: '6 Saat (Süper Kamp)' },
+                  { hours: 2, label: '🎯 2 Seans (Günde ~1.5 Saat)', desc: 'Dengeli ve sürdürülebilir' },
+                  { hours: 3, label: '🚀 3 Seans (Günde ~2.25 Saat)', desc: 'Hedef odaklı kamp' },
+                  { hours: 4, label: '⚡ 4 Seans (Günde ~3 Saat)', desc: 'Yoğun şampiyon temposu' },
                 ].map((item) => (
                   <button
                     key={item.hours}
                     type="button"
                     onClick={() => setDailyHours(item.hours)}
-                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer text-center ${
+                    className={`p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer text-left ${
                       dailyHours === item.hours
                         ? 'bg-primary text-white border-primary shadow-xs'
                         : 'bg-card-bg text-text-muted border-card-border hover:border-primary/50'
                     }`}
                   >
-                    {item.label}
+                    <div className="font-extrabold">{item.label}</div>
+                    <div className={`text-[10px] mt-0.5 ${dailyHours === item.hours ? 'text-white/80' : 'text-text-muted'}`}>
+                      {item.desc}
+                    </div>
                   </button>
                 ))}
               </div>
 
               {/* Preferred Time Slot */}
               <div className="pt-2">
-                <label className="block text-xs font-bold text-text-main mb-1.5">
-                  Günlük Tercih Edilen Çalışma Saat Aralığı:
+                <label className="block text-xs font-bold text-text-main mb-1.5 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base text-primary">schedule</span>
+                  <span>Günlük Tercih Edilen Çalışma Zamanı (45'er dk Odaklanma Seansları):</span>
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
-                    { slot: '09:00 - 12:00', title: '🌅 Sabah Kuşağı' },
-                    { slot: '14:00 - 17:00', title: '☀️ Öğleden Sonra' },
-                    { slot: '19:00 - 22:00', title: '🌙 Akşam Kuşağı' },
+                    { slot: 'evening', title: '🌆 Akşam', time: '17:30 - 21:30' },
+                    { slot: 'night', title: '🌙 Gece', time: '19:30 - 23:30' },
+                    { slot: 'morning', title: '🌅 Sabah', time: '10:00 - 15:00' },
+                    { slot: 'afternoon', title: '☀️ Öğleden Sonra', time: '14:00 - 18:00' },
                   ].map((s) => (
                     <button
                       key={s.slot}
@@ -467,7 +522,7 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
                       }`}
                     >
                       <div>{s.title}</div>
-                      <div className="text-[10px] opacity-80 mt-0.5">{s.slot}</div>
+                      <div className="text-[10px] opacity-80 mt-0.5">{s.time}</div>
                     </button>
                   ))}
                 </div>
@@ -490,7 +545,7 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
                   <span>🚀 {currentExam.name} Kişisel Kampı</span>
                 </span>
                 <span className="text-xs font-black text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
-                  {generatedPlan.length} Görev Oluşturuldu
+                  {generatedPlan.length} Görev Planlandı
                 </span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs pt-2">
@@ -499,12 +554,12 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
                   <strong className="text-text-main font-black">{totalSelectedCount} Adet</strong>
                 </div>
                 <div className="bg-card-bg/80 p-2.5 rounded-xl border border-card-border">
-                  <span className="text-text-muted text-[10px] block">Kamp Uzunluğu:</span>
+                  <span className="text-text-muted text-[10px] block">Kamp Süresi:</span>
                   <strong className="text-text-main font-black">{campaignDays} Gün</strong>
                 </div>
                 <div className="bg-card-bg/80 p-2.5 rounded-xl border border-card-border col-span-2 sm:col-span-1">
-                  <span className="text-text-muted text-[10px] block">Günlük Süre:</span>
-                  <strong className="text-text-main font-black">{dailyHours} Saat / Gün</strong>
+                  <span className="text-text-muted text-[10px] block">Günün Dağılımı:</span>
+                  <strong className="text-text-main font-black">45 dk Seanslar (Düzenli)</strong>
                 </div>
               </div>
             </div>

@@ -95,6 +95,15 @@ export interface Kullanici {
   targetExamDate?: string;
   customExamName?: string;
   lastResetDate?: string;
+  role?: 'student' | 'parent';
+  parentInviteCode?: string;
+  linkedStudentId?: string;
+  linkedStudentName?: string;
+  linkedStudentCode?: string;
+  parentName?: string;
+  parentConnected?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ToplulukCevap {

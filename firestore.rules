@@ -30,12 +30,14 @@ service cloud.firestore {
 
       // User questions subcollection
       match /questions/{questionId} {
-        allow read, write: if isOwner(userId);
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId);
       }
 
       // User schedule subcollection
       match /schedule/{scheduleId} {
-        allow read, write: if isOwner(userId);
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId);
       }
 
       // User friends subcollection — any signed-in user can write (for mutual friendship)
@@ -67,7 +69,8 @@ service cloud.firestore {
 
       // User denemeler subcollection
       match /denemeler/{denemeId} {
-        allow read, write: if isOwner(userId);
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId);
       }
     }
 

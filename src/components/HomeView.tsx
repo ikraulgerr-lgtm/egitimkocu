@@ -990,69 +990,34 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </div>
           )}
 
-          {/* Camera Bottom Controls (Only visible in Scan mode) */}
-          {scanMode === 'scan' && (
-            <div className="absolute bottom-4 left-0 right-0 px-6 flex justify-between items-center z-20">
-              {/* Left Button: Gallery / Photo Library Upload Button */}
+          {/* Hidden Inputs for Gallery & Camera Upload */}
+          <input
+            type="file"
+            ref={galleryInputRef}
+            onChange={handleFileChange}
+            accept="image/*"
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={cameraInputRef}
+            onChange={handleFileChange}
+            accept="image/*"
+            capture="camera"
+            className="hidden"
+          />
+
+          {/* Camera Facing Flip (Only when live camera stream is active, positioned cleanly in corner) */}
+          {scanMode === 'scan' && isLiveCameraOn && (
+            <div className="absolute bottom-4 right-4 z-20">
               <button
                 type="button"
-                onClick={handleOpenGallery}
-                className="w-12 h-12 rounded-full bg-slate-900/80 backdrop-blur-md text-white border border-white/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer"
-                title="Fotoğraf Kitaplığından veya Dosyalardan Seç"
+                onClick={toggleFacingMode}
+                className="w-11 h-11 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/30 text-white flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer shadow-md"
+                title="Ön/Arka Kamera Değiştir"
               >
-                <span className="material-symbols-outlined">photo_library</span>
+                <span className="material-symbols-outlined text-lg">cameraswitch</span>
               </button>
-
-              {/* Hidden Input for Gallery / File Upload (NO capture attr = opens gallery/files picker) */}
-              <input
-                type="file"
-                ref={galleryInputRef}
-                onChange={handleFileChange}
-                accept="image/*"
-                className="hidden"
-              />
-
-              {/* Hidden Input for Direct Camera Capture (capture="camera" forces camera-only on Android) */}
-              <input
-                type="file"
-                ref={cameraInputRef}
-                onChange={handleFileChange}
-                accept="image/*"
-                capture="camera"
-                className="hidden"
-              />
-
-              {/* Center Button: Camera Shutter */}
-              <button
-                type="button"
-                onClick={handleTakePhoto}
-                disabled={isScanning}
-                className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center p-1 group/shutter active:scale-90 transition-transform cursor-pointer shadow-xl relative"
-                title="Fotoğraf Çek ve Yapay Zeka İle Analiz Et"
-              >
-                <div className="w-full h-full bg-primary rounded-full shadow-lg group-hover/shutter:bg-primary-container transition-colors flex items-center justify-center text-white">
-                  <span className="material-symbols-outlined text-3xl">photo_camera</span>
-                </div>
-                <span className="absolute -bottom-1 text-[9px] font-black bg-primary text-white px-2 py-0.5 rounded-full border border-white shadow-xs">
-                  ÇEK
-                </span>
-              </button>
-
-              {/* Camera Facing Flip (Only when live camera stream is active) */}
-              <div className="flex items-center gap-2 min-w-[48px] justify-end">
-                {isLiveCameraOn ? (
-                  <button
-                    type="button"
-                    onClick={toggleFacingMode}
-                    className="w-12 h-12 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/30 text-white flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer shadow-md"
-                    title="Ön/Arka Kamera Değiştir"
-                  >
-                    <span className="material-symbols-outlined">cameraswitch</span>
-                  </button>
-                ) : (
-                  <div className="w-12 h-12" />
-                )}
-              </div>
             </div>
           )}
         </div>

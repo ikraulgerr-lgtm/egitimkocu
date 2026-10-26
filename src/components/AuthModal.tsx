@@ -13,7 +13,55 @@ interface AuthModalProps {
   onLoginSuccess: (user: Partial<Kullanici>) => void;
 }
 
-type AuthMode = 'login' | 'register' | 'forgot_email' | 'forgot_otp' | 'forgot_new_password' | 'forgot_success' | 'forgot_link_sent';
+type AuthMode = 'login' | 'register' | 'role_selection' | 'forgot_email' | 'forgot_otp' | 'forgot_new_password' | 'forgot_success' | 'forgot_link_sent';
+
+// Helper function to find student by 6-digit invite code across Firestore users
+export const findStudentByInviteCode = async (
+  rawCode: string
+): Promise<{ uid: string; name: string; code: string; studentData: any } | null> => {
+  const clean = rawCode.trim().toUpperCase();
+  if (!clean) return null;
+  const formattedCode = clean.startsWith('EK-') ? clean : `EK-${clean}`;
+
+  try {
+    const q = query(collection(db, 'users'), where('parentInviteCode', '==', formattedCode));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const docData = snap.docs[0].data();
+      return {
+        uid: snap.docs[0].id,
+        name: docData.ad || docData.kullaniciAdi || 'Öğrenci',
+        code: formattedCode,
+        studentData: docData,
+      };
+    }
+  } catch (e) {
+    console.warn('Query by parentInviteCode failed:', e);
+  }
+
+  try {
+    const allSnap = await getDocs(collection(db, 'users'));
+    for (const d of allSnap.docs) {
+      const data = d.data();
+      if (
+        data.parentInviteCode === formattedCode ||
+        data.parentInviteCode === clean ||
+        (d.id && d.id.toUpperCase() === clean)
+      ) {
+        return {
+          uid: d.id,
+          name: data.ad || data.kullaniciAdi || 'Öğrenci',
+          code: formattedCode,
+          studentData: data,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('Fallback users query failed:', e);
+  }
+
+  return null;
+};
 
 // Unique automatic username generator based on email prefix or name (created once on first sign up)
 export const autoGenerateUsername = (emailStr?: string | null, nameStr?: string | null): string => {
@@ -57,6 +105,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [otpCode, setOtpCode] = useState<string>('');
   const [agreeTerms, setAgreeTerms] = useState<boolean>(true);
   const [selectedExam, setSelectedExam] = useState<'YKS' | 'LGS' | 'KPSS' | 'YDS' | 'Hazırlanmıyorum'>('YKS');
+  const [registerRole, setRegisterRole] = useState<'student' | 'parent'>('student');
+  const [studentInviteCode, setStudentInviteCode] = useState<string>('');
+
+  // Social first-time role selection states (Google / Apple)
+  const [pendingSocialAuth, setPendingSocialAuth] = useState<{
+    firebaseUser: any;
+    provider: 'google' | 'apple';
+  } | null>(null);
+  const [socialSelectedRole, setSocialSelectedRole] = useState<'student' | 'parent'>('student');
+  const [socialStudentCode, setSocialStudentCode] = useState<string>('');
+  const [isSocialSubmitting, setIsSocialSubmitting] = useState<boolean>(false);
 
   // UI status states
   const [canInteract, setCanInteract] = useState<boolean>(false);
@@ -169,37 +228,114 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           return;
         }
 
-        let examDate = '2027-06-19';
-        if (selectedExam === 'LGS') examDate = '2027-06-06';
-        else if (selectedExam === 'KPSS') examDate = '2027-07-18';
-        else if (selectedExam === 'YDS') examDate = '2027-04-11';
-        else if (selectedExam === 'Hazırlanmıyorum') examDate = '';
+        if (registerRole === 'parent') {
+          // Parent Registration Logic
+          const cleanParentName = name.trim() || 'Veli';
+          const formattedCode = studentInviteCode.trim().toUpperCase().startsWith('EK-')
+            ? studentInviteCode.trim().toUpperCase()
+            : `EK-${studentInviteCode.trim().toUpperCase()}`;
 
-        const sinifVal =
-          selectedExam === 'LGS'
-            ? '8. Sınıf (LGS)'
-            : selectedExam === 'YKS'
-            ? '12. Sınıf / Mezun (YKS)'
-            : 'YKS / LGS Hazırlık';
+          if (!studentInviteCode.trim()) {
+            setErrorMsg('Lütfen öğrencinizin 6 haneli veli davet kodunu (EK-XXXXXX) girin.');
+            setIsEmailLoading(false);
+            return;
+          }
 
-        const cleanName = name.trim() || 'Öğrenci';
-        const fbUser = await registerWithEmailFirebase(email.trim(), password, cleanName, {
-          username: cleanUsername,
-          targetExam: selectedExam,
-          targetExamDate: examDate,
-          sinif: sinifVal,
-        });
+          const studentMatch = await findStudentByInviteCode(formattedCode);
+          if (!studentMatch) {
+            setErrorMsg(`"${formattedCode}" davet koduna sahip bir öğrenci bulunamadı. Lütfen öğrencinizin uygulamasındaki kodu kontrol edin.`);
+            setIsEmailLoading(false);
+            return;
+          }
 
-        onLoginSuccess({
-          id: fbUser.uid,
-          ad: cleanName,
-          kullaniciAdi: cleanUsername,
-          kullaniciAdi_lower: cleanUsername,
-          email: fbUser.email || email.trim(),
-          targetExam: selectedExam,
-          targetExamDate: examDate,
-        });
-        onClose();
+          const fbUser = await registerWithEmailFirebase(email.trim(), password, cleanParentName, {
+            username: cleanUsername,
+            role: 'parent',
+            linkedStudentId: studentMatch.uid,
+            linkedStudentName: studentMatch.name,
+            linkedStudentCode: studentMatch.code,
+            sinif: '',
+            targetExam: '',
+            targetExamDate: '',
+          });
+
+          // Link parent on student's user doc
+          try {
+            await setDoc(doc(db, 'users', studentMatch.uid), {
+              parentConnected: true,
+              parentName: cleanParentName,
+            }, { merge: true });
+          } catch (e) {
+            console.warn('Student parent link warning:', e);
+          }
+
+          const parentUserData: Partial<Kullanici> = {
+            id: fbUser.uid,
+            ad: cleanParentName,
+            kullaniciAdi: cleanUsername,
+            kullaniciAdi_lower: cleanUsername,
+            email: fbUser.email || email.trim(),
+            role: 'parent',
+            linkedStudentId: studentMatch.uid,
+            linkedStudentName: studentMatch.name,
+            linkedStudentCode: studentMatch.code,
+            avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=ParentChampion&backgroundColor=8b5cf6',
+            kredi: 10,
+            maxKredi: 10,
+            seri: 1,
+            xp: 0,
+            isPremium: false,
+            sinif: '',
+            targetExam: '' as any,
+            targetExamDate: '',
+          };
+
+          saveUser(parentUserData as Kullanici, fbUser.uid);
+          onLoginSuccess(parentUserData);
+          onClose();
+        } else {
+          // Student Registration Logic
+          let examDate = '2027-06-19';
+          if (selectedExam === 'LGS') examDate = '2027-06-06';
+          else if (selectedExam === 'KPSS') examDate = '2027-07-18';
+          else if (selectedExam === 'YDS') examDate = '2027-04-11';
+          else if (selectedExam === 'Hazırlanmıyorum') examDate = '';
+
+          const sinifVal =
+            selectedExam === 'LGS'
+              ? '8. Sınıf (LGS)'
+              : selectedExam === 'YKS'
+              ? '12. Sınıf / Mezun (YKS)'
+              : 'YKS / LGS Hazırlık';
+
+          const cleanName = name.trim() || 'Öğrenci';
+          const studentCode = 'EK-' + Math.floor(100000 + Math.random() * 900000).toString();
+          const fbUser = await registerWithEmailFirebase(email.trim(), password, cleanName, {
+            username: cleanUsername,
+            role: 'student',
+            parentInviteCode: studentCode,
+            targetExam: selectedExam,
+            targetExamDate: examDate,
+            sinif: sinifVal,
+          });
+
+          const studentUserData: Partial<Kullanici> = {
+            id: fbUser.uid,
+            ad: cleanName,
+            kullaniciAdi: cleanUsername,
+            kullaniciAdi_lower: cleanUsername,
+            email: fbUser.email || email.trim(),
+            role: 'student',
+            parentInviteCode: studentCode,
+            targetExam: selectedExam,
+            targetExamDate: examDate,
+            sinif: sinifVal,
+          };
+
+          saveUser(studentUserData as Kullanici, fbUser.uid);
+          onLoginSuccess(studentUserData);
+          onClose();
+        }
       } else {
         const fbUser = await loginWithEmailFirebase(email.trim(), password);
         const uid = fbUser.uid;
@@ -214,6 +350,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         let userSeri = cachedUser?.seri ?? 1;
         let userIsPremium = cachedUser?.isPremium ?? false;
         let userSinif = cachedUser?.sinif || '12. Sınıf / Mezun (YKS)';
+        let userRole = cachedUser?.role || 'student';
+        let userParentInviteCode = cachedUser?.parentInviteCode;
+        let userLinkedStudentId = cachedUser?.linkedStudentId;
+        let userLinkedStudentName = cachedUser?.linkedStudentName;
+        let userLinkedStudentCode = cachedUser?.linkedStudentCode;
+        let userParentConnected = cachedUser?.parentConnected ?? false;
+        let userParentName = cachedUser?.parentName;
 
         try {
           const userDocSnap = await Promise.race([
@@ -232,6 +375,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             if (d?.seri !== undefined) userSeri = d.seri;
             if (d?.isPremium !== undefined) userIsPremium = d.isPremium;
             if (d?.sinif) userSinif = d.sinif;
+            if (d?.role) userRole = d.role;
+            if (d?.parentInviteCode) userParentInviteCode = d.parentInviteCode;
+            if (d?.linkedStudentId) userLinkedStudentId = d.linkedStudentId;
+            if (d?.linkedStudentName) userLinkedStudentName = d.linkedStudentName;
+            if (d?.linkedStudentCode) userLinkedStudentCode = d.linkedStudentCode;
+            if (d?.parentConnected !== undefined) userParentConnected = d.parentConnected;
+            if (d?.parentName) userParentName = d.parentName;
           }
         } catch (e) {}
 
@@ -242,6 +392,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           kullaniciAdi_lower: userKullaniciAdi.toLowerCase(),
           email: fbUser.email || email.trim(),
           avatarUrl: userAvatar,
+          role: userRole as any,
+          parentInviteCode: userParentInviteCode,
+          linkedStudentId: userLinkedStudentId,
+          linkedStudentName: userLinkedStudentName,
+          linkedStudentCode: userLinkedStudentCode,
+          parentConnected: userParentConnected,
+          parentName: userParentName,
           targetExam: userTargetExam as any,
           targetExamDate: userTargetExamDate,
           kredi: userKredi,
@@ -396,6 +553,128 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  // Complete first-time social sign in after role selection (Google / Apple)
+  const handleCompleteSocialRegistration = async (skipCode = false) => {
+    if (!pendingSocialAuth) return;
+    const { firebaseUser, provider } = pendingSocialAuth;
+    const uid = firebaseUser.uid;
+    const userDocRef = doc(db, 'users', uid);
+    setIsSocialSubmitting(true);
+    setErrorMsg(null);
+
+    try {
+      const autoName = firebaseUser.displayName || (socialSelectedRole === 'parent' ? 'Veli' : 'Öğrenci');
+      const autoUsername = autoGenerateUsername(firebaseUser.email, autoName);
+
+      if (socialSelectedRole === 'parent') {
+        let matchedStudentId = '';
+        let matchedStudentName = '';
+        let matchedStudentCode = '';
+
+        if (!skipCode && socialStudentCode.trim()) {
+          const formattedCode = socialStudentCode.trim().toUpperCase().startsWith('EK-')
+            ? socialStudentCode.trim().toUpperCase()
+            : `EK-${socialStudentCode.trim().toUpperCase()}`;
+
+          const studentMatch = await findStudentByInviteCode(formattedCode);
+          if (!studentMatch) {
+            setErrorMsg(`"${formattedCode}" davet koduna sahip bir öğrenci bulunamadı. Lütfen öğrencinizin uygulamasındaki kodu kontrol edin.`);
+            setIsSocialSubmitting(false);
+            return;
+          }
+          matchedStudentId = studentMatch.uid;
+          matchedStudentName = studentMatch.name;
+          matchedStudentCode = studentMatch.code;
+
+          // Notify & link on student document
+          try {
+            await setDoc(doc(db, 'users', studentMatch.uid), {
+              parentConnected: true,
+              parentName: autoName,
+            }, { merge: true });
+          } catch (e) {}
+        }
+
+        const parentUserData: Kullanici = {
+          id: uid,
+          ad: autoName,
+          kullaniciAdi: autoUsername,
+          kullaniciAdi_lower: autoUsername.toLowerCase(),
+          email: firebaseUser.email || (provider === 'apple' ? 'veli@privaterelay.appleid.com' : 'veli@egitimkocum.ai'),
+          avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=ParentChampion&backgroundColor=8b5cf6',
+          role: 'parent',
+          linkedStudentId: matchedStudentId,
+          linkedStudentName: matchedStudentName,
+          linkedStudentCode: matchedStudentCode,
+          kredi: 10,
+          maxKredi: 10,
+          seri: 1,
+          xp: 0,
+          isPremium: false,
+          sinif: '',
+          targetExam: '' as any,
+          targetExamDate: '',
+          lastResetDate: getTurkeyDateString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        await setDoc(userDocRef, parentUserData, { merge: true });
+        saveUser(parentUserData, uid);
+        setIsSocialSubmitting(false);
+        onLoginSuccess(parentUserData);
+        onClose();
+      } else {
+        // Student role
+        const studentCode = 'EK-' + Math.floor(100000 + Math.random() * 900000).toString();
+        let examDate = '2027-06-19';
+        if (selectedExam === 'LGS') examDate = '2027-06-06';
+        else if (selectedExam === 'KPSS') examDate = '2027-07-18';
+        else if (selectedExam === 'YDS') examDate = '2027-04-11';
+        else if (selectedExam === 'Hazırlanmıyorum') examDate = '';
+
+        const sinifVal =
+          selectedExam === 'LGS'
+            ? '8. Sınıf (LGS)'
+            : selectedExam === 'YKS'
+            ? '12. Sınıf / Mezun (YKS)'
+            : 'YKS / LGS Hazırlık';
+
+        const studentUserData: Kullanici = {
+          id: uid,
+          ad: autoName,
+          kullaniciAdi: autoUsername,
+          kullaniciAdi_lower: autoUsername.toLowerCase(),
+          email: firebaseUser.email || (provider === 'apple' ? 'ogrenci@privaterelay.appleid.com' : 'ogrenci@egitimkocum.ai'),
+          avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+          role: 'student',
+          parentInviteCode: studentCode,
+          kredi: 10,
+          maxKredi: 10,
+          seri: 1,
+          xp: 0,
+          isPremium: false,
+          sinif: sinifVal,
+          targetExam: selectedExam,
+          targetExamDate: examDate,
+          lastResetDate: getTurkeyDateString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        await setDoc(userDocRef, studentUserData, { merge: true });
+        saveUser(studentUserData, uid);
+        setIsSocialSubmitting(false);
+        onLoginSuccess(studentUserData);
+        onClose();
+      }
+    } catch (err: any) {
+      console.error('Complete social registration error:', err);
+      setErrorMsg(err?.message || 'Kayıt işlemi tamamlanamadı. Lütfen tekrar deneyin.');
+      setIsSocialSubmitting(false);
+    }
+  };
+
   // Password criteria checks (8 characters + Upper & Lowercase letter)
   const passCheck = mode === 'register' ? password : newPassword;
   const has8Chars = passCheck.length >= 8;
@@ -521,6 +800,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             kullaniciAdi_lower: currentUsername.toLowerCase(),
                             email: data.email || firebaseUser.email || 'ogrenci@privaterelay.appleid.com',
                             avatarUrl: data.avatarUrl || firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                            role: (data.role as any) || cachedUser?.role || 'student',
+                            parentInviteCode: data.parentInviteCode || cachedUser?.parentInviteCode,
+                            linkedStudentId: data.linkedStudentId || cachedUser?.linkedStudentId,
+                            linkedStudentName: data.linkedStudentName || cachedUser?.linkedStudentName,
+                            linkedStudentCode: data.linkedStudentCode || cachedUser?.linkedStudentCode,
+                            parentConnected: data.parentConnected ?? cachedUser?.parentConnected ?? false,
+                            parentName: data.parentName || cachedUser?.parentName,
                             targetExam: data.targetExam || cachedUser?.targetExam || 'YKS',
                             targetExamDate: data.targetExamDate || cachedUser?.targetExamDate || '2027-06-19',
                             kredi: data.kredi ?? cachedUser?.kredi ?? 10,
@@ -540,29 +826,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           };
                           setDoc(userDocRef, finalUserData, { merge: true }).catch(() => {});
                         } else {
-                          // 3. Brand new first-time Apple user -> Auto-generate unique username and set default YKS target
-                          const autoName = firebaseUser.displayName || 'Apple Kullanıcısı';
-                          const autoUsername = autoGenerateUsername(firebaseUser.email, autoName);
-                          finalUserData = {
-                            id: uid,
-                            ad: autoName,
-                            kullaniciAdi: autoUsername,
-                            kullaniciAdi_lower: autoUsername.toLowerCase(),
-                            email: firebaseUser.email || 'ogrenci@privaterelay.appleid.com',
-                            avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-                            kredi: 10,
-                            maxKredi: 10,
-                            seri: 1,
-                            xp: 0,
-                            isPremium: false,
-                            sinif: '12. Sınıf / Mezun (YKS)',
-                            targetExam: 'YKS',
-                            targetExamDate: '2027-06-19',
-                            lastResetDate: getTurkeyDateString(),
-                            createdAt: new Date().toISOString(),
-                            updatedAt: new Date().toISOString(),
-                          };
-                          setDoc(userDocRef, finalUserData, { merge: true }).catch(() => {});
+                          // 3. Brand new first-time Apple user -> Prompt for role selection
+                          setPendingSocialAuth({ firebaseUser, provider: 'apple' });
+                          setSocialSelectedRole('student');
+                          setSocialStudentCode('');
+                          setErrorMsg(null);
+                          setMode('role_selection');
+                          setIsAppleLoading(false);
+                          return;
                         }
 
                         saveUser(finalUserData, uid);
@@ -638,6 +909,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           kullaniciAdi_lower: currentUsername.toLowerCase(),
                           email: data.email || firebaseUser.email || 'ogrenci@egitimkocum.ai',
                           avatarUrl: data.avatarUrl || firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                          role: (data.role as any) || cachedUser?.role || 'student',
+                          parentInviteCode: data.parentInviteCode || cachedUser?.parentInviteCode,
+                          linkedStudentId: data.linkedStudentId || cachedUser?.linkedStudentId,
+                          linkedStudentName: data.linkedStudentName || cachedUser?.linkedStudentName,
+                          linkedStudentCode: data.linkedStudentCode || cachedUser?.linkedStudentCode,
+                          parentConnected: data.parentConnected ?? cachedUser?.parentConnected ?? false,
+                          parentName: data.parentName || cachedUser?.parentName,
                           targetExam: data.targetExam || cachedUser?.targetExam || 'YKS',
                           targetExamDate: data.targetExamDate || cachedUser?.targetExamDate || '2027-06-19',
                           kredi: data.kredi ?? cachedUser?.kredi ?? 10,
@@ -657,29 +935,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         };
                         setDoc(userDocRef, finalUserData, { merge: true }).catch(() => {});
                       } else {
-                        // 3. Brand new first-time Google user -> Auto-generate unique username and set default YKS target
-                        const autoName = firebaseUser.displayName || 'Öğrenci';
-                        const autoUsername = autoGenerateUsername(firebaseUser.email, autoName);
-                        finalUserData = {
-                          id: uid,
-                          ad: autoName,
-                          kullaniciAdi: autoUsername,
-                          kullaniciAdi_lower: autoUsername.toLowerCase(),
-                          email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
-                          avatarUrl: firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-                          kredi: 10,
-                          maxKredi: 10,
-                          seri: 1,
-                          xp: 0,
-                          isPremium: false,
-                          sinif: '12. Sınıf / Mezun (YKS)',
-                          targetExam: 'YKS',
-                          targetExamDate: '2027-06-19',
-                          lastResetDate: getTurkeyDateString(),
-                          createdAt: new Date().toISOString(),
-                          updatedAt: new Date().toISOString(),
-                        };
-                        setDoc(userDocRef, finalUserData, { merge: true }).catch(() => {});
+                        // 3. Brand new first-time Google user -> Prompt for role selection (Öğrenciyim vs Veliyim)
+                        setPendingSocialAuth({ firebaseUser, provider: 'google' });
+                        setSocialSelectedRole('student');
+                        setSocialStudentCode('');
+                        setErrorMsg(null);
+                        setMode('role_selection');
+                        setIsGoogleLoading(false);
+                        return;
                       }
 
                       saveUser(finalUserData, uid);
@@ -743,17 +1006,56 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <form onSubmit={handleAuthSubmit} className="space-y-3.5">
               {mode === 'register' && (
                 <>
+                  {/* Role Selector: Student vs Parent */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-text-muted mb-1 ml-1">Kayıt Türü</label>
+                    <div className="grid grid-cols-2 gap-2 p-1 bg-surface-container-low rounded-2xl border border-card-border">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRegisterRole('student');
+                          setErrorMsg(null);
+                        }}
+                        className={`py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          registerRole === 'student'
+                            ? 'bg-primary text-white shadow-xs'
+                            : 'text-text-muted hover:text-text-main'
+                        }`}
+                      >
+                        <span className="text-sm">🎓</span>
+                        <span>Öğrenciyim</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRegisterRole('parent');
+                          setErrorMsg(null);
+                        }}
+                        className={`py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          registerRole === 'parent'
+                            ? 'bg-purple-600 text-white shadow-xs'
+                            : 'text-text-muted hover:text-text-main'
+                        }`}
+                      >
+                        <span className="text-sm">👨‍👩‍👧</span>
+                        <span>Veliyim</span>
+                      </button>
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="block text-xs font-bold text-text-muted mb-1 ml-1">Ad Soyad</label>
+                    <label className="block text-xs font-bold text-text-muted mb-1 ml-1">
+                      {registerRole === 'parent' ? 'Veli Adı Soyadı' : 'Ad Soyad'}
+                    </label>
                     <div className="relative">
                       <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted text-lg">
-                        person
+                        {registerRole === 'parent' ? 'badge' : 'person'}
                       </span>
                       <input
                         type="text"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="Adınız Soyadınız"
+                        placeholder={registerRole === 'parent' ? 'Adınız Soyadınız' : 'Adınız Soyadınız'}
                         autoCapitalize="words"
                         autoCorrect="off"
                         spellCheck={false}
@@ -785,31 +1087,63 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <span className="text-[10px] text-text-muted ml-1 mt-0.5 block">Yalnızca küçük harf, rakam ve alt tire (_) kullanılabilir.</span>
                   </div>
 
-                  {/* Exam Target Selection */}
-                  <div>
-                    <label className="block text-xs font-bold text-text-muted mb-1 ml-1">
-                      🎯 Hazırlandığınız Sınav
-                    </label>
-                    <div className="relative">
-                      <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted text-lg">
-                        school
-                      </span>
-                      <select
-                        value={selectedExam}
-                        onChange={(e) => setSelectedExam(e.target.value as any)}
-                        className="w-full bg-surface-container-low border border-card-border rounded-xl py-3 pl-10 pr-8 text-xs font-semibold text-text-main focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer"
-                      >
-                        <option value="YKS">🎓 YKS 2027 (TYT - AYT)</option>
-                        <option value="LGS">📚 LGS 2027 (Lise Geçiş)</option>
-                        <option value="KPSS">💼 KPSS 2027 (Kamu Personeli)</option>
-                        <option value="YDS">🌐 YÖKDİL / YDS 2027</option>
-                        <option value="Hazırlanmıyorum">✨ Sınava Hazırlanmıyorum (Genel Çalışma)</option>
-                      </select>
-                      <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none text-lg">
-                        expand_more
-                      </span>
+                  {/* If Parent: Student Invite Code Field */}
+                  {registerRole === 'parent' ? (
+                    <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-2xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-black text-purple-300 flex items-center gap-1.5">
+                          <span>🔗 Öğrenci Takip Davet Kodu</span>
+                        </label>
+                        <span className="text-[10px] text-purple-400 font-bold bg-purple-500/20 px-2 py-0.5 rounded-full">
+                          6 Haneli Kod
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-400 text-lg">
+                          key
+                        </span>
+                        <input
+                          type="text"
+                          value={studentInviteCode}
+                          onChange={(e) => setStudentInviteCode(e.target.value.toUpperCase())}
+                          placeholder="Örn: EK-748291"
+                          maxLength={10}
+                          autoCapitalize="characters"
+                          className="w-full bg-slate-900 border border-purple-500/30 rounded-xl py-3 pl-10 pr-4 text-xs font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 tracking-wider"
+                          required
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-300 leading-tight">
+                        💡 Öğrencinizin uygulamasındaki <strong className="text-purple-300">Profil &gt; Veli Bağlantısı</strong> ekranında yer alan 6 haneli kodu yazın.
+                      </p>
                     </div>
-                  </div>
+                  ) : (
+                    /* If Student: Exam Target Selection */
+                    <div>
+                      <label className="block text-xs font-bold text-text-muted mb-1 ml-1">
+                        🎯 Hazırlandığınız Sınav
+                      </label>
+                      <div className="relative">
+                        <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted text-lg">
+                          school
+                        </span>
+                        <select
+                          value={selectedExam}
+                          onChange={(e) => setSelectedExam(e.target.value as any)}
+                          className="w-full bg-surface-container-low border border-card-border rounded-xl py-3 pl-10 pr-8 text-xs font-semibold text-text-main focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer"
+                        >
+                          <option value="YKS">🎓 YKS 2027 (TYT - AYT)</option>
+                          <option value="LGS">📚 LGS 2027 (Lise Geçiş)</option>
+                          <option value="KPSS">💼 KPSS 2027 (Kamu Personeli)</option>
+                          <option value="YDS">🌐 YÖKDİL / YDS 2027</option>
+                          <option value="Hazırlanmıyorum">✨ Sınava Hazırlanmıyorum (Genel Çalışma)</option>
+                        </select>
+                        <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none text-lg">
+                          expand_more
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -916,7 +1250,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={isEmailLoading || isGoogleLoading || isAppleLoading}
-                className="w-full bg-primary text-white font-extrabold text-sm py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer mt-2 disabled:opacity-50 flex items-center justify-center gap-2"
+                className={`w-full text-white font-extrabold text-sm py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-95 transition-all cursor-pointer mt-2 disabled:opacity-50 flex items-center justify-center gap-2 ${
+                  mode === 'register' && registerRole === 'parent' ? 'bg-purple-600 hover:bg-purple-500' : 'bg-primary'
+                }`}
               >
                 {isEmailLoading ? (
                   <>
@@ -924,7 +1260,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <span>{mode === 'register' ? 'Hesap Oluşturuluyor...' : 'Giriş Yapılıyor...'}</span>
                   </>
                 ) : (
-                  <span>{mode === 'register' ? 'Hesabımı Oluştur' : 'Giriş Yap'}</span>
+                  <span>
+                    {mode === 'register'
+                      ? registerRole === 'parent'
+                        ? '👨‍👩‍👧 Veli Hesabı Oluştur ve Takibe Başla'
+                        : 'Hesabımı Oluştur'
+                      : 'Giriş Yap'}
+                  </span>
                 )}
               </button>
             </form>
@@ -946,6 +1288,166 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </p>
             </div>
           </>
+        )}
+
+        {/* ----------------- MODE: ROLE SELECTION (FIRST-TIME GOOGLE / APPLE USERS) ----------------- */}
+        {mode === 'role_selection' && pendingSocialAuth && (
+          <div className="space-y-5 animate-fadeIn">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 bg-gradient-to-tr from-primary to-purple-600 text-white rounded-2xl mx-auto flex items-center justify-center shadow-lg">
+                <span className="material-symbols-outlined text-3xl">how_to_reg</span>
+              </div>
+              <h2 className="font-extrabold text-2xl text-text-main">
+                Hesap Türünüzü Seçin
+              </h2>
+              <p className="text-xs text-text-muted">
+                Hoş geldiniz, <strong className="text-text-main">{pendingSocialAuth.firebaseUser.displayName || 'Kullanıcı'}</strong>! Eğitim Koçum'u nasıl kullanmak istersiniz?
+              </p>
+            </div>
+
+            {/* Role Options */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSocialSelectedRole('student');
+                  setErrorMsg(null);
+                }}
+                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                  socialSelectedRole === 'student'
+                    ? 'bg-primary/10 border-primary ring-2 ring-primary/20 text-text-main'
+                    : 'bg-surface-container-low border-card-border text-text-muted hover:border-primary/40'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full mb-2">
+                  <span className="text-2xl">🎓</span>
+                  <span className={`material-symbols-outlined text-lg ${socialSelectedRole === 'student' ? 'text-primary' : 'text-text-muted'}`}>
+                    {socialSelectedRole === 'student' ? 'check_circle' : 'radio_button_unchecked'}
+                  </span>
+                </div>
+                <h4 className="font-extrabold text-xs text-text-main mb-1">Öğrenciyim</h4>
+                <p className="text-[11px] text-text-muted leading-tight">
+                  Ders çalış, yapay zeka ile soru çöz, netlerini takip et.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSocialSelectedRole('parent');
+                  setErrorMsg(null);
+                }}
+                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                  socialSelectedRole === 'parent'
+                    ? 'bg-purple-600/10 border-purple-500 ring-2 ring-purple-500/20 text-text-main'
+                    : 'bg-surface-container-low border-card-border text-text-muted hover:border-purple-500/40'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full mb-2">
+                  <span className="text-2xl">👨‍👩‍👧</span>
+                  <span className={`material-symbols-outlined text-lg ${socialSelectedRole === 'parent' ? 'text-purple-400' : 'text-text-muted'}`}>
+                    {socialSelectedRole === 'parent' ? 'check_circle' : 'radio_button_unchecked'}
+                  </span>
+                </div>
+                <h4 className="font-extrabold text-xs text-text-main mb-1">Veliyim</h4>
+                <p className="text-[11px] text-text-muted leading-tight">
+                  Öğrencimin ders programını, eksik görevlerini ve sınavlarını takip et.
+                </p>
+              </button>
+            </div>
+
+            {/* If Student: Exam picker */}
+            {socialSelectedRole === 'student' && (
+              <div className="space-y-1.5 animate-fadeIn">
+                <label className="block text-xs font-bold text-text-muted ml-1">
+                  🎯 Hazırlandığınız Hedef Sınav
+                </label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted text-lg">
+                    school
+                  </span>
+                  <select
+                    value={selectedExam}
+                    onChange={(e) => setSelectedExam(e.target.value as any)}
+                    className="w-full bg-surface-container-low border border-card-border rounded-xl py-3 pl-10 pr-8 text-xs font-semibold text-text-main focus:outline-none focus:ring-2 focus:ring-primary appearance-none cursor-pointer"
+                  >
+                    <option value="YKS">🎓 YKS 2027 (TYT - AYT)</option>
+                    <option value="LGS">📚 LGS 2027 (Lise Geçiş)</option>
+                    <option value="KPSS">💼 KPSS 2027 (Kamu Personeli)</option>
+                    <option value="YDS">🌐 YÖKDİL / YDS 2027</option>
+                    <option value="Hazırlanmıyorum">✨ Sınava Hazırlanmıyorum (Genel Çalışma)</option>
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none text-lg">
+                    expand_more
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* If Parent: Student Invite Code */}
+            {socialSelectedRole === 'parent' && (
+              <div className="p-3.5 bg-purple-500/10 border border-purple-500/20 rounded-2xl space-y-2.5 animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-purple-300 flex items-center gap-1.5">
+                    <span>🔗 Öğrenci Takip Davet Kodu</span>
+                  </label>
+                  <span className="text-[10px] text-purple-400 font-bold bg-purple-500/20 px-2 py-0.5 rounded-full">
+                    EK-XXXXXX
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-400 text-lg">
+                    key
+                  </span>
+                  <input
+                    type="text"
+                    value={socialStudentCode}
+                    onChange={(e) => setSocialStudentCode(e.target.value.toUpperCase())}
+                    placeholder="Örn: EK-748291"
+                    maxLength={10}
+                    autoCapitalize="characters"
+                    className="w-full bg-slate-900 border border-purple-500/30 rounded-xl py-3 pl-10 pr-4 text-xs font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 tracking-wider"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-300 leading-tight">
+                  💡 Öğrencinizin uygulamasındaki <strong className="text-purple-300">Profil &gt; Veli Bağlantısı</strong> ekranındaki 6 haneli kodu girerek hesabına bağlanabilirsiniz.
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                disabled={isSocialSubmitting}
+                onClick={() => handleCompleteSocialRegistration(false)}
+                className={`w-full text-white font-extrabold text-sm py-3.5 rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 ${
+                  socialSelectedRole === 'parent' ? 'bg-purple-600 hover:bg-purple-500' : 'bg-primary hover:bg-primary-hover'
+                }`}
+              >
+                {isSocialSubmitting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Kaydediliyor...</span>
+                  </>
+                ) : (
+                  <span>
+                    {socialSelectedRole === 'parent' ? '👨‍👩‍👧 Veli Paneline Başla' : '🎓 Öğrenci Olarak Devam Et'}
+                  </span>
+                )}
+              </button>
+
+              {socialSelectedRole === 'parent' && (
+                <button
+                  type="button"
+                  disabled={isSocialSubmitting}
+                  onClick={() => handleCompleteSocialRegistration(true)}
+                  className="w-full text-xs font-bold text-slate-400 hover:text-white py-2 text-center cursor-pointer transition-colors"
+                >
+                  Öğrenci kodunu daha sonra girmek istiyorum &rarr;
+                </button>
+              )}
+            </div>
+          </div>
         )}
 
         {/* ----------------- MODE 2: FORGOT PASSWORD - STEP 1 (ENTER EMAIL) ----------------- */}

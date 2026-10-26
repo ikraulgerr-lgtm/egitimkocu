@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Kullanici, ProgramOgesi, SoruKaydi } from '../types';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 interface ParentConnectModalProps {
   isOpen: boolean;
@@ -40,6 +42,21 @@ export const ParentConnectModal: React.FC<ParentConnectModalProps> = ({
   const [connectedParentName, setConnectedParentName] = useState<string>(() => {
     return localStorage.getItem('connected_parent_name') || currentUser.parentName || '';
   });
+
+  // Ensure persistent student invite code is recorded in Firestore
+  useEffect(() => {
+    if (currentUser?.id && studentCode && currentUser.parentInviteCode !== studentCode) {
+      setDoc(doc(db, 'users', currentUser.id), {
+        parentInviteCode: studentCode,
+      }, { merge: true }).catch(() => {});
+      if (onUpdateUser) {
+        onUpdateUser({
+          ...currentUser,
+          parentInviteCode: studentCode,
+        });
+      }
+    }
+  }, [currentUser?.id, studentCode]);
 
   // Calculate live statistics for parent review
   const todayAbbrev = useMemo(() => {
