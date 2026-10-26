@@ -76,7 +76,13 @@ export function App() {
   const [friends, setFriendsState] = useState<Arkadas[]>(getFriends());
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
+  const [scheduleSubView, setScheduleSubView] = useState<'schedule' | 'pomodoro'>('pomodoro');
   const [selectedQuestion, setSelectedQuestion] = useState<SoruKaydi | null>(questions[0] || null);
+
+  const openSchedule = (subView: 'schedule' | 'pomodoro' = 'schedule') => {
+    setScheduleSubView(subView);
+    setActiveTab('schedule');
+  };
 
   const [theme, setThemeState] = useState<'light' | 'dark'>(getTheme());
   const [isSplashActive, setIsSplashActive] = useState(true);
@@ -178,6 +184,7 @@ export function App() {
           } else if (type === 'weekly_report' || type === 'stats') {
             setActiveTab('stats');
           } else if (type === 'pomodoro_ongoing' || type === 'pomodoro_alarm') {
+            setScheduleSubView('pomodoro');
             setActiveTab('schedule');
           } else if (type === 'daily_motivation' || type === 'daily_goal' || type === 'streak' || type === 'exam_alert') {
             setActiveTab('home');
@@ -1745,6 +1752,8 @@ export function App() {
             onToggleScheduleItem={handleToggleScheduleItem}
             onAddMultipleScheduleItems={handleAddMultipleScheduleItems}
             onOpenExamCountdown={() => setIsExamModalOpen(true)}
+            onOpenPomodoro={() => openSchedule('pomodoro')}
+            onOpenSchedule={() => openSchedule('schedule')}
           />
         )}
 
@@ -1847,6 +1856,8 @@ export function App() {
               showToast(`🎉 Tebrikler! Çalışma seansı başarıyla tamamlandı (+${amount} XP)`);
             }}
             onPomodoroStatusChange={setLivePomodoroState}
+            subView={scheduleSubView}
+            onSubViewChange={setScheduleSubView}
           />
         </div>
 
@@ -2127,6 +2138,7 @@ export function App() {
                               cleanDeleteNotification(notif.id);
                               setIsNotificationsCenterOpen(false);
                               setPendingJoinRoomCode(notif.roomCode || null);
+                              setScheduleSubView('pomodoro');
                               setActiveTab('schedule');
                               showToast(`🚀 "${notif.roomTitle || notif.roomCode}" odaya katılım sağlanıyor!`);
                             }}
@@ -2287,7 +2299,10 @@ export function App() {
       {activeTab !== 'schedule' && livePomodoroState && (livePomodoroState.isRunning || (livePomodoroState.timeLeft > 0 && livePomodoroState.timeLeft < livePomodoroState.totalSeconds)) && (
         <div className="fixed bottom-20 sm:bottom-24 left-1/2 -translate-x-1/2 z-40 animate-slideUp">
           <button
-            onClick={() => setActiveTab('schedule')}
+            onClick={() => {
+              setScheduleSubView('pomodoro');
+              setActiveTab('schedule');
+            }}
             className="group flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-slate-900/95 dark:bg-zinc-900/95 text-white shadow-2xl border border-red-500/40 backdrop-blur-xl hover:border-red-400 hover:scale-105 active:scale-95 transition-all cursor-pointer ring-4 ring-red-500/10"
             title="Pomodoro Sayacına Dön"
           >
@@ -2361,6 +2376,7 @@ export function App() {
                     const code = activeBannerNotif.roomCode;
                     cleanDeleteNotification(activeBannerNotif.id);
                     setPendingJoinRoomCode(code || null);
+                    setScheduleSubView('pomodoro');
                     setActiveTab('schedule');
                     showToast(`🚀 "${activeBannerNotif.roomTitle || code}" odaya katıldın!`);
                   }}

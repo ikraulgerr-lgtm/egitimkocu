@@ -26,6 +26,8 @@ interface ScheduleViewProps {
     mode: 'work' | 'break';
     totalSeconds: number;
   }) => void;
+  subView?: 'schedule' | 'pomodoro';
+  onSubViewChange?: (subView: 'schedule' | 'pomodoro') => void;
 }
 
 // Helper: get current week's days array dynamically
@@ -73,7 +75,10 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   autoJoinRoomCode,
   onClearAutoJoin,
   onPomodoroStatusChange,
+  subView,
+  onSubViewChange,
 }) => {
+  const [scheduleSubTab, setScheduleSubTab] = useState<'schedule' | 'pomodoro'>(() => subView || 'pomodoro');
   const [selectedDay, setSelectedDay] = useState<string>(todayAbbrev);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
@@ -82,6 +87,14 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   const [completedSession, setCompletedSession] = useState<ProgramOgesi | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [isCustomProgramModalOpen, setIsCustomProgramModalOpen] = useState<boolean>(false);
+  const [isCustomInputOpen, setIsCustomInputOpen] = useState<boolean>(false);
+  const [customInputMinutes, setCustomInputMinutes] = useState<string>('25');
+
+  useEffect(() => {
+    if (subView) {
+      setScheduleSubTab(subView);
+    }
+  }, [subView]);
 
   // Pomodoro Focus Timer State (Customizable Work & Break)
   const [customWorkMinutes, setCustomWorkMinutes] = useState<number>(25);
@@ -1159,16 +1172,52 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         </div>
       )}
 
-      {/* Title & Add Button Header */}
-      <div className="flex justify-between items-center gap-2">
-        <div>
-          <h2 className="font-extrabold text-lg sm:text-xl tracking-tight text-text-main">
-            Akıllı Ders & Pomodoro Programım
-          </h2>
-          <p className="text-[11px] text-text-muted">
-            Haftalık çalışma planını takip et, Pomodoro odaklanma seanslarıyla çalış.
-          </p>
-        </div>
+      {/* Top Segment Switcher: Direct Pomodoro Access vs Timetable */}
+      <div className="grid grid-cols-2 p-1.5 bg-surface-container-low dark:bg-slate-800/80 rounded-2xl border border-card-border/60 gap-1.5 shadow-xs">
+        <button
+          type="button"
+          onClick={() => {
+            setScheduleSubTab('pomodoro');
+            onSubViewChange?.('pomodoro');
+          }}
+          className={`py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            scheduleSubTab === 'pomodoro'
+              ? 'bg-rose-600 text-white shadow-md'
+              : 'text-text-muted hover:text-text-main dark:text-slate-400'
+          }`}
+        >
+          <span className="text-sm">🍅</span>
+          <span>Pomodoro Odaklanma</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setScheduleSubTab('schedule');
+            onSubViewChange?.('schedule');
+          }}
+          className={`py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            scheduleSubTab === 'schedule'
+              ? 'bg-primary text-white shadow-md'
+              : 'text-text-muted hover:text-text-main dark:text-slate-400'
+          }`}
+        >
+          <span className="material-symbols-outlined text-sm">calendar_month</span>
+          <span>Ders Programı & Kamp</span>
+        </button>
+      </div>
+
+      {scheduleSubTab === 'schedule' && (
+        <>
+          {/* Title & Add Button Header */}
+          <div className="flex justify-between items-center gap-2">
+            <div>
+              <h2 className="font-extrabold text-lg sm:text-xl tracking-tight text-text-main">
+                Akıllı Ders Programım
+              </h2>
+              <p className="text-[11px] text-text-muted">
+                Haftalık çalışma planını takip et, hedeflerine adım adım ulaş.
+              </p>
+            </div>
 
         <div className="flex items-center gap-2">
           <button
@@ -1358,6 +1407,8 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                               isRunning: true,
                               roomTitle: activeGroupRoom?.title,
                             });
+                            setScheduleSubTab('pomodoro');
+                            onSubViewChange?.('pomodoro');
                             document.getElementById('pomodoro-section')?.scrollIntoView({ behavior: 'smooth' });
                           }}
                           className="px-2.5 py-1 rounded-lg bg-rose-600/10 text-rose-500 hover:bg-rose-600 hover:text-white font-bold text-[11px] flex items-center gap-0.5 transition-all cursor-pointer border border-rose-500/20"
@@ -1446,9 +1497,13 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           <span className="material-symbols-outlined text-[64px] text-white">psychology</span>
         </div>
       </section>
+      </>
+      )}
 
-      {/* POMODORO FOCUS TIMER SECTION - Clean, Minimalist & Focused */}
-      <section id="pomodoro-section" className="bg-card-bg text-text-main p-4 sm:p-5 rounded-3xl shadow-lg border border-card-border space-y-4 relative overflow-hidden dark:bg-slate-900/90 dark:border-white/10">
+      {scheduleSubTab === 'pomodoro' && (
+        <>
+          {/* POMODORO FOCUS TIMER SECTION - Clean, Minimalist & Focused */}
+          <section id="pomodoro-section" className="bg-card-bg text-text-main p-4 sm:p-5 rounded-3xl shadow-lg border border-card-border space-y-4 relative overflow-hidden dark:bg-slate-900/90 dark:border-white/10">
         {/* Header: Mode & Fullscreen */}
         <div className="flex items-center justify-between gap-2 border-b border-card-border/60 dark:border-white/10 pb-3">
           <div className="flex items-center gap-1.5 p-1 bg-surface-container-low dark:bg-slate-800/80 rounded-2xl border border-card-border/50 dark:border-white/5">
@@ -1535,40 +1590,127 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             </div>
           </div>
 
-          {/* Quick Duration Pills */}
+          {/* Quick Duration Pills + Custom Minute Input Trigger */}
           <div className="flex items-center gap-1.5 flex-wrap justify-center pt-1">
             {pomoMode === 'work' ? (
-              [15, 25, 45, 60].map((m) => (
+              <>
+                {[15, 25, 45, 60].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => {
+                      handleSetWorkMinutes(m);
+                      setIsCustomInputOpen(false);
+                    }}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                      customWorkMinutes === m && !isCustomInputOpen
+                        ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                        : 'bg-surface-container-low text-text-muted border-card-border/60 hover:border-primary/40'
+                    }`}
+                  >
+                    {m} dk
+                  </button>
+                ))}
                 <button
-                  key={m}
                   type="button"
-                  onClick={() => handleSetWorkMinutes(m)}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                    customWorkMinutes === m
+                  onClick={() => {
+                    setIsCustomInputOpen((prev) => !prev);
+                    setCustomInputMinutes(String(customWorkMinutes));
+                  }}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-1 ${
+                    isCustomInputOpen || ![15, 25, 45, 60].includes(customWorkMinutes)
                       ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
                       : 'bg-surface-container-low text-text-muted border-card-border/60 hover:border-primary/40'
                   }`}
+                  title="Özel Süre Belirle"
                 >
-                  {m} dk
+                  <span className="material-symbols-outlined text-xs">tune</span>
+                  <span>{![15, 25, 45, 60].includes(customWorkMinutes) ? `${customWorkMinutes} dk` : 'Özel'}</span>
                 </button>
-              ))
+              </>
             ) : (
-              [5, 10, 15, 20].map((m) => (
+              <>
+                {[5, 10, 15, 20].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => {
+                      handleSetBreakMinutes(m);
+                      setIsCustomInputOpen(false);
+                    }}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                      customBreakMinutes === m && !isCustomInputOpen
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                        : 'bg-surface-container-low text-text-muted border-card-border/60 hover:border-emerald-400'
+                    }`}
+                  >
+                    {m} dk
+                  </button>
+                ))}
                 <button
-                  key={m}
                   type="button"
-                  onClick={() => handleSetBreakMinutes(m)}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                    customBreakMinutes === m
+                  onClick={() => {
+                    setIsCustomInputOpen((prev) => !prev);
+                    setCustomInputMinutes(String(customBreakMinutes));
+                  }}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-1 ${
+                    isCustomInputOpen || ![5, 10, 15, 20].includes(customBreakMinutes)
                       ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
                       : 'bg-surface-container-low text-text-muted border-card-border/60 hover:border-emerald-400'
                   }`}
+                  title="Özel Mola Süresi Belirle"
                 >
-                  {m} dk
+                  <span className="material-symbols-outlined text-xs">tune</span>
+                  <span>{![5, 10, 15, 20].includes(customBreakMinutes) ? `${customBreakMinutes} dk` : 'Özel'}</span>
                 </button>
-              ))
+              </>
             )}
           </div>
+
+          {/* Custom Minute Input Box */}
+          {isCustomInputOpen && (
+            <div className="flex items-center justify-center gap-2 pt-1 animate-scaleUp">
+              <div className="flex items-center bg-surface-container-low dark:bg-slate-800 rounded-xl border border-card-border px-3 py-1 shadow-inner">
+                <input
+                  type="number"
+                  min="1"
+                  max={pomoMode === 'work' ? 180 : 60}
+                  value={customInputMinutes}
+                  onChange={(e) => setCustomInputMinutes(e.target.value)}
+                  placeholder="Dk"
+                  autoFocus
+                  className="w-14 bg-transparent text-center font-black text-sm text-text-main dark:text-white focus:outline-none"
+                />
+                <span className="text-xs font-bold text-text-muted pl-1">dakika</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const val = parseInt(customInputMinutes, 10);
+                  if (!isNaN(val) && val > 0) {
+                    if (pomoMode === 'work') {
+                      handleSetWorkMinutes(val);
+                    } else {
+                      handleSetBreakMinutes(val);
+                    }
+                    setIsCustomInputOpen(false);
+                  }
+                }}
+                className={`px-3.5 py-1.5 rounded-xl text-white text-xs font-extrabold shadow-sm active:scale-95 cursor-pointer hover:brightness-110 ${
+                  pomoMode === 'work' ? 'bg-rose-600' : 'bg-emerald-600'
+                }`}
+              >
+                Uygula
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCustomInputOpen(false)}
+                className="p-1.5 text-text-muted hover:text-text-main text-xs cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            </div>
+          )}
 
           {/* Action Buttons: Big Play/Pause + Reset */}
           <div className="flex items-center gap-3 w-full max-w-xs pt-1">
@@ -1964,6 +2106,8 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           </div>
         )}
       </section>
+      </>
+      )}
 
       {/* CREATE ROOM MODAL */}
       {isCreateRoomModalOpen && (

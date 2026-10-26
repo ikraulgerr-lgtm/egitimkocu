@@ -6,6 +6,8 @@ interface TodayScheduleSectionProps {
   onToggleItem: (id: string) => void;
   onOpenCustomProgramModal: () => void;
   setActiveTab: (tab: ActiveTab) => void;
+  onOpenPomodoro?: () => void;
+  onOpenSchedule?: () => void;
 }
 
 export const TodayScheduleSection: React.FC<TodayScheduleSectionProps> = ({
@@ -13,6 +15,8 @@ export const TodayScheduleSection: React.FC<TodayScheduleSectionProps> = ({
   onToggleItem,
   onOpenCustomProgramModal,
   setActiveTab,
+  onOpenPomodoro,
+  onOpenSchedule,
 }) => {
   // Determine today's day abbreviation and formatted date
   const { todayAbbrev, fullDateString } = useMemo(() => {
@@ -76,7 +80,7 @@ export const TodayScheduleSection: React.FC<TodayScheduleSectionProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('schedule')}
+            onClick={() => (onOpenSchedule ? onOpenSchedule() : setActiveTab('schedule'))}
             className="px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-text-main font-bold text-xs border border-card-border transition-all active:scale-95 cursor-pointer flex items-center gap-1"
           >
             <span>Tüm Takvim</span>
@@ -159,7 +163,11 @@ export const TodayScheduleSection: React.FC<TodayScheduleSectionProps> = ({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setActiveTab('schedule');
+                  if (onOpenPomodoro) {
+                    onOpenPomodoro();
+                  } else {
+                    setActiveTab('schedule');
+                  }
                 }}
                 className="w-8 h-8 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white flex items-center justify-center shrink-0 transition-colors cursor-pointer"
                 title="Bu ders için Pomodoro Odaklanma başlat"

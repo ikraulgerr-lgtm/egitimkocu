@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Kullanici, ProgramOgesi, SoruKaydi } from '../types';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';

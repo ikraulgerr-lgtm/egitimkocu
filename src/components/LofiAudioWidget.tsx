@@ -95,80 +95,123 @@ export const LofiAudioWidget: React.FC<LofiAudioWidgetProps> = ({
   });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const dragJustFinishedRef = useRef<boolean>(false);
+  const isDraggingRef = useRef<boolean>(false);
+  const startPosRef = useRef<{ x: number; y: number; initX: number; initY: number; hasMoved: boolean }>({
+    x: 0,
+    y: 0,
+    initX: 0,
+    initY: 0,
+    hasMoved: false,
+  });
   const widgetRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+  const startDrag = (clientX: number, clientY: number) => {
     if (isEmbedded) return;
-    // Only handle primary click / touch
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-
     const btnEl = buttonRef.current;
     if (!btnEl) return;
     const rect = btnEl.getBoundingClientRect();
-
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const initX = rect.left;
-    const initY = rect.top;
-    let hasMoved = false;
-
-    const onPointerMove = (moveEvt: PointerEvent) => {
-      const dx = moveEvt.clientX - startX;
-      const dy = moveEvt.clientY - startY;
-
-      if (!hasMoved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
-        hasMoved = true;
-        setIsDragging(true);
-      }
-
-      if (hasMoved) {
-        const btnW = rect.width || 120;
-        const btnH = rect.height || 44;
-        const minX = 8;
-        const maxX = Math.max(minX, window.innerWidth - btnW - 8);
-        const minY = 50; // below top bar
-        const maxY = Math.max(minY, window.innerHeight - btnH - 65); // above bottom nav
-
-        const newX = Math.max(minX, Math.min(maxX, initX + dx));
-        const newY = Math.max(minY, Math.min(maxY, initY + dy));
-
-        setPosition({ x: newX, y: newY });
-      }
+    startPosRef.current = {
+      x: clientX,
+      y: clientY,
+      initX: rect.left,
+      initY: rect.top,
+      hasMoved: false,
     };
+    isDraggingRef.current = true;
+  };
 
-    const onPointerUp = (upEvt: PointerEvent) => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('pointercancel', onPointerUp);
+  const moveDrag = (clientX: number, clientY: number) => {
+    if (!isDraggingRef.current) return;
+    const { x: startX, y: startY, initX, initY, hasMoved } = startPosRef.current;
+    const dx = clientX - startX;
+    const dy = clientY - startY;
 
-      setIsDragging(false);
+    if (!hasMoved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+      startPosRef.current.hasMoved = true;
+      setIsDragging(true);
+    }
 
-      if (hasMoved) {
-        dragJustFinishedRef.current = true;
-        const dx = upEvt.clientX - startX;
-        const dy = upEvt.clientY - startY;
-        const btnW = rect.width || 120;
-        const btnH = rect.height || 44;
-        const finalX = Math.max(8, Math.min(window.innerWidth - btnW - 8, initX + dx));
-        const finalY = Math.max(50, Math.min(window.innerHeight - btnH - 65, initY + dy));
-        const finalPos = { x: finalX, y: finalY };
-        setPosition(finalPos);
-        try {
-          localStorage.setItem('lofi_widget_pos', JSON.stringify(finalPos));
-        } catch (e) {}
+    if (startPosRef.current.hasMoved) {
+      const btnW = buttonRef.current?.offsetWidth || 120;
+      const btnH = buttonRef.current?.offsetHeight || 44;
+      const minX = 8;
+      const maxX = Math.max(minX, window.innerWidth - btnW - 8);
+      const minY = 50;
+      const maxY = Math.max(minY, window.innerHeight - btnH - 65);
 
-        setTimeout(() => {
-          dragJustFinishedRef.current = false;
-        }, 150);
-      } else {
-        setIsExpanded((prev) => !prev);
-      }
-    };
+      const newX = Math.max(minX, Math.min(maxX, initX + dx));
+      const newY = Math.max(minY, Math.min(maxY, initY + dy));
 
-    window.addEventListener('pointermove', onPointerMove, { passive: true });
-    window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', onPointerUp);
+      setPosition({ x: newX, y: newY });
+    }
+  };
+
+  const endDrag = (clientX: number, clientY: number) => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    setIsDragging(false);
+
+    if (startPosRef.current.hasMoved) {
+      dragJustFinishedRef.current = true;
+      const { x: startX, y: startY, initX, initY } = startPosRef.current;
+      const dx = clientX - startX;
+      const dy = clientY - startY;
+      const btnW = buttonRef.current?.offsetWidth || 120;
+      const btnH = buttonRef.current?.offsetHeight || 44;
+      const finalX = Math.max(8, Math.min(window.innerWidth - btnW - 8, initX + dx));
+      const finalY = Math.max(50, Math.min(window.innerHeight - btnH - 65, initY + dy));
+      const finalPos = { x: finalX, y: finalY };
+      setPosition(finalPos);
+      try {
+        localStorage.setItem('lofi_widget_pos', JSON.stringify(finalPos));
+      } catch (e) {}
+
+      setTimeout(() => {
+        dragJustFinishedRef.current = false;
+      }, 200);
+    } else {
+      setIsExpanded((prev) => !prev);
+    }
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (isEmbedded) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+    startDrag(e.clientX, e.clientY);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!isDraggingRef.current) return;
+    moveDrag(e.clientX, e.clientY);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!isDraggingRef.current) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
+    endDrag(e.clientX, e.clientY);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLButtonElement>) => {
+    if (isEmbedded || e.touches.length === 0) return;
+    startDrag(e.touches[0].clientX, e.touches[0].clientY);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLButtonElement>) => {
+    if (!isDraggingRef.current || e.touches.length === 0) return;
+    if (e.cancelable) e.preventDefault();
+    moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLButtonElement>) => {
+    if (!isDraggingRef.current) return;
+    const touch = e.changedTouches[0];
+    endDrag(touch ? touch.clientX : startPosRef.current.x, touch ? touch.clientY : startPosRef.current.y);
   };
 
   const handleButtonClick = (e: React.MouseEvent) => {
@@ -665,8 +708,13 @@ export const LofiAudioWidget: React.FC<LofiAudioWidgetProps> = ({
         ref={buttonRef}
         type="button"
         onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         onClick={handleButtonClick}
-        title="Tıkla: Menüyü Aç / Basılı Tutarak Sürükle & Taşı"
+        title="Tıkla: Menüyü Aç / Sürükle & İsteğin Yere Taşı"
         style={{ touchAction: 'none' }}
         className={`px-3 py-2.5 rounded-2xl text-xs font-black flex items-center gap-1.5 shadow-xl border cursor-grab active:cursor-grabbing touch-none select-none transition-shadow ${
           isPlaying

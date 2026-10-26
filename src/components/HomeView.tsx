@@ -28,6 +28,8 @@ interface HomeViewProps {
   onToggleScheduleItem?: (id: string) => void;
   onAddMultipleScheduleItems?: (items: Omit<ProgramOgesi, 'id'>[]) => void;
   onOpenExamCountdown?: () => void;
+  onOpenPomodoro?: () => void;
+  onOpenSchedule?: () => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
@@ -47,6 +49,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onToggleScheduleItem,
   onAddMultipleScheduleItems,
   onOpenExamCountdown,
+  onOpenPomodoro,
+  onOpenSchedule,
 }) => {
   const [scanMode, setScanMode] = useState<'scan' | 'voice' | 'text'>('scan');
   const [isScanning, setIsScanning] = useState(false);
@@ -1211,6 +1215,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
         onToggleItem={onToggleScheduleItem || (() => {})}
         onOpenCustomProgramModal={() => setIsCustomProgramModalOpen(true)}
         setActiveTab={setActiveTab}
+        onOpenPomodoro={onOpenPomodoro}
+        onOpenSchedule={onOpenSchedule}
       />
 
       {/* Ebbinghaus - Today's Spaced Repetition Due Card (Compact & Click to Expand) */}
@@ -1227,7 +1233,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
       <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {/* Pomodoro Focus Timer Card */}
         <div 
-          onClick={() => setActiveTab('schedule')}
+          onClick={() => {
+            if (onOpenPomodoro) {
+              onOpenPomodoro();
+            } else {
+              setActiveTab('schedule');
+            }
+          }}
           className="bg-card-bg p-4 rounded-2xl border border-rose-500/30 shadow-xs hover:border-rose-500 transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between"
         >
           <div>
