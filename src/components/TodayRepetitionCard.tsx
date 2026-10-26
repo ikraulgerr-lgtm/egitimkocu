@@ -26,6 +26,7 @@ export const TodayRepetitionCard: React.FC<TodayRepetitionCardProps> = ({
   setActiveTab,
 }) => {
   const [toastAlert, setToastAlert] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   const dueQuestions = getDueQuestionsToday(questions);
 
@@ -105,11 +106,23 @@ export const TodayRepetitionCard: React.FC<TodayRepetitionCardProps> = ({
 
         {/* Counter Badge & See All Button */}
         <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+          {dueQuestions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded((prev) => !prev)}
+              className="bg-primary hover:bg-primary-hover text-white font-black text-xs px-3.5 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+            >
+              <span>{isExpanded ? 'Gizle' : `Soruları İncele (${dueQuestions.length})`}</span>
+              <span className="material-symbols-outlined text-sm">
+                {isExpanded ? 'expand_less' : 'expand_more'}
+              </span>
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('errorPool')}
             className="bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs px-3 py-1.5 rounded-xl border border-primary/20 transition-all cursor-pointer flex items-center gap-1 active:scale-95"
           >
-            <span>Tümünü Gör</span>
+            <span>Havuz</span>
             <span className="material-symbols-outlined text-sm">chevron_right</span>
           </button>
           <span
@@ -119,14 +132,15 @@ export const TodayRepetitionCard: React.FC<TodayRepetitionCardProps> = ({
                 : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
             }`}
           >
-            {dueQuestions.length > 0 ? `${dueQuestions.length} Soru Bekliyor` : 'Tamamlandı 🎉'}
+            {dueQuestions.length > 0 ? `${dueQuestions.length} Soru` : 'Tamamlandı 🎉'}
           </span>
         </div>
       </div>
 
-      {/* Content Condition */}
+      {/* Content Condition: Expandable on click so it doesn't crowd home screen */}
       {dueQuestions.length > 0 ? (
-        <div className="space-y-4">
+        isExpanded ? (
+          <div className="space-y-4 animate-fadeIn">
           {/* Sleek Retention Bar & Subject Summary */}
           <div className="bg-surface-container-low p-3.5 rounded-2xl border border-card-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2.5 font-bold text-text-main">
@@ -236,7 +250,8 @@ export const TodayRepetitionCard: React.FC<TodayRepetitionCardProps> = ({
             </button>
           </div>
         </div>
-      ) : (
+      ) : null
+    ) : (
         /* Empty / All Reviewed State */
         <div className="bg-surface-container-low/60 border border-card-border rounded-2xl p-6 text-center space-y-3">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">

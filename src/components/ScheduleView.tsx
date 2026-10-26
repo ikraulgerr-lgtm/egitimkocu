@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ProgramOgesi, SoruKaydi, ActiveTab, Arkadas, Kullanici, Bildirim } from '../types';
 import { LofiAudioWidget } from './LofiAudioWidget';
+import { CustomProgramModal } from './CustomProgramModal';
 import { playPomodoroBellSound } from '../lib/soundUtils';
 import { updatePomodoroNotification, schedulePomodoroNotification, clearPomodoroLocalNotification } from '../lib/notificationService';
 import { db, auth } from '../lib/firebase';
@@ -10,6 +11,7 @@ interface ScheduleViewProps {
   scheduleItems: ProgramOgesi[];
   onToggleItem: (id: string) => void;
   onAddItem: (newItem: Omit<ProgramOgesi, 'id'>) => void;
+  onAddMultipleItems?: (items: Omit<ProgramOgesi, 'id'>[]) => void;
   onDeleteItem?: (id: string) => void;
   onRewardXp?: (amount: number) => void;
   questions?: SoruKaydi[];
@@ -61,6 +63,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   scheduleItems,
   onToggleItem,
   onAddItem,
+  onAddMultipleItems,
   onDeleteItem,
   onRewardXp,
   questions = [],
@@ -78,6 +81,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [completedSession, setCompletedSession] = useState<ProgramOgesi | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [isCustomProgramModalOpen, setIsCustomProgramModalOpen] = useState<boolean>(false);
 
   // Pomodoro Focus Timer State (Customizable Work & Break)
   const [customWorkMinutes, setCustomWorkMinutes] = useState<number>(25);
@@ -1166,13 +1170,22 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="bg-primary text-white font-extrabold text-xs px-3.5 py-2 rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-md flex items-center gap-1 cursor-pointer whitespace-nowrap"
-        >
-          <span className="material-symbols-outlined text-sm">add</span>
-          <span>+ Görev Ekle</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsCustomProgramModalOpen(true)}
+            className="bg-gradient-to-r from-primary to-indigo-600 hover:from-primary-hover hover:to-indigo-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+          >
+            <span className="material-symbols-outlined text-sm">auto_awesome</span>
+            <span>Özel Kamp Oluştur</span>
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-surface-container-low hover:bg-surface-container text-text-main border border-card-border font-extrabold text-xs px-3.5 py-2 rounded-xl active:scale-95 transition-all shadow-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+          >
+            <span className="material-symbols-outlined text-sm">add</span>
+            <span>+ Görev</span>
+          </button>
+        </div>
       </div>
 
       {/* Days Strip - Compact */}
@@ -1198,7 +1211,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
       {/* Timeline Schedule for Selected Day */}
       <section className="space-y-3">
-        <div className="flex justify-between items-center gap-2">
+        <div className="flex justify-between items-center gap-2 flex-wrap">
           <h3 className="font-extrabold text-sm sm:text-base text-text-main flex items-center gap-2">
             <span>{days.find(d => d.day === selectedDay)?.name} Programı</span>
             <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
@@ -1206,31 +1219,50 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             </span>
           </h3>
 
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer shrink-0"
-          >
-            <span className="material-symbols-outlined text-xs">add_circle</span>
-            <span>+ Yeni Ders</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsCustomProgramModalOpen(true)}
+              className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+            >
+              <span className="material-symbols-outlined text-xs">auto_awesome</span>
+              <span>Özel Kamp</span>
+            </button>
+            <span className="text-card-border">•</span>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+            >
+              <span className="material-symbols-outlined text-xs">add_circle</span>
+              <span>+ Yeni Ders</span>
+            </button>
+          </div>
         </div>
 
         {currentDayItems.length === 0 ? (
-          <div className="bg-card-bg rounded-2xl p-6 border border-card-border text-center space-y-2.5 shadow-2xs">
+          <div className="bg-card-bg rounded-2xl p-6 border border-card-border text-center space-y-3 shadow-2xs">
             <div className="w-10 h-10 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center">
               <span className="material-symbols-outlined text-xl">calendar_add_on</span>
             </div>
             <h4 className="font-extrabold text-sm text-text-main">Bu Gün İçin Ders Eklenmemiş</h4>
             <p className="text-[11px] text-text-muted max-w-sm mx-auto">
-              {days.find(d => d.day === selectedDay)?.name} günü için henüz bir çalışma programı eklemediniz.
+              {days.find(d => d.day === selectedDay)?.name} günü için henüz bir çalışma programı eklemediniz. İster hazır sınav kampı oluşturun, ister manuel ders ekleyin.
             </p>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="bg-primary text-white font-extrabold text-xs px-4 py-2 rounded-xl hover:brightness-110 transition-all cursor-pointer inline-flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-xs">add</span>
-              <span>Program Ekle</span>
-            </button>
+            <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+              <button
+                onClick={() => setIsCustomProgramModalOpen(true)}
+                className="bg-gradient-to-r from-primary to-indigo-600 text-white font-extrabold text-xs px-4 py-2 rounded-xl hover:brightness-110 transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-md"
+              >
+                <span className="material-symbols-outlined text-xs">auto_awesome</span>
+                <span>Özel Kamp Programı Oluştur</span>
+              </button>
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="bg-surface-container-low text-text-main border border-card-border font-extrabold text-xs px-3.5 py-2 rounded-xl hover:bg-surface-container transition-all cursor-pointer inline-flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-xs">add</span>
+                <span>Manuel Ders Ekle</span>
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -2523,6 +2555,29 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Custom Camp & Study Program Wizard Modal */}
+      <CustomProgramModal
+        isOpen={isCustomProgramModalOpen}
+        onClose={() => setIsCustomProgramModalOpen(false)}
+        onAddMultipleItems={(items) => {
+          if (onAddMultipleItems) {
+            onAddMultipleItems(items);
+          } else {
+            items.forEach((it) => onAddItem(it));
+          }
+        }}
+        showToast={(msg) => {
+          // Trigger local banner notification or alert
+          setPomoNotificationBanner({
+            title: 'Özel Kamp Programı',
+            body: msg,
+            type: 'work',
+          });
+          setTimeout(() => setPomoNotificationBanner(null), 4000);
+        }}
+        setActiveTab={setActiveTab}
+      />
     </div>
   );
 };

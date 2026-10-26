@@ -53,6 +53,7 @@ import { AuthModal } from './components/AuthModal';
 import { QuizTestModal } from './components/QuizTestModal';
 import { AiAnalyzingOverlay } from './components/AiAnalyzingOverlay';
 import { InviteFriendsModal } from './components/InviteFriendsModal';
+import { ParentConnectModal } from './components/ParentConnectModal';
 import { AppInviteLanding } from './components/AppInviteLanding';
 import { LofiAudioWidget } from './components/LofiAudioWidget';
 import { ExamCountdownWidget } from './components/ExamCountdownWidget';
@@ -61,7 +62,7 @@ import { SplashScreen } from './components/SplashScreen';
 
 import { auth, db, handleFirestoreError, OperationType, logoutFirebase, deleteAccountFirebase } from './lib/firebase';
 import { onAuthStateChanged, updateProfile } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, onSnapshot, writeBatch } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
@@ -96,6 +97,7 @@ export function App() {
   });
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isExamModalOpen, setIsExamModalOpen] = useState(false);
+  const [isParentModalOpen, setIsParentModalOpen] = useState(false);
   const [quizQuestion, setQuizQuestion] = useState<SoruKaydi | null>(null);
   const [quizList, setQuizList] = useState<SoruKaydi[]>([]);
   const isLoggingOutRef = useRef<boolean>(false);
@@ -971,6 +973,32 @@ export function App() {
     showToast(`✅ "${newItem.ders} - ${newItem.konu}" ders programınıza eklendi!`);
   };
 
+  const handleAddMultipleScheduleItems = async (items: Omit<ProgramOgesi, 'id'>[]) => {
+    if (!items || items.length === 0) return;
+    const now = Date.now();
+    const itemsWithId: ProgramOgesi[] = items.map((it, idx) => ({
+      ...it,
+      id: 'sch_camp_' + now + '_' + idx,
+    }));
+    const updated = [...itemsWithId, ...schedule];
+    setScheduleState(updated);
+    saveSchedule(updated);
+
+    if (auth.currentUser) {
+      try {
+        const batch = writeBatch(db);
+        itemsWithId.forEach((it) => {
+          const sRef = doc(db, 'users', auth.currentUser!.uid, 'schedule', it.id);
+          batch.set(sRef, { ...it, userId: auth.currentUser!.uid });
+        });
+        await batch.commit();
+      } catch (err) {
+        console.warn('Error batch adding schedule items to Firestore:', err);
+      }
+    }
+    showToast(`🎉 ${items.length} adet kamp ders görevi programınıza eklendi!`);
+  };
+
   const handleDeleteScheduleItem = async (id: string) => {
     const updated = schedule.filter((i) => i.id !== id);
     setScheduleState(updated);
@@ -1713,6 +1741,10 @@ export function App() {
             onOpenNoCreditsModal={() => setIsNoCreditsModalOpen(true)}
             recentQuestionsCount={questions.length}
             onUpdateUser={handleUpdateUser}
+            scheduleItems={schedule}
+            onToggleScheduleItem={handleToggleScheduleItem}
+            onAddMultipleScheduleItems={handleAddMultipleScheduleItems}
+            onOpenExamCountdown={() => setIsExamModalOpen(true)}
           />
         )}
 
@@ -1790,6 +1822,7 @@ export function App() {
             currentUser={user}
             friends={friends}
             onOpenInviteModal={() => setIsInviteModalOpen(true)}
+            onOpenParentModal={() => setIsParentModalOpen(true)}
           />
         )}
 
@@ -1804,6 +1837,7 @@ export function App() {
             onClearAutoJoin={() => setPendingJoinRoomCode(null)}
             onToggleItem={handleToggleScheduleItem}
             onAddItem={handleAddScheduleItem}
+            onAddMultipleItems={handleAddMultipleScheduleItems}
             onDeleteItem={handleDeleteScheduleItem}
             onRewardXp={(amount) => {
               const updatedUser = { ...user, xp: user.xp + amount };
@@ -1824,6 +1858,7 @@ export function App() {
             onOpenNotifications={() => setIsNotificationsCenterOpen(true)}
             onOpenAuth={() => setIsAuthModalOpen(true)}
             onOpenInviteModal={() => setIsInviteModalOpen(true)}
+            onOpenParentModal={() => setIsParentModalOpen(true)}
             theme={theme}
             onToggleTheme={handleToggleTheme}
             setActiveTab={setActiveTab}
@@ -1924,6 +1959,16 @@ export function App() {
         onAddFriend={handleAddFriend}
         onRemoveFriend={handleRemoveFriend}
         showToast={showToast}
+      />
+
+      <ParentConnectModal
+        isOpen={isParentModalOpen}
+        onClose={() => setIsParentModalOpen(false)}
+        currentUser={user}
+        scheduleItems={schedule}
+        questions={questions}
+        showToast={showToast}
+        onUpdateUser={handleUpdateUser}
       />
       <QuizTestModal
         isOpen={isQuizModalOpen}

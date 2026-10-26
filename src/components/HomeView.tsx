@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Kullanici, SoruKaydi, ActiveTab } from '../types';
+import { Kullanici, SoruKaydi, ActiveTab, ProgramOgesi } from '../types';
 import { TodayRepetitionCard } from './TodayRepetitionCard';
+import { TodayScheduleSection } from './TodayScheduleSection';
+import { CustomProgramModal } from './CustomProgramModal';
+import { ParentConnectModal } from './ParentConnectModal';
 import { ExamCountdownWidget } from './ExamCountdownWidget';
 import { SavedNotesSection } from './SavedNotesSection';
 import { startNativeSpeechRecognition } from '../lib/nativeSpeech';
@@ -21,6 +24,10 @@ interface HomeViewProps {
   onOpenNoCreditsModal?: () => void;
   recentQuestionsCount: number;
   onUpdateUser?: (updatedUser: Kullanici) => void;
+  scheduleItems?: ProgramOgesi[];
+  onToggleScheduleItem?: (id: string) => void;
+  onAddMultipleScheduleItems?: (items: Omit<ProgramOgesi, 'id'>[]) => void;
+  onOpenExamCountdown?: () => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
@@ -36,11 +43,23 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onOpenNoCreditsModal,
   recentQuestionsCount,
   onUpdateUser,
+  scheduleItems = [],
+  onToggleScheduleItem,
+  onAddMultipleScheduleItems,
+  onOpenExamCountdown,
 }) => {
-  const [scanMode, setScanMode] = useState<'scan' | 'voice'>('scan');
+  const [scanMode, setScanMode] = useState<'scan' | 'voice' | 'text'>('scan');
   const [isScanning, setIsScanning] = useState(false);
   const [flashOn, setFlashOn] = useState(false);
   const [textPrompt, setTextPrompt] = useState('');
+  const [isCustomProgramModalOpen, setIsCustomProgramModalOpen] = useState(false);
+  const [isParentConnectModalOpen, setIsParentConnectModalOpen] = useState(false);
+  const [homeToast, setHomeToast] = useState<string | null>(null);
+
+  const showHomeToast = (msg: string) => {
+    setHomeToast(msg);
+    setTimeout(() => setHomeToast(null), 3000);
+  };
 
   // Live Camera states
   const [isLiveCameraOn, setIsLiveCameraOn] = useState(false);
@@ -451,8 +470,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
     }
   };
 
-  const handleTextSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleTextSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!textPrompt.trim()) return;
     if (user.kredi <= 0) {
       triggerNoCreditsModal();
@@ -673,7 +692,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
       {/* Camera Viewfinder & Question Upload / Ask Area */}
       <section className="space-y-3">
         <div className="relative w-full aspect-[3/4] sm:aspect-[4/3] rounded-3xl overflow-hidden bg-slate-950 border-4 border-white dark:border-slate-800 shadow-2xl group">
-          {/* Live Video element vs Static Image */}
+          {/* Live Video element vs Question Capture Canvas */}
           {isLiveCameraOn ? (
             <video
               ref={videoRef}
@@ -685,11 +704,55 @@ export const HomeView: React.FC<HomeViewProps> = ({
               } ${isScanning ? 'scale-105 filter brightness-110' : ''}`}
             />
           ) : (
-            <img 
-              src="https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=1000&q=80" 
-              alt="Camera Viewport"
-              className={`w-full h-full object-cover transition-transform duration-700 ${isScanning ? 'scale-105 filter brightness-110' : 'group-hover:scale-105'}`}
-            />
+            <div className="w-full h-full bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 flex flex-col items-center justify-center p-6 text-center select-none relative overflow-hidden">
+              {/* Subtle grid pattern */}
+              <div className="absolute inset-0 bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:20px_20px] opacity-25 pointer-events-none" />
+
+              {/* Animated Laser Scanning Line */}
+              <div className={`absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_20px_4px_#22d3ee] pointer-events-none ${isScanning ? 'animate-scan' : 'top-1/2 opacity-75'}`} />
+
+              {/* Center Guidance Content */}
+              <div className="relative z-10 flex flex-col items-center space-y-3.5 max-w-sm">
+                <div className="w-16 h-16 rounded-3xl bg-primary/20 border-2 border-primary/50 text-white flex items-center justify-center shadow-xl shadow-primary/30 group-hover:scale-105 transition-transform">
+                  <span className="material-symbols-outlined text-3xl text-cyan-300">document_scanner</span>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black tracking-widest uppercase text-cyan-400 bg-cyan-950/70 border border-cyan-500/30 px-3 py-1 rounded-full shadow-xs">
+                    📸 YAPAY ZEKA SORU ÇÖZÜCÜ
+                  </span>
+                  <h3 className="text-lg sm:text-xl font-black text-white tracking-tight pt-1">
+                    Soru Fotoğrafı Çek & Gönder
+                  </h3>
+                  <p className="text-xs text-slate-300 leading-relaxed px-1">
+                    Kitap, defter veya denemedeki sorunun fotoğrafını çekin; yapay zeka adım adım çözüp püf noktalarını anlatsın.
+                  </p>
+                </div>
+
+                {/* Primary Action Buttons */}
+                <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleTakePhoto}
+                    disabled={isScanning}
+                    className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-primary to-indigo-600 hover:from-primary-hover hover:to-indigo-500 text-white font-black text-xs shadow-lg shadow-primary/30 active:scale-95 transition-all cursor-pointer flex items-center gap-2 border border-white/20"
+                  >
+                    <span className="material-symbols-outlined text-lg">photo_camera</span>
+                    <span>Fotoğraf Çek</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenGallery}
+                    disabled={isScanning}
+                    className="px-4 py-2.5 rounded-2xl bg-slate-800/90 hover:bg-slate-700 text-white font-extrabold text-xs shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 border border-white/10"
+                  >
+                    <span className="material-symbols-outlined text-lg">photo_library</span>
+                    <span>Galeriden Seç</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Flash Screen Simulation */}
@@ -699,9 +762,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
           {/* Dark Overlay gradient */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80 pointer-events-none" />
-
-          {/* Animated Scanner Line */}
-          <div className={`absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary-container to-transparent shadow-[0_0_15px_3px_#6c5ce7] ${isScanning ? 'animate-scan' : 'top-1/2 opacity-70'}`} />
 
           {/* Top Controls Bar: Centered Mode Switcher Pill */}
           <div className="absolute top-3 left-0 right-0 flex items-center justify-center z-30 px-4">
@@ -713,8 +773,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   scanMode === 'scan' ? 'bg-primary text-white shadow-sm' : 'text-slate-300 hover:text-white'
                 }`}
               >
-                <span className="material-symbols-outlined text-sm">auto_awesome</span>
-                <span>Soru Tara</span>
+                <span className="material-symbols-outlined text-sm">photo_camera</span>
+                <span>Fotoğrafla</span>
               </button>
               <div className="w-px h-4 bg-white/20" />
               <button
@@ -725,7 +785,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 }`}
               >
                 <span className="material-symbols-outlined text-sm">mic</span>
-                <span>Sesle Soru Sor</span>
+                <span>Sesle</span>
+              </button>
+              <div className="w-px h-4 bg-white/20" />
+              <button
+                type="button"
+                onClick={() => setScanMode('text')}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                  scanMode === 'text' ? 'bg-primary text-white shadow-sm' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                <span className="material-symbols-outlined text-sm">edit_note</span>
+                <span>Yazıyla</span>
               </button>
             </div>
           </div>
@@ -876,6 +947,34 @@ export const HomeView: React.FC<HomeViewProps> = ({
               </div>
             );
           })()}
+
+          {/* Text Mode Overlay within Viewfinder */}
+          {scanMode === 'text' && (
+            <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 z-20 pt-16 pb-4 overflow-y-auto animate-fadeIn">
+              <div className="max-w-md mx-auto w-full my-auto space-y-3">
+                <div className="flex items-center gap-2 text-white">
+                  <span className="material-symbols-outlined text-primary text-xl">edit_note</span>
+                  <h4 className="font-extrabold text-sm sm:text-base">Yazıyla Soru Sor</h4>
+                </div>
+                <textarea
+                  value={textPrompt}
+                  onChange={(e) => setTextPrompt(e.target.value)}
+                  placeholder="Çözülmesini istediğiniz soru metnini buraya yazın veya yapıştırın..."
+                  rows={4}
+                  className="w-full bg-slate-900 border border-white/20 rounded-2xl p-3.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-primary resize-none font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleTextSubmit()}
+                  disabled={!textPrompt.trim() || isScanning}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-indigo-600 hover:from-primary-hover hover:to-indigo-500 text-white font-black text-xs shadow-lg active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-base">psychology</span>
+                  <span>Yapay Zekaya Sor & Çöz</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Scanning Overlay State */}
           {isScanning && (
@@ -1106,7 +1205,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </form>
       </section>
 
-      {/* Ebbinghaus - Today's Spaced Repetition Due Card */}
+      {/* Prominent Daily Study Schedule & Camp Section (Elevated to Home) */}
+      <TodayScheduleSection
+        scheduleItems={scheduleItems}
+        onToggleItem={onToggleScheduleItem || (() => {})}
+        onOpenCustomProgramModal={() => setIsCustomProgramModalOpen(true)}
+        setActiveTab={setActiveTab}
+      />
+
+      {/* Ebbinghaus - Today's Spaced Repetition Due Card (Compact & Click to Expand) */}
       <TodayRepetitionCard
         questions={questions}
         onSelectQuestion={onSelectQuestion}
@@ -1116,69 +1223,126 @@ export const HomeView: React.FC<HomeViewProps> = ({
         setActiveTab={setActiveTab}
       />
 
-      {/* Quick Access Cards */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* Quick Access Feature Cards Grid */}
+      <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {/* Pomodoro Focus Timer Card */}
         <div 
           onClick={() => setActiveTab('schedule')}
-          className="bg-card-bg p-4 rounded-2xl border border-rose-500/30 shadow-xs hover:border-rose-500 transition-all cursor-pointer group relative overflow-hidden"
+          className="bg-card-bg p-4 rounded-2xl border border-rose-500/30 shadow-xs hover:border-rose-500 transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between"
         >
-          <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center mb-3 group-hover:bg-rose-600 group-hover:text-white transition-colors">
-            <span className="text-xl">🍅</span>
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center mb-3 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+              <span className="text-xl">🍅</span>
+            </div>
+            <h3 className="font-extrabold text-sm sm:text-base text-text-main mb-0.5 flex items-center justify-between">
+              <span>Pomodoro</span>
+              <span className="text-[10px] font-black bg-rose-500/15 text-rose-500 px-2 py-0.5 rounded-full">25 Dk</span>
+            </h3>
+            <p className="text-[11px] text-text-muted">Ders & Mola Zamanlayıcısı</p>
           </div>
-          <h3 className="font-extrabold text-base text-text-main mb-0.5 flex items-center justify-between">
-            <span>Pomodoro Odaklanma</span>
-            <span className="text-[10px] font-black bg-rose-500/15 text-rose-500 px-2 py-0.5 rounded-full">25 Dk</span>
-          </h3>
-          <p className="text-xs text-text-muted">Ders Programı & Mola Zamanlayıcısı</p>
-          <div className="mt-3 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-            <span className="text-[11px] font-bold text-rose-500">Odaklanma Modu</span>
+          <div className="mt-3 flex items-center gap-1.5 pt-2 border-t border-card-border">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+            <span className="text-[10px] font-bold text-rose-500">Odaklanma Modu</span>
           </div>
         </div>
 
         {/* Yanlış Havuzu Card */}
         <div 
           onClick={() => setActiveTab('errorPool')}
-          className="bg-card-bg p-4 rounded-2xl border border-card-border shadow-xs hover:border-primary/50 transition-all cursor-pointer group"
+          className="bg-card-bg p-4 rounded-2xl border border-card-border shadow-xs hover:border-primary/50 transition-all cursor-pointer group flex flex-col justify-between"
         >
-          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-3 group-hover:bg-primary group-hover:text-white transition-colors">
-            <span className="material-symbols-outlined">history_edu</span>
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-3 group-hover:bg-primary group-hover:text-white transition-colors">
+              <span className="material-symbols-outlined">history_edu</span>
+            </div>
+            <h3 className="font-extrabold text-sm sm:text-base text-text-main mb-0.5">Yanlış Havuzu</h3>
+            <p className="text-[11px] text-text-muted">Aralıklı Tekrar & Unutma Eğrisi</p>
           </div>
-          <h3 className="font-extrabold text-base text-text-main mb-0.5">Yanlış Havuzu</h3>
-          <p className="text-xs text-text-muted">Aralıklı Tekrar & Unutma Eğrisi</p>
-          <div className="mt-3 flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-            <span className="text-[11px] font-bold text-rose-500">{recentQuestionsCount} Kayıtlı Soru</span>
+          <div className="mt-3 flex items-center gap-1 pt-2 border-t border-card-border">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
+            <span className="text-[10px] font-bold text-rose-500 truncate">{recentQuestionsCount} Kayıtlı Soru</span>
           </div>
         </div>
 
-        {/* Hata Analizi Card */}
+        {/* Özel Kamp Planlayıcı Card */}
         <div 
-          onClick={() => setActiveTab('stats')}
-          className="bg-card-bg p-4 rounded-2xl border border-card-border shadow-xs hover:border-primary/50 transition-all cursor-pointer group"
+          onClick={() => setIsCustomProgramModalOpen(true)}
+          className="bg-card-bg p-4 rounded-2xl border border-indigo-500/30 shadow-xs hover:border-indigo-500 transition-all cursor-pointer group flex flex-col justify-between"
         >
-          <div className="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center mb-3 group-hover:bg-secondary group-hover:text-white transition-colors">
-            <span className="material-symbols-outlined">analytics</span>
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center mb-3 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+              <span className="material-symbols-outlined">auto_awesome</span>
+            </div>
+            <h3 className="font-extrabold text-sm sm:text-base text-text-main mb-0.5">Özel Kamp Planı</h3>
+            <p className="text-[11px] text-text-muted">YKS / KPSS / Sınıf Konu Kampı</p>
           </div>
-          <h3 className="font-extrabold text-base text-text-main mb-0.5">Hata Analizi</h3>
-          <p className="text-xs text-text-muted">Haftalık Rapor & Teşhis</p>
-          <div className="mt-3 flex items-center gap-1.5">
-            {questions.length > 0 ? (
-              <>
-                <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                  %{Math.max(0, Math.round(((questions.length - questions.filter((q) => q.isSaved).length) / questions.length) * 100))} Başarı
-                </span>
-                <span className="text-[10px] text-text-muted">Gelişim Analizi</span>
-              </>
-            ) : (
-              <>
-                <span className="text-[10px] font-bold bg-slate-500/10 text-slate-500 px-2 py-0.5 rounded-full">
-                  Henüz Soru Yok
-                </span>
-                <span className="text-[10px] text-text-muted">Sıfırlandı</span>
-              </>
-            )}
+          <div className="mt-3 flex items-center gap-1 pt-2 border-t border-card-border">
+            <span className="material-symbols-outlined text-xs text-indigo-500">add_task</span>
+            <span className="text-[10px] font-bold text-indigo-500">Otomatik Dağıtım</span>
+          </div>
+        </div>
+
+        {/* Deneme Takibi & Net Analizi Card */}
+        <div 
+          onClick={() => setActiveTab('deneme')}
+          className="bg-card-bg p-4 rounded-2xl border border-card-border shadow-xs hover:border-primary/50 transition-all cursor-pointer group flex flex-col justify-between"
+        >
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center mb-3 group-hover:bg-secondary group-hover:text-white transition-colors">
+              <span className="material-symbols-outlined">analytics</span>
+            </div>
+            <h3 className="font-extrabold text-sm sm:text-base text-text-main mb-0.5">Deneme Takibi</h3>
+            <p className="text-[11px] text-text-muted">Net Grafikleri & Gelişim</p>
+          </div>
+          <div className="mt-3 flex items-center gap-1.5 pt-2 border-t border-card-border">
+            <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+              Haftalık Net Raporu
+            </span>
+          </div>
+        </div>
+
+        {/* Veli Bağlantısı & Takip Card */}
+        <div 
+          onClick={() => setIsParentConnectModalOpen(true)}
+          className="bg-card-bg p-4 rounded-2xl border border-purple-500/30 shadow-xs hover:border-purple-500 transition-all cursor-pointer group flex flex-col justify-between"
+        >
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center mb-3 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+              <span className="material-symbols-outlined">family_restroom</span>
+            </div>
+            <h3 className="font-extrabold text-sm sm:text-base text-text-main mb-0.5">Veli Bağlantısı</h3>
+            <p className="text-[11px] text-text-muted">Öğrenci Gelişim Takip Modu</p>
+          </div>
+          <div className="mt-3 flex items-center gap-1 pt-2 border-t border-card-border">
+            <span className={`w-2 h-2 rounded-full ${user.parentConnected ? 'bg-emerald-500' : 'bg-purple-500'} shrink-0`} />
+            <span className="text-[10px] font-bold text-purple-500">
+              {user.parentConnected ? 'Veli Bağlı' : 'Veli Davet Et'}
+            </span>
+          </div>
+        </div>
+
+        {/* Hedef Sınav Geri Sayımı Card */}
+        <div 
+          onClick={() => {
+            if (onOpenExamCountdown) {
+              onOpenExamCountdown();
+            } else {
+              setActiveTab('profile');
+            }
+          }}
+          className="bg-card-bg p-4 rounded-2xl border border-amber-500/30 shadow-xs hover:border-amber-500 transition-all cursor-pointer group flex flex-col justify-between"
+        >
+          <div>
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+              <span className="material-symbols-outlined">hourglass_top</span>
+            </div>
+            <h3 className="font-extrabold text-sm sm:text-base text-text-main mb-0.5">Sınav Sayacı</h3>
+            <p className="text-[11px] text-text-muted">Hedef Sınav: {user.targetExam || 'YKS / LGS'}</p>
+          </div>
+          <div className="mt-3 flex items-center gap-1 pt-2 border-t border-card-border">
+            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+              Kalan Gün & Hedef Takibi
+            </span>
           </div>
         </div>
       </section>
@@ -1190,6 +1354,38 @@ export const HomeView: React.FC<HomeViewProps> = ({
         onUpdateQuestions={onUpdateQuestions}
         setActiveTab={setActiveTab}
       />
+
+      {/* Custom Program Wizard Modal */}
+      <CustomProgramModal
+        isOpen={isCustomProgramModalOpen}
+        onClose={() => setIsCustomProgramModalOpen(false)}
+        onAddMultipleItems={(items) => {
+          if (onAddMultipleScheduleItems) {
+            onAddMultipleScheduleItems(items);
+          }
+        }}
+        showToast={showHomeToast}
+        setActiveTab={setActiveTab}
+      />
+
+      {/* Parent Connect & Monitoring Modal */}
+      <ParentConnectModal
+        isOpen={isParentConnectModalOpen}
+        onClose={() => setIsParentConnectModalOpen(false)}
+        currentUser={user}
+        scheduleItems={scheduleItems}
+        questions={questions}
+        showToast={showHomeToast}
+        onUpdateUser={onUpdateUser}
+      />
+
+      {/* Local Toast Alert */}
+      {homeToast && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white font-bold text-xs px-5 py-3 rounded-full shadow-2xl border border-white/20 animate-fadeIn flex items-center gap-2 pointer-events-none">
+          <span className="material-symbols-outlined text-base text-primary">auto_awesome</span>
+          <span>{homeToast}</span>
+        </div>
+      )}
     </div>
   );
 };

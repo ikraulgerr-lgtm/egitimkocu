@@ -75,6 +75,7 @@ interface ProfileViewProps {
   onOpenNotifications: () => void;
   onOpenAuth: () => void;
   onOpenInviteModal?: () => void;
+  onOpenParentModal?: () => void;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
   setActiveTab: (tab: ActiveTab) => void;
@@ -92,6 +93,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenNotifications,
   onOpenAuth,
   onOpenInviteModal,
+  onOpenParentModal,
   theme,
   onToggleTheme,
   setActiveTab,
@@ -771,7 +773,24 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         {/* TAB 4: HESAP & YASAL */}
         {activeSettingsTab === 'account' && (
           <div className="space-y-4 animate-fadeIn">
-            {/* Arkadaşlarını Davet Et */}
+            {/* Veli Bağlantısı & Takip Modu */}
+            {onOpenParentModal && (
+              <div
+                onClick={onOpenParentModal}
+                className="flex items-center justify-between p-4 bg-purple-500/5 hover:bg-purple-500/10 rounded-2xl border border-purple-500/20 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-3 text-text-main">
+                  <span className="material-symbols-outlined text-purple-600 dark:text-purple-400">family_restroom</span>
+                  <div>
+                    <span className="text-xs font-extrabold block text-text-main">Veli Bağlantısı & Takip Modu</span>
+                    <span className="text-[11px] font-medium text-text-muted">Öğrenci çalışma programını ve gelişimini veliyle paylaş</span>
+                  </div>
+                </div>
+                <span className="bg-purple-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-xs whitespace-nowrap">
+                  {user.parentConnected ? 'Bağlı' : 'Davet Et'}
+                </span>
+              </div>
+            )}
             {onOpenInviteModal && (
               <div
                 onClick={onOpenInviteModal}
