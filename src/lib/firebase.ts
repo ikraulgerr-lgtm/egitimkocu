@@ -87,14 +87,20 @@ export async function registerWithEmailFirebase(
     targetExam?: string;
     targetExamDate?: string;
     sinif?: string;
+    role?: 'student' | 'parent';
+    linkedStudentId?: string;
+    linkedStudentName?: string;
+    linkedStudentCode?: string;
+    parentInviteCode?: string;
   }
 ) {
   const cleanEmail = email.trim();
-  const cleanName = name ? name.trim() : 'Öğrenci';
-  const cleanUsername = (extraData?.username || cleanEmail.split('@')[0] || 'ogrenci').toLowerCase().replace(/[^a-z0-9_]/g, '');
-  const targetExam = extraData?.targetExam || 'YKS';
-  const targetExamDate = extraData?.targetExamDate || '2027-06-19';
-  const sinifVal = extraData?.sinif || (targetExam === 'LGS' ? '8. Sınıf (LGS)' : targetExam === 'YKS' ? '12. Sınıf / Mezun (YKS)' : 'YKS / LGS Hazırlık');
+  const isParent = extraData?.role === 'parent';
+  const cleanName = name ? name.trim() : (isParent ? 'Veli' : 'Öğrenci');
+  const cleanUsername = (extraData?.username || cleanEmail.split('@')[0] || (isParent ? 'veli' : 'ogrenci')).toLowerCase().replace(/[^a-z0-9_]/g, '');
+  const targetExam = isParent ? '' : (extraData?.targetExam || 'YKS');
+  const targetExamDate = isParent ? '' : (extraData?.targetExamDate || '2027-06-19');
+  const sinifVal = isParent ? '' : (extraData?.sinif || (targetExam === 'LGS' ? '8. Sınıf (LGS)' : targetExam === 'YKS' ? '12. Sınıf / Mezun (YKS)' : 'YKS / LGS Hazırlık'));
 
   let resolvedUser: any = null;
 
@@ -112,7 +118,9 @@ export async function registerWithEmailFirebase(
           uid: nativeRes.user.uid,
           email: nativeRes.user.email || cleanEmail,
           displayName: cleanName,
-          photoURL: nativeRes.user.photoUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+          photoURL: nativeRes.user.photoUrl || (isParent
+            ? 'https://api.dicebear.com/7.x/adventurer/svg?seed=ParentChampion&backgroundColor=8b5cf6'
+            : 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1'),
         };
       }
     } catch (nativeErr: any) {
@@ -145,33 +153,43 @@ export async function registerWithEmailFirebase(
     }
   }
 
-  // Write initial user profile to Firestore non-blockingly (fire and forget with error logging)
+  // Write initial user profile to Firestore reliably
   try {
     const userDocRef = doc(db, 'users', resolvedUser.uid);
-    const initialDocData = {
+    const initialDocData: Record<string, any> = {
       id: resolvedUser.uid,
       ad: cleanName,
       kullaniciAdi: cleanUsername,
       kullaniciAdi_lower: cleanUsername,
       email: cleanEmail,
+      role: isParent ? 'parent' : 'student',
       kredi: 10,
       maxKredi: 10,
       seri: 1,
       xp: 0,
       isPremium: false,
       sinif: sinifVal,
-      avatarUrl: resolvedUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+      avatarUrl: resolvedUser.photoURL || (isParent
+        ? 'https://api.dicebear.com/7.x/adventurer/svg?seed=ParentChampion&backgroundColor=8b5cf6'
+        : 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1'),
       targetExam: targetExam,
       targetExamDate: targetExamDate,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    Promise.race([
+
+    if (isParent) {
+      if (extraData?.linkedStudentId) initialDocData.linkedStudentId = extraData.linkedStudentId;
+      if (extraData?.linkedStudentName) initialDocData.linkedStudentName = extraData.linkedStudentName;
+      if (extraData?.linkedStudentCode) initialDocData.linkedStudentCode = extraData.linkedStudentCode;
+    } else {
+      initialDocData.parentInviteCode = extraData?.parentInviteCode || ('EK-' + Math.floor(100000 + Math.random() * 900000).toString());
+    }
+
+    await Promise.race([
       setDoc(userDocRef, initialDocData, { merge: true }),
-      new Promise((r) => setTimeout(r, 2000)),
-    ]).catch((err) => {
-      console.warn('Firestore initial user setDoc warning (non-fatal):', err);
-    });
+      new Promise((r) => setTimeout(r, 2500)),
+    ]);
   } catch (err) {
     console.warn('Firestore initial user setup warning:', err);
   }

@@ -100,7 +100,15 @@ export function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => {
     if (auth.currentUser) return false;
     const savedUser = getUser();
-    return !(savedUser && savedUser.id && savedUser.id !== '' && savedUser.id !== 'student' && savedUser.id !== 'usr_new' && savedUser.email && savedUser.targetExam);
+    return !(
+      savedUser &&
+      savedUser.id &&
+      savedUser.id !== '' &&
+      savedUser.id !== 'student' &&
+      savedUser.id !== 'usr_new' &&
+      savedUser.email &&
+      (savedUser.role === 'parent' || savedUser.targetExam)
+    );
   });
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isExamModalOpen, setIsExamModalOpen] = useState(false);
@@ -398,7 +406,7 @@ export function App() {
 
         // 1. Instant local cache restoration
         const cachedUser = getUser(uid);
-        if (cachedUser && cachedUser.id && cachedUser.targetExam) {
+        if (cachedUser && cachedUser.id && (cachedUser.role === 'parent' || cachedUser.targetExam)) {
           setUserState(cachedUser);
           setQuestionsState(getQuestions(uid));
           setScheduleState(getSchedule(uid));
@@ -434,28 +442,29 @@ export function App() {
               finalAvatar = firebaseUser.photoURL || DEFAULT_AVATAR;
             }
 
+            const isParent = (data.role === 'parent') || (cachedUser?.role === 'parent');
             const userData: Kullanici = {
               id: uid,
               ad: cleanName,
               kullaniciAdi: currentUsername,
               kullaniciAdi_lower: currentUsername.toLowerCase(),
-              email: data.email || firebaseUser.email || 'ogrenci@egitimkocum.ai',
+              email: data.email || firebaseUser.email || (isParent ? 'veli@egitimkocum.ai' : 'ogrenci@egitimkocum.ai'),
               avatarUrl: finalAvatar,
-              role: (data.role as any) || cachedUser?.role || 'student',
+              role: isParent ? 'parent' : 'student',
               parentInviteCode: data.parentInviteCode || cachedUser?.parentInviteCode,
               linkedStudentId: data.linkedStudentId || cachedUser?.linkedStudentId,
               linkedStudentName: data.linkedStudentName || cachedUser?.linkedStudentName,
               linkedStudentCode: data.linkedStudentCode || cachedUser?.linkedStudentCode,
               parentConnected: data.parentConnected ?? cachedUser?.parentConnected ?? false,
               parentName: data.parentName || cachedUser?.parentName,
-              targetExam: data.targetExam || cachedUser?.targetExam || 'YKS',
-              targetExamDate: data.targetExamDate || cachedUser?.targetExamDate || '2027-06-19',
+              targetExam: isParent ? ('' as any) : (data.targetExam || cachedUser?.targetExam || 'YKS'),
+              targetExamDate: isParent ? '' : (data.targetExamDate || cachedUser?.targetExamDate || '2027-06-19'),
               kredi: userKredi,
               maxKredi: data.maxKredi ?? 10,
               seri: data.seri ?? cachedUser?.seri ?? 1,
               xp: data.xp ?? cachedUser?.xp ?? 0,
               isPremium: data.isPremium ?? cachedUser?.isPremium ?? false,
-              sinif: data.sinif || cachedUser?.sinif || '12. Sınıf / Mezun (YKS)',
+              sinif: isParent ? '' : (data.sinif || cachedUser?.sinif || '12. Sınıf / Mezun (YKS)'),
               customExamName: data.customExamName || cachedUser?.customExamName || '',
               lastResetDate: userResetDate,
             };
@@ -518,39 +527,14 @@ export function App() {
               } catch {}
             }
           } else {
-            // First time user: initialize profile once with unique username and default YKS target
-            const cleanName = firebaseUser.displayName || 'Öğrenci';
-            const base = (firebaseUser.email?.split('@')[0] || cleanName)
-              .toLowerCase()
-              .replace(/[^a-z0-9_]/g, '')
-              .slice(0, 12) || 'ogrenci';
-            const autoUsername = `${base}_${Math.floor(100 + Math.random() * 900)}`;
-            const DEFAULT_AVATAR = firebaseUser.photoURL || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1';
-
-            const newUserData: Kullanici = {
-              id: uid,
-              ad: cleanName,
-              kullaniciAdi: autoUsername,
-              kullaniciAdi_lower: autoUsername.toLowerCase(),
-              email: firebaseUser.email || 'ogrenci@egitimkocum.ai',
-              avatarUrl: DEFAULT_AVATAR,
-              kredi: 10,
-              maxKredi: 10,
-              seri: 1,
-              xp: 0,
-              isPremium: false,
-              sinif: '12. Sınıf / Mezun (YKS)',
-              targetExam: 'YKS',
-              targetExamDate: '2027-06-19',
-              lastResetDate: todayTr,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-
-            setUserState(newUserData);
-            saveUser(newUserData, uid);
-            setDoc(userDocRef, newUserData, { merge: true }).catch(() => {});
-            setIsAuthModalOpen(false);
+            // Check if local cachedUser already exists as parent or student
+            if (cachedUser && cachedUser.id && (cachedUser.role === 'parent' || cachedUser.targetExam)) {
+              setUserState(cachedUser);
+              setIsAuthModalOpen(false);
+            } else {
+              // Brand new user or role selection in progress: keep AuthModal open
+              setIsAuthModalOpen(true);
+            }
           }
         } catch (err) {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
@@ -563,7 +547,14 @@ export function App() {
             if (nativeRes?.user) {
               const uid = nativeRes.user.uid;
               const savedUser = getUser(uid);
-              if (savedUser && savedUser.id && savedUser.id !== 'student' && savedUser.id !== 'usr_new' && savedUser.email && savedUser.targetExam) {
+              if (
+                savedUser &&
+                savedUser.id &&
+                savedUser.id !== 'student' &&
+                savedUser.id !== 'usr_new' &&
+                savedUser.email &&
+                (savedUser.role === 'parent' || savedUser.targetExam)
+              ) {
                 setUserState(savedUser);
                 setIsAuthModalOpen(false);
                 return;
@@ -988,23 +979,34 @@ export function App() {
     showToast(`✅ "${newItem.ders} - ${newItem.konu}" ders programınıza eklendi!`);
   };
 
-  const handleAddMultipleScheduleItems = async (items: Omit<ProgramOgesi, 'id'>[]) => {
+  const handleAddMultipleScheduleItems = async (items: Omit<ProgramOgesi, 'id'>[], replaceExisting: boolean = true) => {
     if (!items || items.length === 0) return;
     const now = Date.now();
     const itemsWithId: ProgramOgesi[] = items.map((it, idx) => ({
       ...it,
       id: 'sch_camp_' + now + '_' + idx,
     }));
-    const updated = [...itemsWithId, ...schedule];
+    const updated = replaceExisting ? itemsWithId : [...itemsWithId, ...schedule];
     setScheduleState(updated);
     saveSchedule(updated);
 
     if (auth.currentUser) {
       try {
+        const uid = auth.currentUser.uid;
+        // Clean previous schedule if replacing to prevent day overload
+        if (replaceExisting && schedule.length > 0) {
+          const deleteBatch = writeBatch(db);
+          schedule.forEach((oldItem) => {
+            const oldRef = doc(db, 'users', uid, 'schedule', oldItem.id);
+            deleteBatch.delete(oldRef);
+          });
+          await deleteBatch.commit();
+        }
+
         const batch = writeBatch(db);
         itemsWithId.forEach((it) => {
-          const sRef = doc(db, 'users', auth.currentUser!.uid, 'schedule', it.id);
-          batch.set(sRef, { ...it, userId: auth.currentUser!.uid });
+          const sRef = doc(db, 'users', uid, 'schedule', it.id);
+          batch.set(sRef, { ...it, userId: uid });
         });
         await batch.commit();
       } catch (err) {

@@ -17,6 +17,7 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
   onUpdateUser,
 }) => {
   const [activeTab, setActiveTab] = useState<'daily' | 'pomodoro' | 'deneme' | 'questions'>('daily');
+  const [selectedDayFilter, setSelectedDayFilter] = useState<string>('TODAY');
   const [studentData, setStudentData] = useState<Partial<Kullanici> | null>(null);
   const [studentSchedule, setStudentSchedule] = useState<ProgramOgesi[]>([]);
   const [studentDenemeler, setStudentDenemeler] = useState<DenemeRecord[]>([]);
@@ -184,7 +185,31 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
     };
   }, [studentId]);
 
-  // Calculations for today's tasks
+  // Filtered tasks based on selected day or today
+  const displayedTasks = useMemo(() => {
+    if (selectedDayFilter === 'TODAY') {
+      return studentSchedule.filter((item) => item.gun === todayAbbrev);
+    }
+    if (selectedDayFilter === 'ALL') {
+      return studentSchedule;
+    }
+    return studentSchedule.filter((item) => item.gun === selectedDayFilter);
+  }, [studentSchedule, selectedDayFilter, todayAbbrev]);
+
+  const completedDisplayedTasks = useMemo(() => {
+    return displayedTasks.filter((t) => t.tamamlandi);
+  }, [displayedTasks]);
+
+  const missingDisplayedTasks = useMemo(() => {
+    return displayedTasks.filter((t) => !t.tamamlandi);
+  }, [displayedTasks]);
+
+  const displayedProgressPercent = useMemo(() => {
+    if (displayedTasks.length === 0) return 0;
+    return Math.round((completedDisplayedTasks.length / displayedTasks.length) * 100);
+  }, [displayedTasks.length, completedDisplayedTasks.length]);
+
+  // Today specific calculation for badge alerts
   const todaysTasks = useMemo(() => {
     return studentSchedule.filter((item) => item.gun === todayAbbrev);
   }, [studentSchedule, todayAbbrev]);
@@ -448,20 +473,54 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
         {/* TAB 1: GÜNLÜK GÖREV RAPORU */}
         {activeTab === 'daily' && (
           <div className="space-y-4 animate-fadeIn">
-            {/* Today's Progress Bar Card */}
+            {/* Day Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+              {[
+                { id: 'TODAY', label: `Bugün (${todayAbbrev})` },
+                { id: 'ALL', label: 'Tüm Hafta' },
+                { id: 'Pzt', label: 'Pazartesi' },
+                { id: 'Sal', label: 'Salı' },
+                { id: 'Çar', label: 'Çarşamba' },
+                { id: 'Per', label: 'Perşembe' },
+                { id: 'Cum', label: 'Cuma' },
+                { id: 'Cmt', label: 'Cumartesi' },
+                { id: 'Paz', label: 'Pazar' },
+              ].map((btn) => (
+                <button
+                  key={btn.id}
+                  type="button"
+                  onClick={() => setSelectedDayFilter(btn.id)}
+                  className={`px-3 py-1.5 rounded-xl font-black text-xs shrink-0 transition-all cursor-pointer ${
+                    selectedDayFilter === btn.id
+                      ? 'bg-purple-600 text-white shadow-md'
+                      : 'bg-slate-900 border border-white/10 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {btn.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Progress Bar Card */}
             <div className="bg-slate-900 border border-white/10 p-4 sm:p-5 rounded-3xl space-y-3 shadow-md">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white flex items-center gap-2">
                     <span className="material-symbols-outlined text-purple-400">calendar_today</span>
-                    <span>Bugünün Ders Programı Tamamlanma Oranı</span>
+                    <span>
+                      {selectedDayFilter === 'TODAY'
+                        ? 'Bugünün Ders Programı Tamamlanma Oranı'
+                        : selectedDayFilter === 'ALL'
+                        ? 'Tüm Haftanın Programı Tamamlanma Oranı'
+                        : `${selectedDayFilter} Günü Program Tamamlanma Oranı`}
+                    </span>
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    {todayAbbrev} Günü için planlanan ders ve soru hedefleri
+                    Planlanan ders ve konu hedefleri takibi
                   </p>
                 </div>
                 <span className="text-sm font-black text-purple-300 bg-purple-500/20 border border-purple-500/30 px-3 py-1 rounded-full">
-                  {completedTodayTasks.length} / {todaysTasks.length} Görev (%{todayProgressPercent})
+                  {completedDisplayedTasks.length} / {displayedTasks.length} Görev (%{displayedProgressPercent})
                 </span>
               </div>
 
@@ -469,26 +528,35 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
               <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-white/5">
                 <div
                   className="h-full bg-gradient-to-r from-purple-600 via-indigo-500 to-emerald-500 transition-all duration-700 rounded-full"
-                  style={{ width: `${todayProgressPercent}%` }}
+                  style={{ width: `${displayedProgressPercent}%` }}
                 />
               </div>
             </div>
 
             {/* UNCOMPLETED / MISSING TASKS WARNING CARD */}
-            {missingTodayTasks.length > 0 && (
+            {missingDisplayedTasks.length > 0 && (
               <div className="bg-rose-950/40 border-2 border-rose-500/40 p-4 sm:p-5 rounded-3xl space-y-3 shadow-lg">
-                <div className="flex items-center gap-2 text-rose-300">
-                  <span className="material-symbols-outlined text-xl text-rose-400">warning</span>
-                  <h4 className="font-black text-sm sm:text-base">
-                    Bugün Henüz Tamamlanmamış Eksik Görevler ({missingTodayTasks.length})
-                  </h4>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2 text-rose-300">
+                    <span className="material-symbols-outlined text-xl text-rose-400">warning</span>
+                    <h4 className="font-black text-sm sm:text-base">
+                      Henüz Tamamlanmamış Eksik Görevler ({missingDisplayedTasks.length})
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessageToStudent('Ders programındaki görevlerini tamamlamak için biraz gayret! Sen başarırsın, sana güveniyorum! 💪')}
+                    className="text-[11px] font-black bg-rose-500/20 hover:bg-rose-500 text-rose-200 hover:text-white px-3 py-1.5 rounded-xl border border-rose-500/30 transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                  >
+                    <span>💬 Hatırlatma Gönder</span>
+                  </button>
                 </div>
                 <p className="text-xs text-rose-200/80">
-                  Öğrencinizin bugün çalışması gereken ancak henüz tamamlamadığı dersler:
+                  Öğrencinizin çalışması gereken ancak henüz tamamlamadığı dersler:
                 </p>
 
                 <div className="space-y-2 pt-1">
-                  {missingTodayTasks.map((task) => (
+                  {missingDisplayedTasks.map((task) => (
                     <div
                       key={task.id}
                       className="bg-slate-900/90 border border-rose-500/30 p-3 rounded-2xl flex items-center justify-between gap-3 text-xs"
@@ -498,6 +566,9 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-extrabold text-rose-400 uppercase text-[11px]">{task.ders}</span>
+                            <span className="text-[10px] text-purple-300 font-bold bg-purple-900/40 px-2 py-0.5 rounded">
+                              {task.gun}
+                            </span>
                             <span className="text-[10px] text-slate-400 font-mono">🕒 {task.saat}</span>
                           </div>
                           <p className="font-bold text-white truncate mt-0.5">{task.konu}</p>
@@ -517,17 +588,17 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
               <div className="flex items-center justify-between">
                 <h4 className="font-extrabold text-sm text-white flex items-center gap-2">
                   <span className="material-symbols-outlined text-emerald-400">check_circle</span>
-                  <span>Bugün Başarıyla Tamamlanan Dersler ({completedTodayTasks.length})</span>
+                  <span>Başarıyla Tamamlanan Dersler ({completedDisplayedTasks.length})</span>
                 </h4>
               </div>
 
-              {completedTodayTasks.length === 0 ? (
+              {completedDisplayedTasks.length === 0 ? (
                 <div className="text-center py-6 text-slate-400 text-xs">
-                  Henüz bugün tamamlanan ders görevi işaretlenmedi.
+                  Henüz seçilen zaman için tamamlanan ders görevi işaretlenmedi.
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {completedTodayTasks.map((task) => (
+                  {completedDisplayedTasks.map((task) => (
                     <div
                       key={task.id}
                       className="bg-emerald-950/20 border border-emerald-500/30 p-3 rounded-2xl flex items-center justify-between gap-3 text-xs"
@@ -537,6 +608,9 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-extrabold text-emerald-400 uppercase text-[11px]">{task.ders}</span>
+                            <span className="text-[10px] text-purple-300 font-bold bg-purple-900/40 px-2 py-0.5 rounded">
+                              {task.gun}
+                            </span>
                             <span className="text-[10px] text-slate-400 font-mono">🕒 {task.saat}</span>
                           </div>
                           <p className="font-bold text-slate-200 line-through truncate mt-0.5">{task.konu}</p>

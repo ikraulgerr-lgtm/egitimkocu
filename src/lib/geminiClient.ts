@@ -1,6 +1,8 @@
 import { GoogleGenAI } from '@google/genai';
 import Tesseract from 'tesseract.js';
 import { trySolveMathExpression } from './mathUtils';
+import { ProgramOgesi } from '../types';
+import { generateCampScheduleItems } from '../data/curriculumData';
 
 const DEFAULT_GROQ_KEY = ['gsk', 'eO3A8XXpNQ8lV8Bw5llNWGdyb3FYMaimdZMF1jf41YpTLALcwjdM'].join('_');
 const GROQ_API_KEY =
@@ -1105,4 +1107,112 @@ JSON formatı:
   }
 
   return [];
+}
+
+// -------------------------------------------------------------
+// AI-Powered Study Camp Schedule Generator (Gemini + Groq Fallback)
+// -------------------------------------------------------------
+export interface AiCampPlanParams {
+  examName: string;
+  selectedTopics: { ders: string; konu: string }[];
+  startDate: string;
+  targetEndDate: string;
+  dailyHours: number;
+  preferredTimeSlot?: string;
+  userApiKey?: string;
+}
+
+export async function generateAiCampScheduleService(
+  params: AiCampPlanParams
+): Promise<Omit<ProgramOgesi, 'id'>[]> {
+  const { examName, selectedTopics, startDate, targetEndDate, dailyHours = 2, preferredTimeSlot = 'evening', userApiKey } = params;
+  if (!selectedTopics || selectedTopics.length === 0) return [];
+
+  const start = new Date(startDate);
+  const end = new Date(targetEndDate);
+  const diffDays = Math.max(1, Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+  // Summarize topics for the AI prompt
+  const topicsSummary = selectedTopics.slice(0, 30).map((t, idx) => `${idx + 1}. [${t.ders}] ${t.konu}`).join('\n');
+
+  const promptText = `Sen uzman bir MEB & ÖSYM rehberlik pedagogu ve eğitim koçusun.
+Öğrencinin Hedef Sınavı: ${examName}
+Çalışılacak Konular:
+${topicsSummary}
+Kamp Tarihleri: ${startDate} - ${targetEndDate} (${diffDays} gün)
+Günlük Hedef Seans: Günde ${dailyHours} seans
+Tercih Edilen Zaman Aralığı: ${preferredTimeSlot}
+
+GÖREVİN:
+Bu konuları öğrencinin 7 günlük haftalık çalışma programına (günler: "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz") dağıtarak pedagojik ve dengeli bir kamp programı hazırla.
+
+KESİN KURALLAR:
+1. GÜNLÜK YÜK: Bir güne EN FAZLA 2 veya 3 seans yaz. Kesinlikle bir güne 4 veya daha fazla görev yığma!
+2. SÜRE: Her seans KESİNLİKLE 45 dakika olmalı (örneğin "18:00 - 18:45 (45 dk)", "19:00 - 19:45 (45 dk)", "20:00 - 20:45 (45 dk)"). Asla tek göreve 2 veya 3 saat yazma! Seanslar arasında 15 dakika mola olmalı ve saatler çakışmamalıdır.
+3. GÜN İSİMLERİ: Sadece şu 7 kısaltmayı kullan: "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz".
+4. DENGELİ DAĞILIM: Farklı dersleri günlere dengeli dağıt (örneğin Matematik ve Türkçe/Tarih aynı güne).
+5. PAZAR GÜNÜ: "Paz" gününü "Haftalık Tekrar & Yanlış Havuzu Çözümü" ve "Dinlenme" olarak planla.
+6. JSON ÇIKTI FORMATI:
+{
+  "schedule": [
+    {
+      "gun": "Pzt",
+      "ders": "TYT Matematik",
+      "konu": "Fonksiyonlar (Konu Özeti & Soru Çözümü)",
+      "saat": "18:00 - 18:45 (45 dk)"
+    }
+  ]
+}
+Yalnızca geçerli JSON formatında yanıt ver.`;
+
+  const ai = getAIClient(userApiKey);
+  if (ai) {
+    try {
+      const rawText = await callGeminiClientWithFallback(ai, promptText, true);
+      const parsed = safeParseJSON(rawText);
+      const list = parsed?.schedule || (Array.isArray(parsed) ? parsed : null);
+      if (Array.isArray(list) && list.length > 0) {
+        return list.map((item: any) => ({
+          gun: item.gun || 'Pzt',
+          ders: item.ders || examName,
+          konu: item.konu || 'Konu Çalışması',
+          saat: item.saat || '18:00 - 18:45 (45 dk)',
+          tamamlandi: false,
+          isCurrent: false,
+        }));
+      }
+    } catch (e) {
+      console.warn('Gemini AI camp generator warning, falling back:', e);
+    }
+  }
+
+  try {
+    const groqRaw = await callGroqAI(promptText, 'Sen MEB ve ÖSYM için uzman eğitim koçusun.', true);
+    if (groqRaw) {
+      const parsed = safeParseJSON(groqRaw);
+      const list = parsed?.schedule || (Array.isArray(parsed) ? parsed : null);
+      if (Array.isArray(list) && list.length > 0) {
+        return list.map((item: any) => ({
+          gun: item.gun || 'Pzt',
+          ders: item.ders || examName,
+          konu: item.konu || 'Konu Çalışması',
+          saat: item.saat || '18:00 - 18:45 (45 dk)',
+          tamamlandi: false,
+          isCurrent: false,
+        }));
+      }
+    }
+  } catch (groqErr) {
+    console.warn('Groq AI camp generator warning:', groqErr);
+  }
+
+  // Robust pedagogical fallback
+  return generateCampScheduleItems({
+    examName,
+    selectedTopics,
+    startDate,
+    targetEndDate,
+    dailyHours,
+    preferredTimeSlot,
+  });
 }

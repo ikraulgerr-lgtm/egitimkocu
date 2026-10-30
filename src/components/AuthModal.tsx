@@ -25,8 +25,11 @@ export const findStudentByInviteCode = async (
 
   try {
     const q = query(collection(db, 'users'), where('parentInviteCode', '==', formattedCode));
-    const snap = await getDocs(q);
-    if (!snap.empty) {
+    const snap = await Promise.race([
+      getDocs(q),
+      new Promise<null>((r) => setTimeout(() => r(null), 3000)),
+    ]);
+    if (snap && !snap.empty) {
       const docData = snap.docs[0].data();
       return {
         uid: snap.docs[0].id,
@@ -40,20 +43,25 @@ export const findStudentByInviteCode = async (
   }
 
   try {
-    const allSnap = await getDocs(collection(db, 'users'));
-    for (const d of allSnap.docs) {
-      const data = d.data();
-      if (
-        data.parentInviteCode === formattedCode ||
-        data.parentInviteCode === clean ||
-        (d.id && d.id.toUpperCase() === clean)
-      ) {
-        return {
-          uid: d.id,
-          name: data.ad || data.kullaniciAdi || 'Öğrenci',
-          code: formattedCode,
-          studentData: data,
-        };
+    const allSnap = await Promise.race([
+      getDocs(collection(db, 'users')),
+      new Promise<null>((r) => setTimeout(() => r(null), 2500)),
+    ]);
+    if (allSnap && !allSnap.empty) {
+      for (const d of allSnap.docs) {
+        const data = d.data();
+        if (
+          data.parentInviteCode === formattedCode ||
+          data.parentInviteCode === clean ||
+          (d.id && d.id.toUpperCase() === clean)
+        ) {
+          return {
+            uid: d.id,
+            name: data.ad || data.kullaniciAdi || 'Öğrenci',
+            code: formattedCode,
+            studentData: data,
+          };
+        }
       }
     }
   } catch (e) {
@@ -231,54 +239,67 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         if (registerRole === 'parent') {
           // Parent Registration Logic
           const cleanParentName = name.trim() || 'Veli';
-          const formattedCode = studentInviteCode.trim().toUpperCase().startsWith('EK-')
-            ? studentInviteCode.trim().toUpperCase()
-            : `EK-${studentInviteCode.trim().toUpperCase()}`;
+          const cleanParentUsername = cleanUsername;
+          const rawCode = studentInviteCode.trim().toUpperCase();
+          const formattedCode = rawCode ? (rawCode.startsWith('EK-') ? rawCode : `EK-${rawCode}`) : '';
 
-          if (!studentInviteCode.trim()) {
-            setErrorMsg('Lütfen öğrencinizin 6 haneli veli davet kodunu (EK-XXXXXX) girin.');
-            setIsEmailLoading(false);
-            return;
-          }
-
-          const studentMatch = await findStudentByInviteCode(formattedCode);
-          if (!studentMatch) {
-            setErrorMsg(`"${formattedCode}" davet koduna sahip bir öğrenci bulunamadı. Lütfen öğrencinizin uygulamasındaki kodu kontrol edin.`);
-            setIsEmailLoading(false);
-            return;
-          }
-
+          // 1. Create parent user in Firebase Auth FIRST (so auth.currentUser exists and is authenticated)
           const fbUser = await registerWithEmailFirebase(email.trim(), password, cleanParentName, {
-            username: cleanUsername,
+            username: cleanParentUsername,
             role: 'parent',
-            linkedStudentId: studentMatch.uid,
-            linkedStudentName: studentMatch.name,
-            linkedStudentCode: studentMatch.code,
             sinif: '',
             targetExam: '',
             targetExamDate: '',
           });
 
-          // Link parent on student's user doc
-          try {
-            await setDoc(doc(db, 'users', studentMatch.uid), {
-              parentConnected: true,
-              parentName: cleanParentName,
-            }, { merge: true });
-          } catch (e) {
-            console.warn('Student parent link warning:', e);
+          let linkedStudentId = '';
+          let linkedStudentName = '';
+          let linkedStudentCode = '';
+
+          // 2. If student invite code was provided, look up and link student safely
+          if (formattedCode) {
+            try {
+              const studentMatch = await findStudentByInviteCode(formattedCode);
+              if (studentMatch) {
+                linkedStudentId = studentMatch.uid;
+                linkedStudentName = studentMatch.name;
+                linkedStudentCode = studentMatch.code;
+
+                // Notify student document
+                try {
+                  await setDoc(doc(db, 'users', studentMatch.uid), {
+                    parentConnected: true,
+                    parentName: cleanParentName,
+                  }, { merge: true });
+                } catch (e) {
+                  console.warn('Student parent link warning:', e);
+                }
+              }
+            } catch (lookupErr) {
+              console.warn('Student lookup error during parent registration:', lookupErr);
+            }
           }
+
+          // 3. Write linked student info to parent document
+          try {
+            await setDoc(doc(db, 'users', fbUser.uid), {
+              role: 'parent',
+              linkedStudentId,
+              linkedStudentName,
+              linkedStudentCode,
+            }, { merge: true });
+          } catch (e) {}
 
           const parentUserData: Partial<Kullanici> = {
             id: fbUser.uid,
             ad: cleanParentName,
-            kullaniciAdi: cleanUsername,
-            kullaniciAdi_lower: cleanUsername,
+            kullaniciAdi: cleanParentUsername,
+            kullaniciAdi_lower: cleanParentUsername.toLowerCase(),
             email: fbUser.email || email.trim(),
             role: 'parent',
-            linkedStudentId: studentMatch.uid,
-            linkedStudentName: studentMatch.name,
-            linkedStudentCode: studentMatch.code,
+            linkedStudentId,
+            linkedStudentName,
+            linkedStudentCode,
             avatarUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=ParentChampion&backgroundColor=8b5cf6',
             kredi: 10,
             maxKredi: 10,
@@ -293,6 +314,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           saveUser(parentUserData as Kullanici, fbUser.uid);
           onLoginSuccess(parentUserData);
           onClose();
+          return;
         } else {
           // Student Registration Logic
           let examDate = '2027-06-19';
@@ -1095,7 +1117,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           <span>🔗 Öğrenci Takip Davet Kodu</span>
                         </label>
                         <span className="text-[10px] text-purple-400 font-bold bg-purple-500/20 px-2 py-0.5 rounded-full">
-                          6 Haneli Kod
+                          İsteğe Bağlı
                         </span>
                       </div>
                       <div className="relative">
@@ -1106,15 +1128,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           type="text"
                           value={studentInviteCode}
                           onChange={(e) => setStudentInviteCode(e.target.value.toUpperCase())}
-                          placeholder="Örn: EK-748291"
+                          placeholder="Örn: EK-748291 (veya boş bırakın)"
                           maxLength={10}
                           autoCapitalize="characters"
                           className="w-full bg-slate-900 border border-purple-500/30 rounded-xl py-3 pl-10 pr-4 text-xs font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 tracking-wider"
-                          required
                         />
                       </div>
                       <p className="text-[11px] text-slate-300 leading-tight">
-                        💡 Öğrencinizin uygulamasındaki <strong className="text-purple-300">Profil &gt; Veli Bağlantısı</strong> ekranında yer alan 6 haneli kodu yazın.
+                        💡 Öğrencinizin <strong className="text-purple-300">Profil &gt; Veli Bağlantısı</strong> ekranındaki 6 haneli kodunu girebilir veya daha sonra panelden ekleyebilirsiniz.
                       </p>
                     </div>
                   ) : (

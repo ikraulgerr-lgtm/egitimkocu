@@ -5,11 +5,12 @@ import {
   ExamCurriculum,
   generateCampScheduleItems,
 } from '../data/curriculumData';
+import { generateAiCampScheduleService } from '../lib/geminiClient';
 
 interface CustomProgramModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddMultipleItems: (items: Omit<ProgramOgesi, 'id'>[]) => void;
+  onAddMultipleItems: (items: Omit<ProgramOgesi, 'id'>[], replaceExisting?: boolean) => void;
   showToast: (msg: string) => void;
   setActiveTab?: (tab: any) => void;
 }
@@ -44,6 +45,12 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
   const [targetEndDate, setTargetEndDate] = useState<string>(defaultTargetStr);
   const [dailyHours, setDailyHours] = useState<number>(2);
   const [preferredTimeSlot, setPreferredTimeSlot] = useState<string>('evening');
+
+  // Step 4: AI Generation & Settings
+  const [isAiGenerating, setIsAiGenerating] = useState<boolean>(false);
+  const [replaceExisting, setReplaceExisting] = useState<boolean>(true);
+  const [aiPlan, setAiPlan] = useState<Omit<ProgramOgesi, 'id'>[] | null>(null);
+  const [previewDayFilter, setPreviewDayFilter] = useState<string>('ALL');
 
   const currentExam = useMemo(() => {
     return EXAM_CURRICULUM_DATA.find((e) => e.id === selectedExamId) || EXAM_CURRICULUM_DATA[0];
@@ -81,8 +88,8 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
     return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1);
   }, [startDate, targetEndDate]);
 
-  // Generated Plan Preview
-  const generatedPlan = useMemo(() => {
+  // Algorithmic Fallback Plan
+  const defaultPlan = useMemo(() => {
     return generateCampScheduleItems({
       examName: currentExam.name,
       selectedTopics: flattenedSelectedTopics,
@@ -92,6 +99,38 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
       preferredTimeSlot,
     });
   }, [currentExam, flattenedSelectedTopics, startDate, targetEndDate, dailyHours, preferredTimeSlot]);
+
+  // Final active plan (AI generated or algorithmic fallback)
+  const finalPlan = useMemo(() => {
+    return aiPlan && aiPlan.length > 0 ? aiPlan : defaultPlan;
+  }, [aiPlan, defaultPlan]);
+
+  // Trigger Gemini AI generation
+  const handleGenerateAiPlan = async () => {
+    if (flattenedSelectedTopics.length === 0) return;
+    setIsAiGenerating(true);
+    try {
+      const items = await generateAiCampScheduleService({
+        examName: currentExam.name,
+        selectedTopics: flattenedSelectedTopics,
+        startDate,
+        targetEndDate,
+        dailyHours,
+        preferredTimeSlot,
+      });
+      if (items && items.length > 0) {
+        setAiPlan(items);
+        showToast('✨ Kamp programınız Gemini Yapay Zekası ile pedagojik olarak optimize edildi!');
+      } else {
+        setAiPlan(defaultPlan);
+      }
+    } catch (err) {
+      console.warn('AI camp generation warning:', err);
+      setAiPlan(defaultPlan);
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -130,12 +169,12 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
   };
 
   const handleFinishAndApply = () => {
-    if (generatedPlan.length === 0) {
+    if (finalPlan.length === 0) {
       showToast('⚠️ Lütfen önce en az 1 konu seçin!');
       return;
     }
 
-    onAddMultipleItems(generatedPlan);
+    onAddMultipleItems(finalPlan, replaceExisting);
     showToast(`🎉 Harika! ${campaignDays} günlük özel kamp programınız hazırlandı ve takvime eklendi.`);
     onClose();
     if (setActiveTab) {
@@ -534,21 +573,39 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
         {/* Step 4: Preview & Confirm */}
         {step === 4 && (
           <div className="space-y-4 overflow-y-auto pr-1">
-            <h4 className="text-xs font-extrabold text-text-muted uppercase tracking-wider">
-              4. Kamp Programınız Hazır! Önizlemeyi İnceleyin:
-            </h4>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h4 className="text-xs font-extrabold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm text-primary">auto_awesome</span>
+                <span>4. Yapay Zeka Kamp Programı Önizlemesi</span>
+              </h4>
+              <button
+                type="button"
+                disabled={isAiGenerating}
+                onClick={handleGenerateAiPlan}
+                className="text-[11px] font-black text-primary hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+              >
+                <span className={`material-symbols-outlined text-sm ${isAiGenerating ? 'animate-spin' : ''}`}>
+                  refresh
+                </span>
+                <span>{isAiGenerating ? 'AI Hazırlıyor...' : 'Yapay Zeka ile Yeniden Oluştur'}</span>
+              </button>
+            </div>
 
-            {/* Campaign Summary Card */}
-            <div className="bg-gradient-to-tr from-primary/10 via-indigo-600/10 to-purple-600/10 border border-primary/30 p-4 rounded-2xl space-y-2">
+            {/* Campaign Summary Card with AI Badge */}
+            <div className="bg-gradient-to-tr from-primary/10 via-indigo-600/10 to-purple-600/10 border border-primary/30 p-4 rounded-2xl space-y-2.5">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="font-extrabold text-sm text-text-main flex items-center gap-2">
                   <span>🚀 {currentExam.name} Kişisel Kampı</span>
+                  <span className="text-[10px] font-black bg-gradient-to-r from-primary to-purple-600 text-white px-2.5 py-0.5 rounded-full shadow-xs flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[11px]">neurology</span>
+                    <span>Gemini AI Destekli</span>
+                  </span>
                 </span>
                 <span className="text-xs font-black text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
-                  {generatedPlan.length} Görev Planlandı
+                  {finalPlan.length} Görev Planlandı
                 </span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs pt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs pt-1">
                 <div className="bg-card-bg/80 p-2.5 rounded-xl border border-card-border">
                   <span className="text-text-muted text-[10px] block">Seçilen Konu:</span>
                   <strong className="text-text-main font-black">{totalSelectedCount} Adet</strong>
@@ -559,27 +616,89 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
                 </div>
                 <div className="bg-card-bg/80 p-2.5 rounded-xl border border-card-border col-span-2 sm:col-span-1">
                   <span className="text-text-muted text-[10px] block">Günün Dağılımı:</span>
-                  <strong className="text-text-main font-black">45 dk Seanslar (Düzenli)</strong>
+                  <strong className="text-text-main font-black">Maks. 2-3 Seans (45 dk)</strong>
                 </div>
               </div>
             </div>
 
+            {/* Clean Schedule Option Toggle */}
+            <div className="bg-surface-container-low border border-card-border p-3.5 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-lg">auto_delete</span>
+                </div>
+                <div>
+                  <div className="text-xs font-black text-text-main flex items-center gap-1.5">
+                    <span>Mevcut Programı Temizle</span>
+                    <span className="text-[10px] font-bold bg-emerald-500/15 text-emerald-500 px-2 py-0.2 rounded-full">
+                      Önerilen
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-text-muted">
+                    Eski çakışan görevleri siler, yalnızca bu yeni kampı düzenli uygular.
+                  </div>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={replaceExisting}
+                  onChange={(e) => setReplaceExisting(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+              </label>
+            </div>
+
+            {/* AI Loading Banner */}
+            {isAiGenerating && (
+              <div className="p-4 bg-primary/10 border border-primary/30 rounded-2xl flex items-center gap-3 animate-pulse">
+                <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+                <div className="text-xs">
+                  <strong className="text-primary font-black block">Gemini Yapay Zeka Pedagogu Kampı Hazırlıyor...</strong>
+                  <span className="text-text-muted text-[11px]">Seçtiğiniz {totalSelectedCount} konu günlere dengeli bölünüyor, odak seansları ayarlanıyor.</span>
+                </div>
+              </div>
+            )}
+
+            {/* Day Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+              {['ALL', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map((day) => {
+                const label = day === 'ALL' ? 'Tüm Günler' : day;
+                const count = day === 'ALL' ? finalPlan.length : finalPlan.filter((i) => i.gun === day).length;
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => setPreviewDayFilter(day)}
+                    className={`px-3 py-1.5 rounded-xl font-black text-[11px] shrink-0 transition-all cursor-pointer ${
+                      previewDayFilter === day
+                        ? 'bg-primary text-white shadow-xs'
+                        : 'bg-surface-container-low border border-card-border text-text-muted hover:text-text-main'
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <span className="ml-1.5 opacity-70">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Generated Items Sample Preview */}
             <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-              <span className="text-xs font-extrabold text-text-muted">Örnek Günlük Dağılım:</span>
-              {generatedPlan.slice(0, 10).map((item, idx) => (
+              {(previewDayFilter === 'ALL' ? finalPlan : finalPlan.filter((i) => i.gun === previewDayFilter)).map((item, idx) => (
                 <div
                   key={idx}
                   className="bg-surface-container-low border border-card-border p-3 rounded-xl flex items-center justify-between gap-3 text-xs"
                 >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary font-black flex items-center justify-center shrink-0 text-xs">
                       {item.gun}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-extrabold text-[11px] text-primary">{item.ders}</span>
-                        <span className="text-[10px] bg-card-bg border border-card-border px-2 py-0.5 rounded-md text-text-muted">
+                        <span className="text-[10px] bg-card-bg border border-card-border px-2 py-0.5 rounded-md text-text-muted font-mono font-bold">
                           {item.saat}
                         </span>
                       </div>
@@ -591,11 +710,6 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
                   </span>
                 </div>
               ))}
-              {generatedPlan.length > 10 && (
-                <p className="text-center text-xs text-text-muted italic pt-1">
-                  + {generatedPlan.length - 10} günün görevleri takvime eklenecektir...
-                </p>
-              )}
             </div>
           </div>
         )}
@@ -629,12 +743,19 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
                   showToast('⚠️ Lütfen devam etmek için en az 1 konu seçin!');
                   return;
                 }
-                setStep((prev) => (prev + 1) as any);
+                if (step === 3) {
+                  setStep(4);
+                  handleGenerateAiPlan();
+                } else {
+                  setStep((prev) => (prev + 1) as any);
+                }
               }}
               className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white font-black text-xs shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
             >
-              <span>İleri</span>
-              <span className="material-symbols-outlined text-base">arrow_forward</span>
+              <span>{step === 3 ? '✨ AI Kampını Oluştur' : 'İleri'}</span>
+              <span className="material-symbols-outlined text-base">
+                {step === 3 ? 'auto_awesome' : 'arrow_forward'}
+              </span>
             </button>
           ) : (
             <button

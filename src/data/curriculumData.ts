@@ -886,167 +886,118 @@ export interface CampGeneratorOptions {
 }
 
 export function generateCampScheduleItems(options: CampGeneratorOptions): Omit<ProgramOgesi, 'id'>[] {
-  const { examName, selectedTopics, startDate, targetEndDate, preferredTimeSlot = 'evening' } = options;
+  const { examName, selectedTopics, dailyHours = 2, preferredTimeSlot = 'evening' } = options;
 
-  if (selectedTopics.length === 0) return [];
+  if (!selectedTopics || selectedTopics.length === 0) return [];
 
-  const start = new Date(startDate);
-  const end = new Date(targetEndDate);
-
-  // Fallback if end date is invalid or before start
-  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) {
-    end.setTime(start.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 days default
-  }
-
-  const diffTime = Math.abs(end.getTime() - start.getTime());
-  const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
-
-  const dayAbbrevs = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
   const generatedItems: Omit<ProgramOgesi, 'id'>[] = [];
 
-  // Realistic human study slot definitions (45 dk focus sessions + breaks)
+  // Realistic human study slot definitions (strictly 45 dk focus sessions + breaks)
   const slotPresets: Record<string, string[]> = {
     evening: [
-      '17:30 - 18:15 (45 dk)',
-      '18:30 - 19:15 (45 dk)',
-      '19:45 - 20:30 (45 dk)',
-      '20:45 - 21:30 (45 dk)',
+      '18:00 - 18:45 (45 dk)',
+      '19:00 - 19:45 (45 dk)',
+      '20:00 - 20:45 (45 dk)',
     ],
     night: [
       '19:30 - 20:15 (45 dk)',
       '20:30 - 21:15 (45 dk)',
       '21:30 - 22:15 (45 dk)',
-      '22:30 - 23:15 (45 dk)',
     ],
     morning: [
-      '10:00 - 10:45 (45 dk)',
-      '11:00 - 11:45 (45 dk)',
-      '13:30 - 14:15 (45 dk)',
-      '14:30 - 15:15 (45 dk)',
+      '09:30 - 10:15 (45 dk)',
+      '10:30 - 11:15 (45 dk)',
+      '11:30 - 12:15 (45 dk)',
     ],
     afternoon: [
       '14:00 - 14:45 (45 dk)',
       '15:00 - 15:45 (45 dk)',
-      '16:15 - 17:00 (45 dk)',
-      '17:15 - 18:00 (45 dk)',
+      '16:00 - 16:45 (45 dk)',
     ],
   };
 
-  // Determine which slots array to use
   let activeSlots = slotPresets.evening;
-  const slotKey = preferredTimeSlot.toLowerCase();
+  const slotKey = (preferredTimeSlot || '').toLowerCase();
   if (slotKey.includes('gece') || slotKey.includes('night') || slotKey.includes('21:') || slotKey.includes('22:')) {
     activeSlots = slotPresets.night;
-  } else if (slotKey.includes('gündüz') || slotKey.includes('sabah') || slotKey.includes('morning') || slotKey.includes('10:')) {
+  } else if (slotKey.includes('sabah') || slotKey.includes('morning') || slotKey.includes('09:') || slotKey.includes('10:')) {
     activeSlots = slotPresets.morning;
   } else if (slotKey.includes('öğle') || slotKey.includes('afternoon') || slotKey.includes('14:')) {
     activeSlots = slotPresets.afternoon;
   }
 
-  // Shuffle / interleave topics pool by subject so we alternate subjects across days
-  const topicsPool = [...selectedTopics];
-  // Sort lightly to alternate different lessons
+  // Strictly cap daily sessions at 2 or 3 to avoid cognitive burnout and schedule clutter
+  const sessionsPerDay = Math.min(3, Math.max(2, dailyHours));
+
+  // Interleave topics across different subjects
   const groupedByDers: Record<string, { ders: string; konu: string }[]> = {};
-  topicsPool.forEach((t) => {
+  selectedTopics.forEach((t) => {
     if (!groupedByDers[t.ders]) groupedByDers[t.ders] = [];
     groupedByDers[t.ders].push(t);
   });
 
-  const interleavedTopics: { ders: string; konu: string }[] = [];
+  const interleavedQueue: { ders: string; konu: string }[] = [];
   const dersKeys = Object.keys(groupedByDers);
-  let maxLen = Math.max(...dersKeys.map((k) => groupedByDers[k].length));
+  const maxLen = Math.max(...dersKeys.map((k) => groupedByDers[k].length));
   for (let i = 0; i < maxLen; i++) {
     dersKeys.forEach((k) => {
       if (groupedByDers[k][i]) {
-        interleavedTopics.push(groupedByDers[k][i]);
+        interleavedQueue.push(groupedByDers[k][i]);
       }
     });
   }
 
-  const workingQueue = [...interleavedTopics];
+  const workingQueue = [...interleavedQueue];
+  const studyDays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 
-  // Distribute topics realistically across available days
-  for (let dayIndex = 0; dayIndex < diffDays; dayIndex++) {
-    const currentDate = new Date(start);
-    currentDate.setDate(start.getDate() + dayIndex);
-
-    const dayName = dayAbbrevs[currentDate.getDay()];
-
-    // Every 7th day is a dedicated Review & Rest / Mock test day if camp is 7+ days
-    if (diffDays >= 7 && (dayIndex + 1) % 7 === 0) {
-      generatedItems.push({
-        ders: `${examName} Haftalık Tekrar`,
-        konu: 'Haftalık Konu Tekrarı & Yanlış Havuzu Çözümü',
-        saat: activeSlots[0],
-        gun: dayName,
-        tamamlandi: false,
-        isCurrent: false,
-      });
-      generatedItems.push({
-        ders: 'Dinlenme',
-        konu: 'Zihin Dinlendirme & Motivasyon Molası',
-        saat: activeSlots[1],
-        gun: dayName,
-        tamamlandi: false,
-        isCurrent: false,
-      });
-      continue;
-    }
-
-    // Determine how many topics to assign today (capped at 2 or 3 per day for high cognitive efficiency)
-    const remainingDays = Math.max(1, diffDays - dayIndex);
-    const neededPerDay = Math.ceil(workingQueue.length / remainingDays);
-    const topicsForTodayCount = Math.min(3, Math.max(1, neededPerDay));
-    const daysTopics = workingQueue.splice(0, topicsForTodayCount);
-
-    if (daysTopics.length === 0) {
-      // Completed all topics early -> insert maintenance practice & problem solving
-      if (dayIndex % 2 === 0) {
+  studyDays.forEach((dayName) => {
+    for (let sIdx = 0; sIdx < sessionsPerDay; sIdx++) {
+      const topic = workingQueue.shift();
+      const slot = activeSlots[sIdx] || `18:00 - 18:45 (45 dk)`;
+      if (topic) {
+        const activitySuffix = sIdx === 0 ? 'Konu Özeti & Soru Çözümü' : 'Pekiştirme & Test (30 Soru)';
         generatedItems.push({
-          ders: `${examName} Pekiştirme`,
-          konu: 'Genel Tekrar Soru Çözümü & Formül Tekrarı',
-          saat: activeSlots[0],
           gun: dayName,
-          tamamlandi: false,
-          isCurrent: false,
-        });
-      }
-    } else if (daysTopics.length === 1) {
-      // 1 topic today: break into 2 distinct pedagogical phases (Konu Anlatımı + Soru Çözümü)
-      const t = daysTopics[0];
-      generatedItems.push({
-        ders: t.ders,
-        konu: `${t.konu} - Konu Anlatımı & Özet`,
-        saat: activeSlots[0],
-        gun: dayName,
-        tamamlandi: false,
-        isCurrent: false,
-      });
-      generatedItems.push({
-        ders: t.ders,
-        konu: `${t.konu} - Pekiştirme Soru Çözümü (30 Soru)`,
-        saat: activeSlots[1],
-        gun: dayName,
-        tamamlandi: false,
-        isCurrent: false,
-      });
-    } else {
-      // 2 or 3 topics today: each gets a distinct non-overlapping time slot
-      daysTopics.forEach((t, tIdx) => {
-        const slot = activeSlots[tIdx] || `Slot ${tIdx + 1} (45 dk)`;
-        const activitySuffix = tIdx === 0 ? 'Konu Özeti & Soru Çözümü' : 'Konu Tekrarı & Pekiştirme';
-
-        generatedItems.push({
-          ders: t.ders,
-          konu: `${t.konu} (${activitySuffix})`,
+          ders: topic.ders,
+          konu: `${topic.konu} (${activitySuffix})`,
           saat: slot,
-          gun: dayName,
           tamamlandi: false,
           isCurrent: false,
         });
-      });
+      } else {
+        // If topics are done, fill with reinforcement
+        if (sIdx === 0) {
+          generatedItems.push({
+            gun: dayName,
+            ders: `${examName} Pekiştirme`,
+            konu: 'Haftalık Karma Soru Çözümü & Formül Tekrarı',
+            saat: slot,
+            tamamlandi: false,
+            isCurrent: false,
+          });
+        }
+        break;
+      }
     }
-  }
+  });
+
+  // Sunday (Paz): Dedicated Review & Motivational Rest
+  generatedItems.push({
+    gun: 'Paz',
+    ders: `${examName} Haftalık Tekrar`,
+    konu: 'Haftalık Konu Tekrarı & Yanlış Havuzu Çözümü',
+    saat: activeSlots[0],
+    tamamlandi: false,
+    isCurrent: false,
+  });
+  generatedItems.push({
+    gun: 'Paz',
+    ders: 'Dinlenme & Motivasyon',
+    konu: 'Zihin Dinlendirme & Yeni Hafta Planlaması',
+    saat: activeSlots[1],
+    tamamlandi: false,
+    isCurrent: false,
+  });
 
   return generatedItems;
 }
