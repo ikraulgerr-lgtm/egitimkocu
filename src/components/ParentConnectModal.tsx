@@ -104,13 +104,17 @@ export const ParentConnectModal: React.FC<ParentConnectModalProps> = ({
   };
 
   const handleLinkParentCode = () => {
-    const cleaned = inputCode.trim().toUpperCase();
+    const cleaned = inputCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!cleaned) {
       showToast('⚠️ Lütfen öğrencinizin 6 haneli kodunu girin.');
       return;
     }
 
-    if (cleaned === studentCode) {
+    const cleanStudentCode = studentCode.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const coreClean = cleaned.startsWith('EK') ? cleaned.slice(2) : cleaned;
+    const coreStudent = cleanStudentCode.startsWith('EK') ? cleanStudentCode.slice(2) : cleanStudentCode;
+
+    if (coreClean === coreStudent) {
       const parentName = 'Veli Hesabı';
       setConnectedParentName(parentName);
       localStorage.setItem('connected_parent_name', parentName);

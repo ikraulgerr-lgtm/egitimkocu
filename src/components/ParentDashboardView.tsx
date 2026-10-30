@@ -32,12 +32,13 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
   const studentId = currentUser.linkedStudentId || '';
 
   const handleLinkStudent = async (codeToLink: string) => {
-    const raw = codeToLink.trim().toUpperCase();
-    if (!raw) {
+    const clean = codeToLink.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!clean) {
       showToast('⚠️ Lütfen öğrencinizin 6 haneli davet kodunu girin.');
       return;
     }
-    const formattedCode = raw.startsWith('EK-') ? raw : `EK-${raw}`;
+    const core = clean.startsWith('EK') ? clean.slice(2) : clean;
+    const formattedCode = `EK-${core}`;
     setIsLinking(true);
 
     try {
@@ -46,25 +47,35 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
       let matchData: any = null;
 
       const q = query(collection(db, 'users'), where('parentInviteCode', '==', formattedCode));
-      const snap = await getDocs(q);
+      const snap = await Promise.race([
+        getDocs(q),
+        new Promise<any>((r) => setTimeout(() => r({ empty: true }), 3500)),
+      ]);
 
       if (!snap.empty) {
         matchUid = snap.docs[0].id;
         matchData = snap.docs[0].data();
         matchName = matchData?.ad || matchData?.kullaniciAdi || 'Öğrenci';
       } else {
-        const allSnap = await getDocs(collection(db, 'users'));
-        for (const d of allSnap.docs) {
-          const dData = d.data();
-          if (
-            dData.parentInviteCode === formattedCode ||
-            dData.parentInviteCode === raw ||
-            (d.id && d.id.toUpperCase() === raw)
-          ) {
-            matchUid = d.id;
-            matchData = dData;
-            matchName = dData.ad || dData.kullaniciAdi || 'Öğrenci';
-            break;
+        const allSnap = await Promise.race([
+          getDocs(collection(db, 'users')),
+          new Promise<any>((r) => setTimeout(() => r({ empty: true }), 3500)),
+        ]);
+        if (!allSnap.empty) {
+          for (const d of allSnap.docs) {
+            const dData = d.data();
+            const codeInDoc = (dData.parentInviteCode || '').toString().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (
+              codeInDoc === clean ||
+              codeInDoc === core ||
+              dData.parentInviteCode === formattedCode ||
+              (d.id && d.id.toUpperCase() === clean)
+            ) {
+              matchUid = d.id;
+              matchData = dData;
+              matchName = dData.ad || dData.kullaniciAdi || 'Öğrenci';
+              break;
+            }
           }
         }
       }
@@ -321,8 +332,8 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
             </div>
             <div className="space-y-1">
               <h2 className="text-xl font-black text-white">Öğrenci Hesabınızı Bağlayın</h2>
-              <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
-                Çocuğunuzun Eğitim Koçum uygulamasındaki (<strong className="text-purple-300">Profil &gt; Veli Bağlantısı</strong>) ekranından alabileceğiniz 6 haneli davet kodunu (EK-XXXXXX) girerek canlı takibe başlayın.
+              <p className="text-xs text-slate-200 max-w-md mx-auto leading-relaxed">
+                Çocuğunuzun Eğitim Koçum uygulamasındaki (<strong className="text-purple-300 font-bold">Profil &gt; Veli Bağlantısı</strong>) ekranından alabileceğiniz 6 haneli davet kodunu (EK-XXXXXX) girerek canlı takibe başlayın.
               </p>
             </div>
             <div className="max-w-xs mx-auto flex items-center gap-2 pt-2">
@@ -332,7 +343,7 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                 onChange={(e) => setLinkCodeInput(e.target.value.toUpperCase())}
                 placeholder="Örn: EK-748291"
                 maxLength={10}
-                className="flex-1 bg-slate-950 border border-purple-500/40 rounded-xl px-4 py-3 text-xs font-mono font-black text-white tracking-widest text-center uppercase focus:outline-none focus:border-purple-400"
+                className="flex-1 bg-white dark:bg-slate-950 border-2 border-purple-400 dark:border-purple-500/60 rounded-xl px-4 py-3 text-sm font-mono font-black text-slate-950 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 tracking-widest text-center uppercase focus:outline-none focus:ring-2 focus:ring-purple-400 shadow-inner"
               />
               <button
                 type="button"
@@ -860,8 +871,8 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
               </button>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Öğrencinizin Eğitim Koçum uygulamasındaki (Profil &gt; Veli Bağlantısı) ekranında yer alan 6 haneli kodu yazın:
+            <p className="text-xs text-slate-200 leading-relaxed">
+              Öğrencinizin Eğitim Koçum uygulamasındaki (<strong className="text-purple-300 font-bold">Profil &gt; Veli Bağlantısı</strong>) ekranında yer alan 6 haneli kodu yazın:
             </p>
 
             <input
@@ -870,7 +881,7 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
               onChange={(e) => setLinkCodeInput(e.target.value.toUpperCase())}
               placeholder="Örn: EK-748291"
               maxLength={10}
-              className="w-full bg-slate-950 border border-purple-500/40 rounded-xl px-4 py-3 text-sm font-mono font-black text-white tracking-widest text-center uppercase focus:outline-none focus:border-purple-400"
+              className="w-full bg-white dark:bg-slate-950 border-2 border-purple-400 dark:border-purple-500/60 rounded-xl px-4 py-3 text-base font-mono font-black text-slate-950 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 tracking-widest text-center uppercase focus:outline-none focus:ring-2 focus:ring-purple-400 shadow-inner"
             />
 
             <div className="flex items-center gap-2 pt-2">

@@ -19,9 +19,10 @@ type AuthMode = 'login' | 'register' | 'role_selection' | 'forgot_email' | 'forg
 export const findStudentByInviteCode = async (
   rawCode: string
 ): Promise<{ uid: string; name: string; code: string; studentData: any } | null> => {
-  const clean = rawCode.trim().toUpperCase();
+  const clean = rawCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!clean) return null;
-  const formattedCode = clean.startsWith('EK-') ? clean : `EK-${clean}`;
+  const core = clean.startsWith('EK') ? clean.slice(2) : clean;
+  const formattedCode = `EK-${core}`;
 
   try {
     const q = query(collection(db, 'users'), where('parentInviteCode', '==', formattedCode));
@@ -42,6 +43,25 @@ export const findStudentByInviteCode = async (
     console.warn('Query by parentInviteCode failed:', e);
   }
 
+  // Also try query with core digits
+  try {
+    const q2 = query(collection(db, 'users'), where('parentInviteCode', '==', core));
+    const snap2 = await Promise.race([
+      getDocs(q2),
+      new Promise<null>((r) => setTimeout(() => r(null), 2500)),
+    ]);
+    if (snap2 && !snap2.empty) {
+      const docData = snap2.docs[0].data();
+      return {
+        uid: snap2.docs[0].id,
+        name: docData.ad || docData.kullaniciAdi || 'Öğrenci',
+        code: formattedCode,
+        studentData: docData,
+      };
+    }
+  } catch (e) {}
+
+  // Fallback scan across all users collection
   try {
     const allSnap = await Promise.race([
       getDocs(collection(db, 'users')),
@@ -50,9 +70,11 @@ export const findStudentByInviteCode = async (
     if (allSnap && !allSnap.empty) {
       for (const d of allSnap.docs) {
         const data = d.data();
+        const codeInDoc = (data.parentInviteCode || '').toString().toUpperCase().replace(/[^A-Z0-9]/g, '');
         if (
-          data.parentInviteCode === formattedCode ||
-          data.parentInviteCode === clean ||
+          codeInDoc === clean ||
+          codeInDoc === core ||
+          (data.parentInviteCode && data.parentInviteCode.toUpperCase() === formattedCode) ||
           (d.id && d.id.toUpperCase() === clean)
         ) {
           return {
@@ -609,16 +631,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         let matchedStudentCode = '';
 
         if (!skipCode && socialStudentCode.trim()) {
-          const formattedCode = socialStudentCode.trim().toUpperCase().startsWith('EK-')
-            ? socialStudentCode.trim().toUpperCase()
-            : `EK-${socialStudentCode.trim().toUpperCase()}`;
-
           const studentMatch = await Promise.race([
-            findStudentByInviteCode(formattedCode),
-            new Promise<null>((r) => setTimeout(() => r(null), 3500)),
+            findStudentByInviteCode(socialStudentCode),
+            new Promise<null>((r) => setTimeout(() => r(null), 3000)),
           ]);
           if (!studentMatch) {
-            setErrorMsg(`"${formattedCode}" davet koduna sahip bir öğrenci bulunamadı. Lütfen öğrencinizin uygulamasındaki kodu kontrol edin.`);
+            setErrorMsg(`"${socialStudentCode.trim().toUpperCase()}" davet koduna sahip bir öğrenci bulunamadı. Lütfen öğrencinizin uygulamasındaki kodu kontrol edin veya aşağıdaki "Öğrenci kodunu daha sonra girmek istiyorum" seçeneğiyle devam edin.`);
             setIsSocialSubmitting(false);
             return;
           }
@@ -633,7 +651,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 parentConnected: true,
                 parentName: autoName,
               }, { merge: true }),
-              new Promise((r) => setTimeout(r, 2500)),
+              new Promise((r) => setTimeout(r, 2000)),
             ]);
           } catch (e) {}
         }
@@ -662,16 +680,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           updatedAt: new Date().toISOString(),
         };
 
+        // 1. Save locally FIRST so the user is guaranteed to have their active session
+        saveUser(parentUserData, uid);
+
+        // 2. Safely sync to Firestore with timeout
         try {
           await Promise.race([
             setDoc(userDocRef, parentUserData, { merge: true }),
-            new Promise((r) => setTimeout(r, 3500)),
+            new Promise((r) => setTimeout(r, 2500)),
           ]);
         } catch (e) {
-          console.warn('Parent userDoc write warning:', e);
+          console.warn('Parent userDoc write warning (non-fatal):', e);
         }
 
-        saveUser(parentUserData, uid);
         setIsSocialSubmitting(false);
         onLoginSuccess(parentUserData);
         onClose();
@@ -714,16 +735,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           updatedAt: new Date().toISOString(),
         };
 
+        // 1. Save locally FIRST
+        saveUser(studentUserData, uid);
+
+        // 2. Safely sync to Firestore with timeout
         try {
           await Promise.race([
             setDoc(userDocRef, studentUserData, { merge: true }),
-            new Promise((r) => setTimeout(r, 3500)),
+            new Promise((r) => setTimeout(r, 2500)),
           ]);
         } catch (e) {
-          console.warn('Student userDoc write warning:', e);
+          console.warn('Student userDoc write warning (non-fatal):', e);
         }
 
-        saveUser(studentUserData, uid);
         setIsSocialSubmitting(false);
         onLoginSuccess(studentUserData);
         onClose();
@@ -731,6 +755,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
     } catch (err: any) {
       console.error('Complete social registration error:', err);
+      // Fallback: If pendingSocialAuth exists, save user locally and proceed smoothly
+      if (pendingSocialAuth?.firebaseUser?.uid) {
+        const fallbackUid = pendingSocialAuth.firebaseUser.uid;
+        const autoName = pendingSocialAuth.firebaseUser.displayName || (socialSelectedRole === 'parent' ? 'Veli' : 'Öğrenci');
+        const autoUsername = autoGenerateUsername(pendingSocialAuth.firebaseUser.email, autoName);
+        const fallbackUser: Partial<Kullanici> = {
+          id: fallbackUid,
+          ad: autoName,
+          kullaniciAdi: autoUsername,
+          kullaniciAdi_lower: autoUsername.toLowerCase(),
+          email: pendingSocialAuth.firebaseUser.email || '',
+          role: socialSelectedRole,
+          avatarUrl: pendingSocialAuth.firebaseUser.photoURL || (socialSelectedRole === 'parent'
+            ? 'https://api.dicebear.com/7.x/adventurer/svg?seed=ParentChampion&backgroundColor=8b5cf6'
+            : 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1'),
+          kredi: 10,
+          maxKredi: 10,
+          seri: 1,
+          xp: 0,
+          isPremium: false,
+          lastResetDate: getTurkeyDateString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        saveUser(fallbackUser as Kullanici, fallbackUid);
+        setIsSocialSubmitting(false);
+        onLoginSuccess(fallbackUser);
+        onClose();
+        return;
+      }
       setErrorMsg(err?.message || 'Kayıt işlemi tamamlanamadı. Lütfen tekrar deneyin.');
     } finally {
       setIsSocialSubmitting(false);
@@ -1151,18 +1205,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                   {/* If Parent: Student Invite Code Field */}
                   {registerRole === 'parent' ? (
-                    <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-2xl space-y-2">
+                    <div className="p-3.5 bg-purple-50 dark:bg-purple-950/40 border-2 border-purple-300 dark:border-purple-600/40 rounded-2xl space-y-2.5">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-black text-purple-300 flex items-center gap-1.5">
-                          <span>🔗 Öğrenci Takip Davet Kodu</span>
+                        <label className="text-xs font-black text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-purple-700 dark:text-purple-400 text-base">link</span>
+                          <span>Öğrenci Takip Davet Kodu</span>
                         </label>
-                        <span className="text-[10px] text-purple-400 font-bold bg-purple-500/20 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-extrabold text-purple-800 dark:text-purple-200 bg-purple-200/80 dark:bg-purple-900/60 px-2.5 py-0.5 rounded-full border border-purple-300 dark:border-purple-700">
                           İsteğe Bağlı
                         </span>
                       </div>
                       <div className="relative">
-                        <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-400 text-lg">
-                          key
+                        <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-700 dark:text-purple-400 text-lg">
+                          vpn_key
                         </span>
                         <input
                           type="text"
@@ -1171,11 +1226,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           placeholder="Örn: EK-748291 (veya boş bırakın)"
                           maxLength={10}
                           autoCapitalize="characters"
-                          className="w-full bg-slate-900 border border-purple-500/30 rounded-xl py-3 pl-10 pr-4 text-xs font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 tracking-wider"
+                          className="w-full bg-white dark:bg-slate-900 border-2 border-purple-300 dark:border-purple-600 rounded-xl py-3 pl-10 pr-4 text-xs font-mono font-black text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 tracking-wider shadow-inner"
                         />
                       </div>
-                      <p className="text-[11px] text-slate-300 leading-tight">
-                        💡 Öğrencinizin <strong className="text-purple-300">Profil &gt; Veli Bağlantısı</strong> ekranındaki 6 haneli kodunu girebilir veya daha sonra panelden ekleyebilirsiniz.
+                      <p className="text-[11px] text-slate-700 dark:text-slate-300 font-medium leading-tight">
+                        💡 Öğrencinizin <strong className="text-purple-900 dark:text-purple-200 font-bold">Profil &gt; Veli Bağlantısı</strong> ekranındaki 6 haneli kodunu girebilir veya daha sonra panelden ekleyebilirsiniz.
                       </p>
                     </div>
                   ) : (
@@ -1447,31 +1502,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             {/* If Parent: Student Invite Code */}
             {socialSelectedRole === 'parent' && (
-              <div className="p-3.5 bg-purple-500/10 border border-purple-500/20 rounded-2xl space-y-2.5 animate-fadeIn">
+              <div className="p-3.5 bg-purple-50 dark:bg-purple-950/40 border-2 border-purple-300 dark:border-purple-600/40 rounded-2xl space-y-2.5 animate-fadeIn">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-black text-purple-300 flex items-center gap-1.5">
-                    <span>🔗 Öğrenci Takip Davet Kodu</span>
+                  <label className="text-xs font-black text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-purple-700 dark:text-purple-400 text-base">link</span>
+                    <span>Öğrenci Takip Davet Kodu</span>
                   </label>
-                  <span className="text-[10px] text-purple-400 font-bold bg-purple-500/20 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-extrabold text-purple-800 dark:text-purple-200 bg-purple-200/80 dark:bg-purple-900/60 px-2.5 py-0.5 rounded-full border border-purple-300 dark:border-purple-700">
                     EK-XXXXXX
                   </span>
                 </div>
                 <div className="relative">
-                  <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-400 text-lg">
-                    key
+                  <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-700 dark:text-purple-400 text-lg">
+                    vpn_key
                   </span>
                   <input
                     type="text"
                     value={socialStudentCode}
                     onChange={(e) => setSocialStudentCode(e.target.value.toUpperCase())}
-                    placeholder="Örn: EK-748291"
+                    placeholder="Örn: EK-748291 (veya boş bırakın)"
                     maxLength={10}
                     autoCapitalize="characters"
-                    className="w-full bg-slate-900 border border-purple-500/30 rounded-xl py-3 pl-10 pr-4 text-xs font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 tracking-wider"
+                    className="w-full bg-white dark:bg-slate-900 border-2 border-purple-300 dark:border-purple-600 rounded-xl py-3 pl-10 pr-4 text-xs font-mono font-black text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 tracking-wider shadow-inner"
                   />
                 </div>
-                <p className="text-[11px] text-slate-300 leading-tight">
-                  💡 Öğrencinizin uygulamasındaki <strong className="text-purple-300">Profil &gt; Veli Bağlantısı</strong> ekranındaki 6 haneli kodu girerek hesabına bağlanabilirsiniz.
+                <p className="text-[11px] text-slate-700 dark:text-slate-300 font-medium leading-tight">
+                  💡 Öğrencinizin uygulamasındaki <strong className="text-purple-900 dark:text-purple-200 font-bold">Profil &gt; Veli Bağlantısı</strong> ekranındaki 6 haneli kodu girerek hesabına bağlanabilirsiniz.
                 </p>
               </div>
             )}
@@ -1502,9 +1558,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="button"
                   disabled={isSocialSubmitting}
                   onClick={() => handleCompleteSocialRegistration(true)}
-                  className="w-full text-xs font-bold text-slate-400 hover:text-white py-2 text-center cursor-pointer transition-colors"
+                  className="w-full text-xs font-extrabold text-purple-700 dark:text-purple-300 hover:text-purple-900 dark:hover:text-purple-100 bg-purple-100/70 dark:bg-purple-900/40 border border-purple-300/80 dark:border-purple-700/60 py-2.5 px-3 rounded-xl text-center cursor-pointer transition-all flex items-center justify-center gap-1.5 shadow-xs"
                 >
-                  Öğrenci kodunu daha sonra girmek istiyorum &rarr;
+                  <span>Öğrenci kodunu daha sonra girmek istiyorum</span>
+                  <span className="material-symbols-outlined text-sm">arrow_forward</span>
                 </button>
               )}
             </div>
