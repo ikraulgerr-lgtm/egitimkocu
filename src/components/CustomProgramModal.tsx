@@ -65,14 +65,14 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
 
   // Total topics selected across all subjects
   const totalSelectedCount = useMemo(() => {
-    return Object.values(selectedTopics).reduce((acc, curr) => acc + curr.length, 0);
+    return (Object.values(selectedTopics) as string[][]).reduce((acc, curr) => acc + (curr?.length || 0), 0);
   }, [selectedTopics]);
 
   // Flattened array for the generator
   const flattenedSelectedTopics = useMemo(() => {
     const result: { ders: string; konu: string }[] = [];
-    Object.entries(selectedTopics).forEach(([ders, konular]) => {
-      konular.forEach((konu) => {
+    (Object.entries(selectedTopics) as [string, string[]][]).forEach(([ders, konular]) => {
+      (konular || []).forEach((konu) => {
         result.push({ ders, konu });
       });
     });

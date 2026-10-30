@@ -343,7 +343,7 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                 onChange={(e) => setLinkCodeInput(e.target.value.toUpperCase())}
                 placeholder="Örn: EK-748291"
                 maxLength={10}
-                className="flex-1 bg-white dark:bg-slate-950 border-2 border-purple-400 dark:border-purple-500/60 rounded-xl px-4 py-3 text-sm font-mono font-black text-slate-950 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 tracking-widest text-center uppercase focus:outline-none focus:ring-2 focus:ring-purple-400 shadow-inner"
+                className="flex-1 bg-white text-slate-900 border-2 border-purple-400 rounded-xl px-4 py-3 text-sm font-mono font-black placeholder:text-slate-400 tracking-widest text-center uppercase focus:outline-none focus:ring-2 focus:ring-purple-400 shadow-md"
               />
               <button
                 type="button"
@@ -881,7 +881,7 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
               onChange={(e) => setLinkCodeInput(e.target.value.toUpperCase())}
               placeholder="Örn: EK-748291"
               maxLength={10}
-              className="w-full bg-white dark:bg-slate-950 border-2 border-purple-400 dark:border-purple-500/60 rounded-xl px-4 py-3 text-base font-mono font-black text-slate-950 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 tracking-widest text-center uppercase focus:outline-none focus:ring-2 focus:ring-purple-400 shadow-inner"
+              className="w-full bg-white text-slate-900 border-2 border-purple-400 rounded-xl px-4 py-3 text-base font-mono font-black placeholder:text-slate-400 tracking-widest text-center uppercase focus:outline-none focus:ring-2 focus:ring-purple-400 shadow-md"
             />
 
             <div className="flex items-center gap-2 pt-2">

@@ -370,7 +370,10 @@ export function saveUser(user: Kullanici, userId?: string): void {
     user.kredi = 10;
   }
   const key = getScopedKey(BASE_USER_KEY, userId || user.id);
-  localStorage.setItem(key, JSON.stringify(user));
+  const userJson = JSON.stringify(user);
+  localStorage.setItem(key, userJson);
+  // Also save to unscoped key so getUser() immediately returns valid user during auth state transitions
+  localStorage.setItem(BASE_USER_KEY, userJson);
 
   const uid = userId || auth.currentUser?.uid || user.id;
   if (uid && !uid.startsWith('usr_new')) {

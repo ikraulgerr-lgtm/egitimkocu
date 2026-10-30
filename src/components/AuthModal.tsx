@@ -228,8 +228,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           return;
         }
 
-        // Validate username format with Turkish character transliteration
-        const cleanUsername = username
+        // Validate username format with Turkish character transliteration; fallback to auto-generation if omitted or short
+        let cleanUsername = username
           .trim()
           .replace(/İ/g, 'i')
           .replace(/I/g, 'i')
@@ -246,10 +246,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           .replace(/Ç/g, 'c')
           .toLowerCase()
           .replace(/[^a-z0-9_]/g, '');
-        if (!cleanUsername || cleanUsername.length < 3 || cleanUsername.length > 20) {
-          setErrorMsg('Kullanıcı adı en az 3, en fazla 20 karakter olmalı ve yalnızca küçük harf, rakam ve alt tire (_) içermelidir.');
-          setIsEmailLoading(false);
-          return;
+
+        if (!cleanUsername || cleanUsername.length < 3) {
+          cleanUsername = autoGenerateUsername(email.trim(), name.trim());
+        }
+        if (cleanUsername.length > 20) {
+          cleanUsername = cleanUsername.slice(0, 20);
         }
 
         if (password.length < 8) {
@@ -257,7 +259,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           setIsEmailLoading(false);
           return;
         }
-        const hasUpperLower = /[A-Z]/.test(password) && /[a-z]/.test(password);
+        const hasUpperLower = /[A-ZÇĞİÖŞÜ]/.test(password) && /[a-zçğıöşü]/.test(password);
         if (!hasUpperLower) {
           setErrorMsg('Şifreniz en az bir büyük ve bir küçük harf içermelidir.');
           setIsEmailLoading(false);
@@ -794,7 +796,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Password criteria checks (8 characters + Upper & Lowercase letter)
   const passCheck = mode === 'register' ? password : newPassword;
   const has8Chars = passCheck.length >= 8;
-  const hasUpperLower = /[A-Z]/.test(passCheck) && /[a-z]/.test(passCheck);
+  const hasUpperLower = /[A-ZÇĞİÖŞÜ]/.test(passCheck) && /[a-zçğıöşü]/.test(passCheck);
   const passwordsMatch = newPassword.length > 0 && newPassword === confirmPassword;
 
   return (
@@ -1226,11 +1228,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           placeholder="Örn: EK-748291 (veya boş bırakın)"
                           maxLength={10}
                           autoCapitalize="characters"
-                          className="w-full bg-white dark:bg-slate-900 border-2 border-purple-300 dark:border-purple-600 rounded-xl py-3 pl-10 pr-4 text-xs font-mono font-black text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 tracking-wider shadow-inner"
+                          className="w-full bg-surface-container-low border-2 border-purple-500/60 rounded-xl py-3 pl-10 pr-4 text-xs font-mono font-bold text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-purple-500 tracking-wider shadow-inner"
                         />
                       </div>
-                      <p className="text-[11px] text-slate-700 dark:text-slate-300 font-medium leading-tight">
-                        💡 Öğrencinizin <strong className="text-purple-900 dark:text-purple-200 font-bold">Profil &gt; Veli Bağlantısı</strong> ekranındaki 6 haneli kodunu girebilir veya daha sonra panelden ekleyebilirsiniz.
+                      <p className="text-[11px] text-text-muted font-medium leading-tight">
+                        💡 Öğrencinizin <strong className="text-primary font-bold">Profil &gt; Veli Bağlantısı</strong> ekranındaki 6 haneli kodunu girebilir veya daha sonra panelden ekleyebilirsiniz.
                       </p>
                     </div>
                   ) : (
@@ -1360,6 +1362,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     </button>
                     'ni okudum ve kabul ediyorum.
                   </span>
+                </div>
+              )}
+
+              {/* Error Alert Message directly above submit button for instant mobile visibility */}
+              {errorMsg && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 flex items-start gap-2 animate-shake">
+                  <span className="material-symbols-outlined text-base shrink-0 mt-0.5">error</span>
+                  <span className="flex-1">{errorMsg}</span>
                 </div>
               )}
 
@@ -1523,12 +1533,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     placeholder="Örn: EK-748291 (veya boş bırakın)"
                     maxLength={10}
                     autoCapitalize="characters"
-                    className="w-full bg-white dark:bg-slate-900 border-2 border-purple-300 dark:border-purple-600 rounded-xl py-3 pl-10 pr-4 text-xs font-mono font-black text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 tracking-wider shadow-inner"
+                    className="w-full bg-surface-container-low border-2 border-purple-500/60 rounded-xl py-3 pl-10 pr-4 text-xs font-mono font-bold text-text-main placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-purple-500 tracking-wider shadow-inner"
                   />
                 </div>
-                <p className="text-[11px] text-slate-700 dark:text-slate-300 font-medium leading-tight">
-                  💡 Öğrencinizin uygulamasındaki <strong className="text-purple-900 dark:text-purple-200 font-bold">Profil &gt; Veli Bağlantısı</strong> ekranındaki 6 haneli kodu girerek hesabına bağlanabilirsiniz.
+                <p className="text-[11px] text-text-muted font-medium leading-tight">
+                  💡 Öğrencinizin uygulamasındaki <strong className="text-primary font-bold">Profil &gt; Veli Bağlantısı</strong> ekranındaki 6 haneli kodu girerek hesabına bağlanabilirsiniz.
                 </p>
+              </div>
+            )}
+
+            {/* Error Alert in Role Selection Mode directly above action button */}
+            {errorMsg && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 flex items-start gap-2 animate-shake">
+                <span className="material-symbols-outlined text-base shrink-0 mt-0.5">error</span>
+                <span className="flex-1">{errorMsg}</span>
               </div>
             )}
 

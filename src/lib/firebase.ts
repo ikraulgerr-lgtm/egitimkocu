@@ -15,7 +15,7 @@ import {
   setPersistence,
   browserLocalPersistence 
 } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer, setDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer, setDoc, deleteDoc } from 'firebase/firestore';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { Capacitor } from '@capacitor/core';
 import firebaseConfig from '../../firebase-applet-config.json';

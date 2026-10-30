@@ -291,7 +291,7 @@ export const ParentConnectModal: React.FC<ParentConnectModalProps> = ({
                     value={inputCode}
                     onChange={(e) => setInputCode(e.target.value)}
                     placeholder="Örn: EK-123456"
-                    className="flex-1 bg-card-bg border border-card-border rounded-xl px-3 py-2 text-xs font-mono font-bold text-text-main uppercase focus:outline-none focus:border-primary"
+                    className="flex-1 bg-surface-container-low border-2 border-purple-500/50 rounded-xl px-3 py-2 text-xs font-mono font-bold text-text-main placeholder:text-text-muted uppercase focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                   <button
                     type="button"

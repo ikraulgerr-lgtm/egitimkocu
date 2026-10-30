@@ -527,14 +527,23 @@ export function App() {
               } catch {}
             }
           } else {
-            // Check if local cachedUser already exists as parent or student
-            if (cachedUser && cachedUser.id && (cachedUser.role === 'parent' || cachedUser.targetExam)) {
-              setUserState(cachedUser);
+            // Firestore doc does not exist yet or request timed out:
+            // Check if freshly saved local user exists (e.g. from AuthModal registration)
+            const freshUser = getUser(uid);
+            if (
+              freshUser &&
+              freshUser.id &&
+              freshUser.id !== 'student' &&
+              freshUser.id !== 'usr_new' &&
+              freshUser.email &&
+              (freshUser.role === 'parent' || freshUser.targetExam)
+            ) {
+              setUserState(freshUser);
               setIsAuthModalOpen(false);
-            } else {
-              // Brand new user or role selection in progress: keep AuthModal open
-              setIsAuthModalOpen(true);
             }
+            // If neither Firestore nor localStorage has a user profile yet,
+            // the user is currently completing registration/role selection inside AuthModal.
+            // DO NOT force setIsAuthModalOpen(true) here as that would hijack the registration form.
           }
         } catch (err) {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
