@@ -34,48 +34,26 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
 
 export async function loginWithEmailFirebase(email: string, pass: string) {
   const cleanEmail = email.trim();
-  let resolvedUser: any = null;
 
+  // 1. Authenticate with Firebase Web/JS SDK directly (10s timeout safety)
+  const authPromise = signInWithEmailAndPassword(auth, cleanEmail, pass);
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Giriş işlemi zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin.')), 10000)
+  );
+
+  const result = await Promise.race([authPromise, timeoutPromise]);
+
+  // 2. Non-blocking native session sync
   if (Capacitor.isNativePlatform()) {
-    try {
-      const nativeRes = await FirebaseAuthentication.signInWithEmailAndPassword({
-        email: cleanEmail,
-        password: pass,
-      });
-      if (nativeRes?.user) {
-        resolvedUser = {
-          uid: nativeRes.user.uid,
-          email: nativeRes.user.email || cleanEmail,
-          displayName: nativeRes.user.displayName || 'Öğrenci',
-          photoURL: nativeRes.user.photoUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-        };
-      } else {
-        throw new Error('Giriş başarısız oldu. Kullanıcı bilgisi alınamadı.');
-      }
-    } catch (nativeErr: any) {
-      console.error('Native signInWithEmailAndPassword error:', nativeErr);
-      throw nativeErr;
-    }
-  }
-
-  if (resolvedUser) {
-    // Non-blocking JS SDK synchronization (max 2s)
-    Promise.race([
-      signInWithEmailAndPassword(auth, cleanEmail, pass),
-      new Promise((r) => setTimeout(r, 2000)),
-    ]).catch((e) => {
-      console.warn('JS SDK sync after native login warning (non-fatal):', e);
+    FirebaseAuthentication.signInWithEmailAndPassword({
+      email: cleanEmail,
+      password: pass,
+    }).catch((nativeErr) => {
+      console.warn('Native signInWithEmailAndPassword sync warning (non-fatal):', nativeErr);
     });
-    return resolvedUser;
   }
 
-  try {
-    const result = await signInWithEmailAndPassword(auth, cleanEmail, pass);
-    return result.user;
-  } catch (error) {
-    console.error('Firebase Login Error:', error);
-    throw error;
-  }
+  return result.user;
 }
 
 export async function registerWithEmailFirebase(
@@ -102,62 +80,37 @@ export async function registerWithEmailFirebase(
   const targetExamDate = isParent ? '' : (extraData?.targetExamDate || '2027-06-19');
   const sinifVal = isParent ? '' : (extraData?.sinif || (targetExam === 'LGS' ? '8. Sınıf (LGS)' : targetExam === 'YKS' ? '12. Sınıf / Mezun (YKS)' : 'YKS / LGS Hazırlık'));
 
-  let resolvedUser: any = null;
+  // 1. Create account via Firebase JS SDK directly (10s timeout safety)
+  const authPromise = createUserWithEmailAndPassword(auth, cleanEmail, pass);
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Kayıt işlemi zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.')), 10000)
+  );
 
-  if (Capacitor.isNativePlatform()) {
-    try {
-      const nativeRes = await FirebaseAuthentication.createUserWithEmailAndPassword({
-        email: cleanEmail,
-        password: pass,
-      });
-      try {
-        await FirebaseAuthentication.updateProfile({ displayName: cleanName });
-      } catch (e) {}
-      if (nativeRes?.user) {
-        resolvedUser = {
-          uid: nativeRes.user.uid,
-          email: nativeRes.user.email || cleanEmail,
-          displayName: cleanName,
-          photoURL: nativeRes.user.photoUrl || (isParent
-            ? 'https://api.dicebear.com/7.x/adventurer/svg?seed=ParentChampion&backgroundColor=8b5cf6'
-            : 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1'),
-        };
-      }
-    } catch (nativeErr: any) {
-      console.warn('Native createUserWithEmailAndPassword error, trying JS SDK fallback...', nativeErr);
-      const msg = (nativeErr?.message || '').toLowerCase();
-      if (msg.includes('already') || msg.includes('weak') || msg.includes('invalid')) {
-        throw nativeErr;
-      }
-    }
-  }
+  const result = await Promise.race([authPromise, timeoutPromise]);
+  const user = result.user;
 
-  // Also authenticate on the JS SDK side non-blockingly (max 2s) so auth.currentUser is synchronized
-  if (resolvedUser) {
-    Promise.race([
-      signInWithEmailAndPassword(auth, cleanEmail, pass),
-      new Promise((r) => setTimeout(r, 2000)),
-    ]).catch((jsErr) => {
-      console.warn('Syncing JS SDK auth after native registration (non-fatal):', jsErr);
-    });
-  } else {
-    try {
-      const result = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
-      try {
-        await updateProfile(result.user, { displayName: cleanName });
-      } catch (e) {}
-      resolvedUser = result.user;
-    } catch (error) {
-      console.error('Firebase Register Error:', error);
-      throw error;
-    }
-  }
-
-  // Write initial user profile to Firestore reliably
+  // 2. Update display name
   try {
-    const userDocRef = doc(db, 'users', resolvedUser.uid);
+    await updateProfile(user, { displayName: cleanName });
+  } catch (e) {
+    console.warn('updateProfile error (non-fatal):', e);
+  }
+
+  // 3. Sync native Capacitor auth non-blockingly
+  if (Capacitor.isNativePlatform()) {
+    FirebaseAuthentication.signInWithEmailAndPassword({
+      email: cleanEmail,
+      password: pass,
+    }).catch((nativeErr) => {
+      console.warn('Native register sync warning (non-fatal):', nativeErr);
+    });
+  }
+
+  // 4. Write initial user profile to Firestore reliably (3.5s timeout)
+  try {
+    const userDocRef = doc(db, 'users', user.uid);
     const initialDocData: Record<string, any> = {
-      id: resolvedUser.uid,
+      id: user.uid,
       ad: cleanName,
       kullaniciAdi: cleanUsername,
       kullaniciAdi_lower: cleanUsername,
@@ -169,7 +122,7 @@ export async function registerWithEmailFirebase(
       xp: 0,
       isPremium: false,
       sinif: sinifVal,
-      avatarUrl: resolvedUser.photoURL || (isParent
+      avatarUrl: user.photoURL || (isParent
         ? 'https://api.dicebear.com/7.x/adventurer/svg?seed=ParentChampion&backgroundColor=8b5cf6'
         : 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1'),
       targetExam: targetExam,
@@ -188,13 +141,13 @@ export async function registerWithEmailFirebase(
 
     await Promise.race([
       setDoc(userDocRef, initialDocData, { merge: true }),
-      new Promise((r) => setTimeout(r, 2500)),
+      new Promise((r) => setTimeout(r, 3500)),
     ]);
   } catch (err) {
     console.warn('Firestore initial user setup warning:', err);
   }
 
-  return resolvedUser;
+  return user;
 }
 
 export async function loginWithGoogle() {
@@ -223,17 +176,21 @@ export async function loginWithGoogle() {
         result?.credential?.accessToken ||
         result?.accessToken;
 
-      // Synchronize JS SDK auth in background non-blockingly (max 2.5s)
+      // Synchronize JS SDK auth and AWAIT it with max 4s timeout so auth.currentUser is authenticated
       if (idToken) {
         try {
           const credential = GoogleAuthProvider.credential(idToken, accessToken || undefined);
-          Promise.race([
+          await Promise.race([
             signInWithCredential(auth, credential),
-            new Promise((r) => setTimeout(r, 2500)),
-          ]).catch((credErr) => {
-            console.warn('signInWithCredential with idToken error (non-fatal):', credErr);
-          });
-        } catch (e) {}
+            new Promise((r) => setTimeout(r, 4000)),
+          ]);
+        } catch (credErr) {
+          console.warn('signInWithCredential with Google idToken error (non-fatal):', credErr);
+        }
+      }
+
+      if (auth.currentUser) {
+        return auth.currentUser;
       }
 
       if (result?.user) {
@@ -243,10 +200,6 @@ export async function loginWithGoogle() {
           email: result.user.email || 'ogrenci@egitimkocum.ai',
           photoURL: result.user.photoUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
         } as any;
-      }
-
-      if (auth.currentUser) {
-        return auth.currentUser;
       }
 
       throw new Error('Google ile girişten vazgeçtiniz.');
@@ -322,7 +275,7 @@ export async function loginWithApple() {
         (result?.user as any)?.idToken;
       const rawNonce = result?.credential?.rawNonce || result?.rawNonce;
 
-      // Synchronize JS SDK auth in background non-blockingly (max 2.5s)
+      // Synchronize JS SDK auth and AWAIT it with max 4s timeout so auth.currentUser is authenticated
       if (idToken) {
         try {
           const provider = new OAuthProvider('apple.com');
@@ -330,13 +283,17 @@ export async function loginWithApple() {
             idToken,
             rawNonce,
           });
-          Promise.race([
+          await Promise.race([
             signInWithCredential(auth, credential),
-            new Promise((r) => setTimeout(r, 2500)),
-          ]).catch((credErr) => {
-            console.warn('signInWithCredential with Apple idToken error (non-fatal):', credErr);
-          });
-        } catch (e) {}
+            new Promise((r) => setTimeout(r, 4000)),
+          ]);
+        } catch (credErr) {
+          console.warn('signInWithCredential with Apple idToken error (non-fatal):', credErr);
+        }
+      }
+
+      if (auth.currentUser) {
+        return auth.currentUser;
       }
 
       if (result?.user) {
@@ -347,10 +304,6 @@ export async function loginWithApple() {
           email: result.user.email || 'ogrenci@privaterelay.appleid.com',
           photoURL: result.user.photoUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
         } as any;
-      }
-
-      if (auth.currentUser) {
-        return auth.currentUser;
       }
 
       throw new Error('Apple giriş kimliği doğrulanamadı.');

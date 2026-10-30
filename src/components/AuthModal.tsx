@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Kullanici } from '../types';
 import { auth, db, loginWithGoogle, loginWithApple, resetPasswordFirebase, loginWithEmailFirebase, registerWithEmailFirebase } from '../lib/firebase';
@@ -149,26 +149,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsEmailLoading(false);
   }, [mode]);
 
-  // Always reset mode to 'login' whenever modal is opened
+  const prevIsOpenRef = useRef<boolean>(false);
+
+  // Reset mode to 'login' ONLY when modal transitions from closed to open
   useEffect(() => {
     if (isOpen) {
-      setCanInteract(false);
-      setMode('login');
-      setErrorMsg(null);
-      setIsGoogleLoading(false);
-      setIsAppleLoading(false);
-      setIsEmailLoading(false);
-      setPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setOtpCode('');
+      if (!prevIsOpenRef.current) {
+        prevIsOpenRef.current = true;
+        setCanInteract(false);
+        setMode('login');
+        setErrorMsg(null);
+        setIsGoogleLoading(false);
+        setIsAppleLoading(false);
+        setIsEmailLoading(false);
+        setPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setOtpCode('');
 
-      // Prevent accidental click-through from underlying screen (e.g. logout button)
-      const timer = setTimeout(() => {
-        setCanInteract(true);
-      }, 400);
-      return () => clearTimeout(timer);
+        // Prevent accidental click-through from underlying screen (e.g. logout button)
+        const timer = setTimeout(() => {
+          setCanInteract(true);
+        }, 400);
+        return () => clearTimeout(timer);
+      }
     } else {
+      prevIsOpenRef.current = false;
       setCanInteract(false);
     }
   }, [isOpen]);
@@ -267,10 +273,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                 // Notify student document
                 try {
-                  await setDoc(doc(db, 'users', studentMatch.uid), {
-                    parentConnected: true,
-                    parentName: cleanParentName,
-                  }, { merge: true });
+                  await Promise.race([
+                    setDoc(doc(db, 'users', studentMatch.uid), {
+                      parentConnected: true,
+                      parentName: cleanParentName,
+                    }, { merge: true }),
+                    new Promise((r) => setTimeout(r, 2500)),
+                  ]);
                 } catch (e) {
                   console.warn('Student parent link warning:', e);
                 }
@@ -282,12 +291,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           // 3. Write linked student info to parent document
           try {
-            await setDoc(doc(db, 'users', fbUser.uid), {
-              role: 'parent',
-              linkedStudentId,
-              linkedStudentName,
-              linkedStudentCode,
-            }, { merge: true });
+            await Promise.race([
+              setDoc(doc(db, 'users', fbUser.uid), {
+                role: 'parent',
+                linkedStudentId,
+                linkedStudentName,
+                linkedStudentCode,
+              }, { merge: true }),
+              new Promise((r) => setTimeout(r, 2500)),
+            ]);
           } catch (e) {}
 
           const parentUserData: Partial<Kullanici> = {
@@ -312,6 +324,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           };
 
           saveUser(parentUserData as Kullanici, fbUser.uid);
+          setIsEmailLoading(false);
           onLoginSuccess(parentUserData);
           onClose();
           return;
@@ -355,8 +368,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           };
 
           saveUser(studentUserData as Kullanici, fbUser.uid);
+          setIsEmailLoading(false);
           onLoginSuccess(studentUserData);
           onClose();
+          return;
         }
       } else {
         const fbUser = await loginWithEmailFirebase(email.trim(), password);
@@ -598,7 +613,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             ? socialStudentCode.trim().toUpperCase()
             : `EK-${socialStudentCode.trim().toUpperCase()}`;
 
-          const studentMatch = await findStudentByInviteCode(formattedCode);
+          const studentMatch = await Promise.race([
+            findStudentByInviteCode(formattedCode),
+            new Promise<null>((r) => setTimeout(() => r(null), 3500)),
+          ]);
           if (!studentMatch) {
             setErrorMsg(`"${formattedCode}" davet koduna sahip bir öğrenci bulunamadı. Lütfen öğrencinizin uygulamasındaki kodu kontrol edin.`);
             setIsSocialSubmitting(false);
@@ -610,10 +628,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           // Notify & link on student document
           try {
-            await setDoc(doc(db, 'users', studentMatch.uid), {
-              parentConnected: true,
-              parentName: autoName,
-            }, { merge: true });
+            await Promise.race([
+              setDoc(doc(db, 'users', studentMatch.uid), {
+                parentConnected: true,
+                parentName: autoName,
+              }, { merge: true }),
+              new Promise((r) => setTimeout(r, 2500)),
+            ]);
           } catch (e) {}
         }
 
@@ -641,11 +662,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           updatedAt: new Date().toISOString(),
         };
 
-        await setDoc(userDocRef, parentUserData, { merge: true });
+        try {
+          await Promise.race([
+            setDoc(userDocRef, parentUserData, { merge: true }),
+            new Promise((r) => setTimeout(r, 3500)),
+          ]);
+        } catch (e) {
+          console.warn('Parent userDoc write warning:', e);
+        }
+
         saveUser(parentUserData, uid);
         setIsSocialSubmitting(false);
         onLoginSuccess(parentUserData);
         onClose();
+        return;
       } else {
         // Student role
         const studentCode = 'EK-' + Math.floor(100000 + Math.random() * 900000).toString();
@@ -684,15 +714,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           updatedAt: new Date().toISOString(),
         };
 
-        await setDoc(userDocRef, studentUserData, { merge: true });
+        try {
+          await Promise.race([
+            setDoc(userDocRef, studentUserData, { merge: true }),
+            new Promise((r) => setTimeout(r, 3500)),
+          ]);
+        } catch (e) {
+          console.warn('Student userDoc write warning:', e);
+        }
+
         saveUser(studentUserData, uid);
         setIsSocialSubmitting(false);
         onLoginSuccess(studentUserData);
         onClose();
+        return;
       }
     } catch (err: any) {
       console.error('Complete social registration error:', err);
       setErrorMsg(err?.message || 'Kayıt işlemi tamamlanamadı. Lütfen tekrar deneyin.');
+    } finally {
       setIsSocialSubmitting(false);
     }
   };
