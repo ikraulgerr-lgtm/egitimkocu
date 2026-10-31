@@ -214,7 +214,7 @@ export async function callGroqAI(
             { role: 'user', content: prompt },
           ],
           response_format: isJson ? { type: 'json_object' } : undefined,
-          temperature: 0.1,
+          temperature: 0.0,
         }),
       });
 
@@ -256,8 +256,8 @@ function getAIClient(customKey?: string): GoogleGenAI | null {
 // High-speed client-side image downscaling and compression for instant AI vision
 export async function optimizeImageForAi(
   imageData: string,
-  maxDim: number = 1280,
-  quality: number = 0.82
+  maxDim: number = 2048,
+  quality: number = 0.94
 ): Promise<string> {
   if (!imageData || typeof imageData !== 'string') return imageData;
   if (!imageData.startsWith('data:image')) return imageData;
@@ -304,7 +304,12 @@ export async function optimizeImageForAi(
 }
 
 async function callGeminiClientWithFallback(ai: GoogleGenAI, contents: any, isJson: boolean = true): Promise<string> {
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+  const modelsToTry = [
+    'gemini-2.5-pro',
+    'gemini-2.0-flash',
+    'gemini-1.5-pro',
+    'gemini-1.5-flash',
+  ];
   let lastErr: any = null;
 
   for (const modelName of modelsToTry) {
@@ -313,8 +318,8 @@ async function callGeminiClientWithFallback(ai: GoogleGenAI, contents: any, isJs
         model: modelName,
         contents: contents,
         config: isJson
-          ? { responseMimeType: 'application/json', temperature: 0.1 }
-          : { temperature: 0.2 },
+          ? { responseMimeType: 'application/json', temperature: 0.0 }
+          : { temperature: 0.0 },
       });
 
       if (response && response.text) {
@@ -471,7 +476,7 @@ async function prepareImageInlineData(imageData?: string | null): Promise<{ mime
   let processedImage = imageData;
   if (processedImage.startsWith('data:image')) {
     try {
-      processedImage = await optimizeImageForAi(processedImage, 1280, 0.82);
+      processedImage = await optimizeImageForAi(processedImage, 2048, 0.94);
     } catch (e) {
       console.warn('Image optimization notice:', e);
     }
@@ -670,9 +675,8 @@ export async function analyzeQuestionService(params: {
       const inlineImage = await prepareImageInlineData(imageData);
       const isAudio = Boolean(audioData && audioData.includes('base64,'));
 
-      const systemInstruction = `Sen MEB, ÖSYM (YKS, LGS, KPSS, YDS, MSÜ, ALES) ve tüm okul müfredatı için uzman yapay zeka soru analiz öğretmenisin.
-GÖREVİN:
-Öğrencinin gönderdiği soru görselini, ses kaydını veya soru metnini dikkatle incele.
+      const systemInstruction = `Sen MEB ve ÖSYM (YKS, TYT, AYT, LGS, KPSS, MSÜ, DGS, ALES) sınavlarında ve okul müfredatında en üst düzey uzmanlığa sahip BAŞÖĞRETMEN YAPAY ZEKASISIN.
+TEMEL GÖREVİN: Öğrencinin gönderdiği soruyu %100 MATEMATİKSEL VE BİLİMSEL DOĞRULUKLA, HİÇBİR İŞLEM VEYA MANTIK HATASI YAPMADAN çözmek ve pedagojik olarak adım adım açıklamak.
 
 ÇOK ÖNEMLİ GEÇERLİLİK VE DERS SORUSU KONTROLÜ:
 Eğer yüklenen görsel veya metin bir DERS / SINAV / TEST / ÖDEV SORUSU İÇERMİYORSA:
@@ -688,11 +692,30 @@ Bu durumda DOĞRUDAN aşağıdaki JSON formatını döndür:
   "cozumAdimlari": []
 }
 
-EĞER GEÇERLİ BİR DERS SORUSU İSE:
-1. "ocrMetin": Görseldeki soru metnini, matematiksel formülleri, grafikleri ve soru kökünü doğrudan görselden oku. Filigranları, sayfa/soru numarası etiketlerini (örn: 'VT (Bococ...', '9 2 x © Lisans 2024 Vv SoruNo: 11' gibi çöp yazıları) KESİNLİKLE TEMİZLE. 'ocrMetin' alanına sorunun gerçek, akıcı ve doğru Türkçe/Matematik soru metnini yaz.
-2. Soru çoktan seçmeli ise 'siklar' dizisine seçenekleri (A, B, C, D, E) yaz ve 'dogruSikIndex' (0, 1, 2, 3, 4) olarak doğru cevabı belirt. Açık uçlu ise siklar: [] bırak.
-3. Çözüm adımlarını en az 3 pedagojik adım ('cozumAdimlari') olarak detaylıca oluştur.
-4. Matematik sembollerini okunaklı Türkçe unicode (x², √x, a/b, ≤, ≥, ±, ∈, π, ∞) olarak yaz. LaTeX ($$) KULLANMA.`;
+EĞER GEÇERLİ BİR DERS SORUSU İSE ŞU KRİTİK ADIMLARI VE KURALLARI KESİNLİKLE UYGULA:
+
+1. GÖRSEL VE SORU KÖKÜ HASSASİYETİ (HİÇBİR VERİYİ ATLAMA):
+- Sorunun soru kökünü ("hangisi olamaz?", "kesinlikle doğrudur?", "en az kaçtır?", "en çok kaçtır?", "hangileri doğrudur?") ÇOK DİKKATLİCE oku. Soru kökündeki olumsuzluk eklerini (-me/-ma, değil, olamaz) ve altı çizili kelimeleri asla gözden kaçırma!
+- Sayısal verileri, birimleri, tanım kümelerini (x ∈ N+, x ∈ R, pozitif tam sayı vb.) ve geometrik şekil/grafik verilerini (açı, paralellik, diklik, eksen kesimleri) eksiksiz tespit et.
+- 'ocrMetin' alanına sorunun filigransız, temiz ve akıcı Türkçe soru metnini yaz.
+
+2. ADIM ADIM MATEMATİKSEL AKIL YÜRÜTME (İŞLEM HATASI YAPMA!):
+- İşlemleri asla kafadan atlayarak tahmin etme. Ara işlemleri (parantez açma, payda eşitleme, işaret çarpımı vb.) açık ve net adımlarla yap.
+- Cebir ve denklemlerde: Değişkenleri doğru yerleştir, eksi (-) işaretlerine özellikle dikkat et.
+- Geometride: Benzerlik oranları, Pisagor, özel üçgenler (30-60-90, 45-45-90), trigonometrik değerler ve alan bağıntılarını tek tek sağla.
+- Paragraf/Türkçe/Sosyalde: Çeldirici şıkların neden elendiğini, doğru cevabın metindeki hangi cümleye dayandığını somut olarak açıkla.
+
+3. KENDİ KENDİNİ DOĞRULAMA VE SAĞLAMA (MANDATORY SELF-VERIFICATION):
+- Çözümün son aşamasında bulduğun sonucu MUTLAKA orijinal soruda yerine koyarak SAĞLAMASINI (doğrulamasını) yap!
+- Eğer bulduğun sonuç soru öncüllerini sağlamıyorsa veya seçeneklerde (A, B, C, D, E) yoksa, işlemlerini baştan tekrar kontrol et ve hatanı düzelt.
+- Ancak doğrulamadan başarıyla geçen şıkkı 'dogruSikIndex' (0=A, 1=B, 2=C, 3=D, 4=E) olarak işaretle. Soru açık uçlu ise siklar: [] ve dogruSikIndex: undefined bırak.
+
+4. PEDAGOJİK ÇÖZÜM ADIMLARI:
+- Çözüm adımlarını en az 3 pedagojik adım ('cozumAdimlari') olarak detaylıca oluştur:
+  * 1. Adım: Verilerin Analizi ve Sorunun Kurulumu
+  * 2. Adım: Kritik Çözüm Yöntemi ve Formül Uygulaması (Öğrencinin düşebileceği tuzakları açıkla)
+  * 3. Adım: Doğrulama, Sağlama ve Nihai Cevap
+- Matematik sembollerini okunaklı Türkçe unicode (x², √x, a/b, ≤, ≥, ±, ∈, π, ∞) olarak yaz. LaTeX ($$) KULLANMA.`;
 
       const promptTemplate = `STRICT JSON OUTPUT FORMAT:
 {
@@ -711,9 +734,9 @@ EĞER GEÇERLİ BİR DERS SORUSU İSE:
     { "id": "fk_3", "kavram": "3. Kritik Kavram/Kural Başlığı", "tanim": "Net kural ve formül açıklaması", "ipucuTuzak": "Sınavda dikkat edilecek püf nokta", "zorluk": "İleri" }
   ],
   "cozumAdimlari": [
-    { "adimNo": 1, "baslik": "Sorunun Kurulumu", "aciklama": "Veriler ve istenen ifade...", "isCorrect": true, "dogruMetin": "Veri Analizi" },
-    { "adimNo": 2, "baslik": "Kritik Çözüm Adımı", "aciklama": "Kritik kural ve olası hata...", "isCorrect": false, "hataliMetin": "Hatalı yaklaşım...", "dogruMetin": "Doğru kural..." },
-    { "adimNo": 3, "baslik": "Sonuç ve Doğrulama", "aciklama": "Doğru sonuca ulaşma ve sağlama...", "isCorrect": true, "dogruMetin": "Doğru Yanıt Doğrulandı" }
+    { "adimNo": 1, "baslik": "Sorunun Kurulumu ve Veri Analizi", "aciklama": "Verilenler, istenen ve soru kökü analiz edildi.", "isCorrect": true, "dogruMetin": "Veri Analizi" },
+    { "adimNo": 2, "baslik": "Kritik Çözüm Adımı", "aciklama": "Kritik kural ve çözüm yöntemi:", "isCorrect": false, "hataliMetin": "Olası yanılgı veya işlem hatası tuzağı", "dogruMetin": "Uygulanan doğru formül ve adım adım hesaplama" },
+    { "adimNo": 3, "baslik": "Sonuç ve Sağlama (Doğrulama)", "aciklama": "Bulunan sonucun sorudaki yerine konularak sağlaması yapıldı ve teyit edildi.", "isCorrect": true, "dogruMetin": "Doğrulandı" }
   ]
 }`;
 
@@ -770,7 +793,7 @@ EĞER GEÇERLİ BİR DERS SORUSU İSE:
   // Strategy C: High-Intelligence Groq Cloud AI Engine (Fallback)
   if (userPrompt && userPrompt.trim().length >= 2) {
     try {
-      const groqSystemPrompt = `Sen MEB ve ÖSYM (YKS, LGS, KPSS, YDS, MSÜ) müfredatına tam hâkim uzman yapay zeka soru analiz öğretmenisin.
+      const groqSystemPrompt = `Sen MEB ve ÖSYM (YKS, TYT, AYT, LGS, KPSS, MSÜ, DGS, ALES) müfredatına tam hâkim uzman yapay zeka başöğretmenisin.
 GÖREVİN:
 Verilen metni incele. Eğer metin anlamlı bir okul/ders/sınav sorusu DEĞİLSE (örneğin rastgele harfler "asdfghjk", anlamsız kelimeler, ders dışı sohbet vb. ise):
 KESİNLİKLE uydurma çözüm üretme! DOĞRUDAN şu JSON formatını döndür:
@@ -783,7 +806,11 @@ KESİNLİKLE uydurma çözüm üretme! DOĞRUDAN şu JSON formatını döndür:
   "cozumAdimlari": []
 }
 
-Eğer geçerli bir ders sorusu ise tüm OCR çöplerini temizleyip düzgün soru metnini oluştur, doğru çözümü hesapla ve en az 3 pedagojik adım üret. STRICT JSON formatında döndür.`;
+Eğer geçerli bir ders sorusu ise:
+1. Sorunun kökünü ve verilerini eksiksiz tespit et.
+2. Ara işlemleri kafadan atlamadan adım adım matematiksel kurallarla çöz.
+3. Bulduğun sonucu orijinal soruda yerine koyup SAĞLAMASINI (doğrulamasını) yap.
+4. Ancak doğrulamadan geçen şıkkı 'dogruSikIndex' olarak belirle. En az 3 pedagojik adım üret. STRICT JSON formatında döndür.`;
 
       const groqUserPrompt = `Soru Metni:
 "${userPrompt}"
