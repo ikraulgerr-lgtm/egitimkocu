@@ -49,10 +49,10 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- Google AdMob Official Test Application ID -->
+        <!-- Google AdMob Official Android Application ID -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
+            android:value="ca-app-pub-4497707212444370~4401089980"/>
     </application>
 
     <!-- Package Visibility Queries for Speech Recognition on Android 11+ -->

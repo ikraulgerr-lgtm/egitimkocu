@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 /**
  * Google AdMob Rewarded Ad Unit IDs
  */
-const ANDROID_TEST_REWARDED_ID = 'ca-app-pub-3940256099942544/5224354917';
+const ANDROID_REAL_REWARDED_ID = 'ca-app-pub-4497707212444370/2621076203';
 const IOS_REAL_REWARDED_ID = 'ca-app-pub-4497707212444370/3001672002';
 
 let isInitialized = false;
@@ -53,7 +53,7 @@ export async function showRewardedAd(
       await initializeAdMob();
     }
 
-    const adId = Capacitor.getPlatform() === 'ios' ? IOS_REAL_REWARDED_ID : ANDROID_TEST_REWARDED_ID;
+    const adId = Capacitor.getPlatform() === 'ios' ? IOS_REAL_REWARDED_ID : ANDROID_REAL_REWARDED_ID;
 
     const options: RewardAdOptions = {
       adId,
