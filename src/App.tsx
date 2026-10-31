@@ -1711,13 +1711,39 @@ export function App() {
   // Dedicated Parent Tracking Portal View
   if (user?.role === 'parent') {
     return (
-      <div className="min-h-screen bg-slate-950 text-white font-sans transition-colors duration-200">
+      <div className={`min-h-screen ${theme === 'dark' ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'} font-sans transition-colors duration-200`}>
         {isSplashActive && <SplashScreen theme={theme} />}
         <ParentDashboardView
           currentUser={user}
           onLogout={handleLogout}
           showToast={showToast}
           onUpdateUser={handleUpdateUser}
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
+          onDeleteAccount={async () => {
+            isLoggingOutRef.current = true;
+            const currentUid = user?.id;
+            try {
+              showToast('⏳ Hesabınız ve tüm verileriniz siliniyor...');
+              await deleteAccountFirebase(currentUid);
+              resetToCleanState(currentUid);
+              setUserState(INITIAL_USER);
+              setQuestionsState([]);
+              setScheduleState([]);
+              setFriendsState([]);
+              setNotifications([]);
+              setSelectedQuestion(null);
+              setActiveBannerNotif(null);
+              setActiveTab('home');
+              setIsAuthModalOpen(true);
+              showToast('🗑️ Hesabınız ve tüm verileriniz kalıcı olarak silindi.');
+            } catch (err: any) {
+              console.error('Delete account error:', err);
+              showToast(err?.message || 'Hesap silinirken bir hata oluştu.');
+            } finally {
+              isLoggingOutRef.current = false;
+            }
+          }}
         />
         <AuthModal
           isOpen={isAuthModalOpen}

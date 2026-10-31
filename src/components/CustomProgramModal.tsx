@@ -218,7 +218,7 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
           {[
             { s: 1, title: '1. Sınav' },
             { s: 2, title: '2. Konular' },
-            { s: 3, title: '3. Tarih & Saat' },
+            { s: 3, title: '3. Tarih & Süre' },
             { s: 4, title: '4. Önizleme' },
           ].map((item) => (
             <div
@@ -535,36 +535,6 @@ export const CustomProgramModal: React.FC<CustomProgramModalProps> = ({
                     </div>
                   </button>
                 ))}
-              </div>
-
-              {/* Preferred Time Slot */}
-              <div className="pt-2">
-                <label className="block text-xs font-bold text-text-main mb-1.5 flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-base text-primary">schedule</span>
-                  <span>Günlük Tercih Edilen Çalışma Zamanı (45'er dk Odaklanma Seansları):</span>
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { slot: 'evening', title: '🌆 Akşam', time: '17:30 - 21:30' },
-                    { slot: 'night', title: '🌙 Gece', time: '19:30 - 23:30' },
-                    { slot: 'morning', title: '🌅 Sabah', time: '10:00 - 15:00' },
-                    { slot: 'afternoon', title: '☀️ Öğleden Sonra', time: '14:00 - 18:00' },
-                  ].map((s) => (
-                    <button
-                      key={s.slot}
-                      type="button"
-                      onClick={() => setPreferredTimeSlot(s.slot)}
-                      className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer text-center ${
-                        preferredTimeSlot === s.slot
-                          ? 'bg-primary text-white border-primary shadow-xs'
-                          : 'bg-card-bg text-text-muted border-card-border hover:border-primary/50'
-                      }`}
-                    >
-                      <div>{s.title}</div>
-                      <div className="text-[10px] opacity-80 mt-0.5">{s.time}</div>
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
           </div>

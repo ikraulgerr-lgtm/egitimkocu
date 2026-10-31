@@ -417,8 +417,8 @@ export const DenemeTakibiView: React.FC<DenemeTakibiViewProps> = ({ onRewardXp, 
 
       {/* ADD DENEME MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-          <div className="bg-surface border border-card-border rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90dvh] sm:max-h-[85vh] my-auto overflow-hidden animate-fadeIn">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-3 sm:p-6 pb-24 sm:pb-6 overflow-y-auto">
+          <div className="bg-surface border border-card-border rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85dvh] sm:max-h-[85vh] my-auto overflow-hidden animate-fadeIn">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-card-border p-4 sm:p-5 shrink-0 bg-surface">
               <div className="flex items-center gap-2">
@@ -507,8 +507,17 @@ export const DenemeTakibiView: React.FC<DenemeTakibiViewProps> = ({ onRewardXp, 
                                 type="number"
                                 min={0}
                                 max={ders.maxQ}
-                                value={ders.dogru}
-                                onChange={(e) => handleScoreChange(idx, 'dogru', parseInt(e.target.value))}
+                                value={ders.dogru === 0 ? '' : ders.dogru}
+                                placeholder="0"
+                                onFocus={(e) => {
+                                  if (e.target.value === '0') e.target.value = '';
+                                  e.target.select();
+                                }}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  const val = raw === '' ? 0 : parseInt(raw, 10);
+                                  handleScoreChange(idx, 'dogru', isNaN(val) ? 0 : val);
+                                }}
                                 className="w-12 sm:w-14 bg-surface-container-low border border-card-border rounded-lg p-1 text-xs text-center font-bold"
                               />
                             </div>
@@ -519,8 +528,17 @@ export const DenemeTakibiView: React.FC<DenemeTakibiViewProps> = ({ onRewardXp, 
                                 type="number"
                                 min={0}
                                 max={ders.maxQ}
-                                value={ders.yanlis}
-                                onChange={(e) => handleScoreChange(idx, 'yanlis', parseInt(e.target.value))}
+                                value={ders.yanlis === 0 ? '' : ders.yanlis}
+                                placeholder="0"
+                                onFocus={(e) => {
+                                  if (e.target.value === '0') e.target.value = '';
+                                  e.target.select();
+                                }}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  const val = raw === '' ? 0 : parseInt(raw, 10);
+                                  handleScoreChange(idx, 'yanlis', isNaN(val) ? 0 : val);
+                                }}
                                 className="w-12 sm:w-14 bg-surface-container-low border border-card-border rounded-lg p-1 text-xs text-center font-bold"
                               />
                             </div>

@@ -41,6 +41,7 @@ function getWeekDays() {
 
   const dayNames = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
   const fullDayNames = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+  const monthNames = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 
   return dayNames.map((day, i) => {
     const d = new Date(monday);
@@ -53,7 +54,10 @@ function getWeekDays() {
       day,
       name: fullDayNames[i],
       date: String(d.getDate()),
+      monthStr: monthNames[d.getMonth()],
+      formattedDate: `${d.getDate()} ${monthNames[d.getMonth()]}`,
       isToday,
+      rawDate: d,
     };
   });
 }
@@ -1084,11 +1088,11 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   };
 
   const currentDayItems = scheduleItems.filter(
-    (item) => !item.gun || item.gun === selectedDay
+    (item) => selectedDay === 'ALL' || !item.gun || item.gun === selectedDay
   );
 
   const uncompletedItems = scheduleItems.filter(
-    (item) => (!item.gun || item.gun === selectedDay) && !item.tamamlandi && item.ders !== 'Dinlenme'
+    (item) => (selectedDay === 'ALL' || !item.gun || item.gun === selectedDay) && !item.tamamlandi && item.ders !== 'Dinlenme'
   );
 
   const handleSaveNewItem = (e: React.FormEvent) => {
@@ -1238,31 +1242,49 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
       </div>
 
       {/* Days Strip - Compact */}
-      <section className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar">
+      <section className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar items-center">
         {days.map((d) => (
           <button
             key={d.day}
             onClick={() => setSelectedDay(d.day)}
-            className={`flex flex-col items-center justify-center min-w-[46px] sm:min-w-[52px] h-14 sm:h-16 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center min-w-[50px] sm:min-w-[58px] h-14 sm:h-16 rounded-xl transition-all cursor-pointer px-1.5 ${
               selectedDay === d.day
                 ? 'bg-primary text-white shadow-sm scale-102 font-black'
                 : 'bg-card-bg text-text-muted border border-card-border hover:border-primary/40'
             }`}
           >
             <span className="text-[10px] font-bold">{d.day}</span>
-            <span className="font-black text-sm sm:text-base leading-tight">{d.date}</span>
+            <span className="font-black text-xs sm:text-sm leading-tight">{d.date} {d.monthStr}</span>
             {d.isToday && (
-              <span className={`w-1 h-1 rounded-full mt-0.5 ${selectedDay === d.day ? 'bg-white' : 'bg-primary'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${selectedDay === d.day ? 'bg-white' : 'bg-primary'}`} />
             )}
           </button>
         ))}
+
+        <button
+          type="button"
+          onClick={() => setSelectedDay('ALL')}
+          className={`flex flex-col items-center justify-center min-w-[72px] sm:min-w-[82px] h-14 sm:h-16 rounded-xl transition-all cursor-pointer px-2 shrink-0 ${
+            selectedDay === 'ALL'
+              ? 'bg-gradient-to-tr from-purple-600 to-indigo-600 text-white shadow-md font-black scale-102 border border-purple-400'
+              : 'bg-card-bg text-text-muted border border-card-border hover:border-purple-400/50'
+          }`}
+          title="Bitiş Gününe Kadarki Tüm Kamp Programı"
+        >
+          <span className="material-symbols-outlined text-base">event_note</span>
+          <span className="font-extrabold text-[11px] leading-tight mt-0.5">Tüm Program</span>
+        </button>
       </section>
 
-      {/* Timeline Schedule for Selected Day */}
+      {/* Timeline Schedule for Selected Day or All Program */}
       <section className="space-y-3">
         <div className="flex justify-between items-center gap-2 flex-wrap">
           <h3 className="font-extrabold text-sm sm:text-base text-text-main flex items-center gap-2">
-            <span>{days.find(d => d.day === selectedDay)?.name} Programı</span>
+            <span>
+              {selectedDay === 'ALL'
+                ? `Tüm Kamp Programı (${days[0].formattedDate} - ${days[6].formattedDate})`
+                : `${days.find(d => d.day === selectedDay)?.name} (${days.find(d => d.day === selectedDay)?.formattedDate}) Programı`}
+            </span>
             <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
               {currentDayItems.length} Görev
             </span>
@@ -1287,7 +1309,106 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           </div>
         </div>
 
-        {currentDayItems.length === 0 ? (
+        {selectedDay === 'ALL' ? (
+          <div className="space-y-4">
+            {currentUser?.targetExamDate && (
+              <div className="bg-gradient-to-r from-purple-900/30 via-indigo-900/30 to-slate-900/40 border border-purple-500/30 p-3.5 rounded-2xl flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-2xl">🎯</span>
+                  <div>
+                    <h4 className="font-black text-text-main text-xs sm:text-sm">
+                      {currentUser?.targetExam || 'Hedef Sınav'} Kamp Takvimi
+                    </h4>
+                    <p className="text-[11px] text-text-muted">
+                      Bitiş Hedefi: {new Date(currentUser.targetExamDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-purple-600/20 border border-purple-500/30 px-3 py-1.5 rounded-xl text-center shrink-0">
+                  <span className="text-[10px] text-purple-400 block font-bold">Kalan</span>
+                  <span className="text-xs font-black text-text-main font-mono">
+                    {Math.max(0, Math.ceil((new Date(currentUser.targetExamDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} Gün
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {days.map((d) => {
+              const dayTasks = scheduleItems.filter((i) => i.gun === d.day);
+              const dayCompleted = dayTasks.filter((i) => i.tamamlandi).length;
+              return (
+                <div key={d.day} className="bg-card-bg rounded-2xl border border-card-border p-3.5 sm:p-4 space-y-2.5 shadow-2xs">
+                  <div className="flex items-center justify-between border-b border-card-border pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${d.isToday ? 'bg-primary' : 'bg-slate-400'}`} />
+                      <h4 className="font-extrabold text-xs sm:text-sm text-text-main">
+                        {d.name} <span className="text-text-muted font-bold text-xs">({d.formattedDate})</span>
+                      </h4>
+                      {d.isToday && (
+                        <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-0.5 rounded-full">
+                          Bugün
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-bold text-text-muted bg-surface-container-low px-2 py-0.5 rounded-md">
+                      {dayCompleted} / {dayTasks.length} Görev
+                    </span>
+                  </div>
+
+                  {dayTasks.length === 0 ? (
+                    <p className="text-[11px] text-text-muted py-1 italic">Bu gün için ders eklenmedi.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {dayTasks.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`p-2.5 sm:p-3 rounded-xl border flex items-center justify-between gap-3 text-xs transition-all ${
+                            item.tamamlandi
+                              ? 'bg-emerald-500/10 border-emerald-500/20'
+                              : 'bg-surface-container-low border-card-border'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <button
+                              type="button"
+                              onClick={() => onToggleItem(item.id)}
+                              className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                                item.tamamlandi
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'border-2 border-card-border hover:border-primary text-transparent'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-sm font-black">check</span>
+                            </button>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-black text-primary text-[11px] uppercase">{item.ders}</span>
+                                <span className="text-[10px] text-text-muted font-mono">🕒 {item.saat}</span>
+                              </div>
+                              <p className={`font-semibold text-text-main truncate mt-0.5 ${item.tamamlandi ? 'line-through text-text-muted' : ''}`}>
+                                {item.konu}
+                              </p>
+                            </div>
+                          </div>
+                          {onDeleteItem && (
+                            <button
+                              type="button"
+                              onClick={() => onDeleteItem(item.id)}
+                              className="text-text-muted hover:text-rose-500 p-1 cursor-pointer transition-colors shrink-0"
+                              title="Sil"
+                            >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : currentDayItems.length === 0 ? (
           <div className="bg-card-bg rounded-2xl p-6 border border-card-border text-center space-y-3 shadow-2xs">
             <div className="w-10 h-10 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center">
               <span className="material-symbols-outlined text-xl">calendar_add_on</span>
