@@ -1,7 +1,40 @@
-﻿import React from 'react';
+import React from 'react';
 import 'katex/dist/katex.min.css';
 import { InlineMath, BlockMath } from 'react-katex';
 import { normalizeLatexMath } from '../lib/mathUtils';
+
+/**
+ * Clean fallback for LaTeX code if KaTeX fails or renders offline
+ * Prevents raw coding syntax like \frac{}{}, \times from appearing.
+ */
+function cleanLatexForDisplay(raw: string): string {
+  if (!raw) return '';
+  return raw
+    .replace(/\$\$/g, '')
+    .replace(/\$/g, '')
+    .replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '($1 / $2)')
+    .replace(/\\sqrt\{([^{}]+)\}/g, '√($1)')
+    .replace(/\\text\{([^{}]+)\}/g, '$1')
+    .replace(/\\mathbf\{([^{}]+)\}/g, '$1')
+    .replace(/\\mathrm\{([^{}]+)\}/g, '$1')
+    .replace(/\\cdot/g, '·')
+    .replace(/\\times/g, '×')
+    .replace(/\\div/g, '÷')
+    .replace(/\\pm/g, '±')
+    .replace(/\\leq?/g, '≤')
+    .replace(/\\geq?/g, '≥')
+    .replace(/\\neq/g, '≠')
+    .replace(/\\approx/g, '≈')
+    .replace(/\\pi/g, 'π')
+    .replace(/\\alpha/g, 'α')
+    .replace(/\\beta/g, 'β')
+    .replace(/\\theta/g, 'θ')
+    .replace(/\\sum/g, '∑')
+    .replace(/\\int/g, '∫')
+    .replace(/\\infty/g, '∞')
+    .replace(/\\([a-zA-Z]+)/g, '$1')
+    .replace(/[\{\}]/g, '');
+}
 
 interface FormattedMathTextProps {
   text: string | undefined | null;
@@ -24,7 +57,7 @@ export const FormattedMathText: React.FC<FormattedMathTextProps> = ({ text, clas
       const cleanMath = rawText.trim().replace(/^\$\$|\$\$$|^\\\[|\\\]$/g, '').trim();
       return (
         <div className={`my-2 overflow-x-auto ${className}`}>
-          <BlockMath math={cleanMath} renderError={() => <span>{rawText}</span>} />
+          <BlockMath math={cleanMath} renderError={() => <span className="font-semibold">{cleanLatexForDisplay(cleanMath)}</span>} />
         </div>
       );
     }
@@ -53,7 +86,7 @@ export const FormattedMathText: React.FC<FormattedMathTextProps> = ({ text, clas
           }
 
           parts.push(
-            <InlineMath key={`${keyPrefix}_m_${match.index}`} math={formula} renderError={() => <span>{matchedStr}</span>} />
+            <InlineMath key={`${keyPrefix}_m_${match.index}`} math={formula} renderError={() => <span className="font-medium">{cleanLatexForDisplay(formula)}</span>} />
           );
           lastIndex = match.index + Math.max(1, matchedStr.length);
         }
@@ -63,7 +96,7 @@ export const FormattedMathText: React.FC<FormattedMathTextProps> = ({ text, clas
         }
         return parts.length > 0 ? parts : content;
       } catch {
-        return content;
+        return cleanLatexForDisplay(content);
       }
     };
 

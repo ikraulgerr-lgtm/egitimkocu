@@ -883,10 +883,100 @@ export interface CampGeneratorOptions {
   targetEndDate: string; // YYYY-MM-DD
   dailyHours?: number; // Kept for interface compatibility
   preferredTimeSlot?: string; // 'evening' | 'night' | 'morning' | 'afternoon' or custom string
+  campId?: string;
+  campTitle?: string;
 }
 
+export interface ReadyMadeCamp {
+  id: string;
+  title: string;
+  category: 'YKS' | 'KPSS' | 'LGS';
+  durationDays: number;
+  dailyHours: number;
+  badge: string;
+  icon: string;
+  description: string;
+  examId: string;
+  recommendedSubjects: string[];
+}
+
+export const READY_MADE_CAMPS: ReadyMadeCamp[] = [
+  {
+    id: 'camp_tyt_90',
+    title: '90 Günde TYT Bitirme Kampı',
+    category: 'YKS',
+    durationDays: 90,
+    dailyHours: 3,
+    badge: 'En Çok Tercih Edilen',
+    icon: '🎯',
+    description: 'Sıfırdan zirveye tüm TYT konularını 90 günde eksiksiz bitirip netlerini maksimuma çıkar!',
+    examId: 'yks_tyt_ayt',
+    recommendedSubjects: ['TYT Türkçe', 'TYT Matematik', 'Geometri (TYT-AYT)', 'Fizik (TYT)', 'Kimya (TYT)', 'Biyoloji (TYT)'],
+  },
+  {
+    id: 'camp_ayt_sayisal_60',
+    title: '60 Günde AYT Sayısal Kampı',
+    category: 'YKS',
+    durationDays: 60,
+    dailyHours: 4,
+    badge: 'Derece Hedefi',
+    icon: '🚀',
+    description: 'AYT Matematik ve Fen branşlarını derinlemesine kavra, yüksek netlerle hedeflediğin bölüme yerleş.',
+    examId: 'yks_tyt_ayt',
+    recommendedSubjects: ['AYT Matematik', 'Geometri (TYT-AYT)', 'Fizik (AYT)', 'Kimya (AYT)', 'Biyoloji (AYT)'],
+  },
+  {
+    id: 'camp_ayt_ea_60',
+    title: '60 Günde AYT Eşit Ağırlık Kampı',
+    category: 'YKS',
+    durationDays: 60,
+    dailyHours: 3,
+    badge: 'Hukuk & İİBF',
+    icon: '📚',
+    description: 'AYT Matematik, Edebiyat, Tarih ve Coğrafya konularını 2 ayda tam donanımlı tamamla.',
+    examId: 'yks_tyt_ayt',
+    recommendedSubjects: ['AYT Matematik', 'Geometri (TYT-AYT)', 'Edebiyat', 'Tarih (AYT)', 'Coğrafya (AYT)'],
+  },
+  {
+    id: 'camp_lgs_45',
+    title: '45 Günde LGS Tam Hazırlık Kampı',
+    category: 'LGS',
+    durationDays: 45,
+    dailyHours: 2,
+    badge: 'Nitelikli Liseler',
+    icon: '🏆',
+    description: '8. Sınıf tüm LGS branşlarını yeni nesil soru mantığı ve pratik yöntemlerle 45 günde tekrar et.',
+    examId: 'lgs_8',
+    recommendedSubjects: ['LGS Türkçe', 'LGS Matematik', 'LGS Fen Bilimleri', 'LGS İnkılap Tarihi'],
+  },
+  {
+    id: 'camp_geo_30',
+    title: '30 Günde Geometri Temel & Net Kampı',
+    category: 'YKS',
+    durationDays: 30,
+    dailyHours: 2,
+    badge: 'Sıfırdan Geometri',
+    icon: '📐',
+    description: 'Üçgenler, çokgenler ve çemberde görme açını geliştirerek geometriden firesiz net çıkar.',
+    examId: 'yks_tyt_ayt',
+    recommendedSubjects: ['Geometri (TYT-AYT)'],
+  },
+  {
+    id: 'camp_kpss_60',
+    title: '60 Günde KPSS GY-GK Kampı',
+    category: 'KPSS',
+    durationDays: 60,
+    dailyHours: 3,
+    badge: 'Memurluk Hedefi',
+    icon: '🏛️',
+    description: 'KPSS Genel Yetenek & Genel Kültür konularını 60 günde planlı şekilde bitir.',
+    examId: 'kpss_gy_gk',
+    recommendedSubjects: ['KPSS Türkçe', 'KPSS Matematik', 'KPSS Tarih', 'KPSS Coğrafya', 'KPSS Vatandaşlık'],
+  },
+];
+
 export function generateCampScheduleItems(options: CampGeneratorOptions): Omit<ProgramOgesi, 'id'>[] {
-  const { examName, selectedTopics, dailyHours = 2, preferredTimeSlot = 'evening' } = options;
+  const { examName, selectedTopics, dailyHours = 2, preferredTimeSlot = 'evening', campId, campTitle } = options;
 
   if (!selectedTopics || selectedTopics.length === 0) return [];
 
@@ -963,6 +1053,8 @@ export function generateCampScheduleItems(options: CampGeneratorOptions): Omit<P
           saat: slot,
           tamamlandi: false,
           isCurrent: false,
+          campId,
+          campTitle,
         });
       } else {
         // If topics are done, fill with reinforcement
@@ -974,6 +1066,8 @@ export function generateCampScheduleItems(options: CampGeneratorOptions): Omit<P
             saat: slot,
             tamamlandi: false,
             isCurrent: false,
+            campId,
+            campTitle,
           });
         }
         break;
@@ -989,6 +1083,8 @@ export function generateCampScheduleItems(options: CampGeneratorOptions): Omit<P
     saat: activeSlots[0],
     tamamlandi: false,
     isCurrent: false,
+    campId,
+    campTitle,
   });
   generatedItems.push({
     gun: 'Paz',
@@ -997,6 +1093,8 @@ export function generateCampScheduleItems(options: CampGeneratorOptions): Omit<P
     saat: activeSlots[1],
     tamamlandi: false,
     isCurrent: false,
+    campId,
+    campTitle,
   });
 
   return generatedItems;

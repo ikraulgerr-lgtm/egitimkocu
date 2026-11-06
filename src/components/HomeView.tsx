@@ -1191,6 +1191,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
       <CustomProgramModal
         isOpen={isCustomProgramModalOpen}
         onClose={() => setIsCustomProgramModalOpen(false)}
+        currentUserId={user.id}
         onAddMultipleItems={(items) => {
           if (onAddMultipleScheduleItems) {
             onAddMultipleScheduleItems(items);

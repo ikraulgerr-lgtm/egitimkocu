@@ -60,6 +60,9 @@ import { LofiAudioWidget } from './components/LofiAudioWidget';
 import { ExamCountdownWidget } from './components/ExamCountdownWidget';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SplashScreen } from './components/SplashScreen';
+import { OfflineBanner } from './components/OfflineBanner';
+import { OnboardingTour } from './components/OnboardingTour';
+import { UpdateAlertModal, UpdateInfo } from './components/UpdateAlertModal';
 
 import { auth, db, handleFirestoreError, OperationType, logoutFirebase, deleteAccountFirebase } from './lib/firebase';
 import { onAuthStateChanged, updateProfile } from 'firebase/auth';
@@ -129,6 +132,55 @@ export function App() {
     totalSeconds: number;
   } | null>(null);
   const deliveredNativeNotifsRef = useRef<Set<string>>(new Set());
+
+  // Onboarding Tour State (Interactive Feature Walkthrough)
+  const [isOnboardingTourOpen, setIsOnboardingTourOpen] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem('edumind_has_seen_tour');
+    } catch {
+      return false;
+    }
+  });
+
+  // In-App Update State
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo>({
+    isAvailable: false,
+    versionName: '1.3.16',
+    releaseNotes:
+      '• Hazır ve özel sınav kampları yönetimi (90 Günde TYT, 60 Günde AYT vb.)\n• Çevrimdışı bağlantı desteği ve yerel simge iyileştirmesi\n• Günlük çalışma temposu kontrolü\n• Hesap oturumunun güncellemelerde korunması',
+  });
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleStartTour = () => setIsOnboardingTourOpen(true);
+    window.addEventListener('edumind_start_tour', handleStartTour);
+
+    // Remote version check from Firestore system_config
+    const checkRemoteVersion = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'system_config', 'app_version'));
+        if (snap.exists()) {
+          const data = snap.data();
+          const latest = data?.latestVersion || data?.version;
+          const currentVersion = '1.3.16';
+          if (latest && latest !== currentVersion && data?.showUpdateAlert) {
+            setUpdateInfo({
+              isAvailable: true,
+              versionName: latest,
+              releaseNotes: data?.releaseNotes,
+              isMandatory: !!data?.isMandatory,
+              storeUrl: data?.storeUrl,
+            });
+            setIsUpdateModalOpen(true);
+          }
+        }
+      } catch {}
+    };
+
+    checkRemoteVersion();
+
+    return () => window.removeEventListener('edumind_start_tour', handleStartTour);
+  }, []);
 
   const cleanDeleteNotification = async (notifId: string) => {
     if (!notifId) return;
@@ -549,27 +601,44 @@ export function App() {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
         }
       } else {
-        // Firebase JS auth reported null: check if native auth has an active user ONLY when NOT logging out
-        if (!isLoggingOutRef.current && Capacitor.isNativePlatform()) {
-          try {
-            const nativeRes = await FirebaseAuthentication.getCurrentUser();
-            if (nativeRes?.user) {
-              const uid = nativeRes.user.uid;
-              const savedUser = getUser(uid);
-              if (
-                savedUser &&
-                savedUser.id &&
-                savedUser.id !== 'student' &&
-                savedUser.id !== 'usr_new' &&
-                savedUser.email &&
-                (savedUser.role === 'parent' || savedUser.targetExam)
-              ) {
-                setUserState(savedUser);
-                setIsAuthModalOpen(false);
-                return;
+        // Firebase JS auth reported null: check if native auth or cached local session exists when NOT explicitly logging out
+        if (!isLoggingOutRef.current) {
+          if (Capacitor.isNativePlatform()) {
+            try {
+              const nativeRes = await FirebaseAuthentication.getCurrentUser();
+              if (nativeRes?.user) {
+                const uid = nativeRes.user.uid;
+                const savedUser = getUser(uid);
+                if (
+                  savedUser &&
+                  savedUser.id &&
+                  savedUser.id !== 'student' &&
+                  savedUser.id !== 'usr_new' &&
+                  savedUser.email &&
+                  (savedUser.role === 'parent' || savedUser.targetExam)
+                ) {
+                  setUserState(savedUser);
+                  setIsAuthModalOpen(false);
+                  return;
+                }
               }
-            }
-          } catch (e) {}
+            } catch (e) {}
+          }
+
+          // Persistent Login Fallback: Check local stored session so app updates/offline launch never log out
+          const cachedUser = getUser();
+          if (
+            cachedUser &&
+            cachedUser.id &&
+            cachedUser.id !== 'student' &&
+            cachedUser.id !== 'usr_new' &&
+            cachedUser.email &&
+            (cachedUser.role === 'parent' || cachedUser.targetExam)
+          ) {
+            setUserState(cachedUser);
+            setIsAuthModalOpen(false);
+            return;
+          }
         }
 
         // Truly logged out: show auth screen
@@ -1713,6 +1782,7 @@ export function App() {
     return (
       <div className={`min-h-screen ${theme === 'dark' ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'} font-sans transition-colors duration-200`}>
         {isSplashActive && <SplashScreen theme={theme} />}
+        <OfflineBanner />
         <ParentDashboardView
           currentUser={user}
           onLogout={handleLogout}
@@ -1763,6 +1833,7 @@ export function App() {
   return (
     <div className="min-h-screen bg-background text-text-main font-sans transition-colors duration-200">
       {isSplashActive && <SplashScreen theme={theme} />}
+      <OfflineBanner />
 
       {/* Global Top Header */}
       <TopHeader
@@ -1805,12 +1876,23 @@ export function App() {
           </div>
         )}
 
-        {/* Sub Navigation Bar for "Gelişim" group */}
-        {(activeTab === 'stats' || activeTab === 'leaderboard' || activeTab === 'schedule') && (
-          <div className="max-w-2xl mx-auto mb-5 bg-surface-container-low dark:bg-card-bg border border-card-border p-1.5 rounded-2xl flex items-center justify-center gap-1 shadow-xs">
+        {/* Sub Navigation Bar for "Gelişim" group (Program 1. sırada, İstatistikler 2. sırada, Sıralama 3. sırada) */}
+        {(activeTab === 'stats' || activeTab === 'leaderboard' || activeTab === 'schedule' || activeTab === 'deneme') && (
+          <div className="max-w-2xl mx-auto mb-5 bg-surface-container-low dark:bg-card-bg border border-card-border p-1.5 rounded-2xl flex items-center justify-center gap-1 shadow-xs select-none">
+            <button
+              onClick={() => setActiveTab('schedule')}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                activeTab === 'schedule'
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'text-text-muted hover:text-text-main'
+              }`}
+            >
+              <span className="material-symbols-outlined text-base">calendar_month</span>
+              <span>Program</span>
+            </button>
             <button
               onClick={() => setActiveTab('stats')}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                 activeTab === 'stats'
                   ? 'bg-primary text-white shadow-xs'
                   : 'text-text-muted hover:text-text-main'
@@ -1821,7 +1903,7 @@ export function App() {
             </button>
             <button
               onClick={() => setActiveTab('leaderboard')}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                 activeTab === 'leaderboard'
                   ? 'bg-primary text-white shadow-xs'
                   : 'text-text-muted hover:text-text-main'
@@ -1829,17 +1911,6 @@ export function App() {
             >
               <span className="material-symbols-outlined text-base">workspace_premium</span>
               <span>Sıralama</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('schedule')}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                activeTab === 'schedule'
-                  ? 'bg-primary text-white shadow-xs'
-                  : 'text-text-muted hover:text-text-main'
-              }`}
-            >
-              <span className="material-symbols-outlined text-base">calendar_month</span>
-              <span>Program</span>
             </button>
           </div>
         )}
@@ -2585,6 +2656,26 @@ export function App() {
           }}
         />
       )}
+
+      {/* Interactive Onboarding Feature Tour for New Users & Manual Start */}
+      <OnboardingTour
+        isOpen={
+          isOnboardingTourOpen &&
+          !isAuthModalOpen &&
+          !isSplashActive &&
+          !!user?.id &&
+          user.id !== 'student' &&
+          user.id !== 'usr_new'
+        }
+        onClose={() => setIsOnboardingTourOpen(false)}
+      />
+
+      {/* In-App Version Update Alert Modal */}
+      <UpdateAlertModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        updateInfo={updateInfo}
+      />
 
       {/* Toast Notification Notification */}
       {toastMessage && (

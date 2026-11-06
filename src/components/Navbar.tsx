@@ -204,7 +204,7 @@ export const BottomNavBar: React.FC<NavbarProps> = ({ activeTab, setActiveTab })
       isActive: isGrowthTabActive,
       onClick: () => {
         triggerHaptic();
-        setActiveTab('stats');
+        setActiveTab('schedule');
       },
     },
     {

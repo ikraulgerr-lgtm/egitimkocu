@@ -136,6 +136,19 @@ export interface ToplulukSoru {
   cevaplar?: ToplulukCevap[];
 }
 
+export interface ActiveCamp {
+  id: string;
+  presetKey?: string;
+  title: string;
+  category: string; // 'YKS' | 'LGS' | 'KPSS' | 'SINIF'
+  startDate: string;
+  endDate: string;
+  dailyHours: number;
+  totalTopics: number;
+  itemCount: number;
+  createdAt: number;
+}
+
 export interface ProgramOgesi {
   id: string;
   saat: string;
@@ -144,6 +157,8 @@ export interface ProgramOgesi {
   tamamlandi: boolean;
   isCurrent?: boolean;
   gun: string; // 'Pzt' | 'Sal' | etc.
+  campId?: string;
+  campTitle?: string;
 }
 
 export interface DenemeDersResult {

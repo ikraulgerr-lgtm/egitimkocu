@@ -751,6 +751,26 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </button>
             </div>
 
+            {/* Interactive Feature Walkthrough Tour Button */}
+            <div className="flex items-center justify-between p-3.5 bg-surface-container-low rounded-2xl border border-card-border">
+              <div className="flex items-center gap-3 text-text-main">
+                <span className="material-symbols-outlined text-primary">explore</span>
+                <div>
+                  <p className="text-xs font-extrabold text-text-main">Uygulama Tanıtım Turu</p>
+                  <p className="text-[11px] text-text-muted">Özellikleri ve kullanım rehberini adım adım inceleyin</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event('edumind_start_tour'))}
+                className="bg-primary text-white font-extrabold text-xs px-3.5 py-1.5 rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-xs">play_arrow</span>
+                <span>Turu Başlat</span>
+              </button>
+            </div>
+
             {/* Weekly Report Email Toggle */}
             <div className="flex items-center justify-between p-3.5 bg-surface-container-low rounded-2xl border border-card-border">
               <div>

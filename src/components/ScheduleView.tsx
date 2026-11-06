@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ProgramOgesi, SoruKaydi, ActiveTab, Arkadas, Kullanici, Bildirim } from '../types';
+import { ProgramOgesi, SoruKaydi, ActiveTab, Arkadas, Kullanici, Bildirim, ActiveCamp } from '../types';
 import { LofiAudioWidget } from './LofiAudioWidget';
 import { CustomProgramModal } from './CustomProgramModal';
 import { playPomodoroBellSound } from '../lib/soundUtils';
@@ -82,7 +82,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   subView,
   onSubViewChange,
 }) => {
-  const [scheduleSubTab, setScheduleSubTab] = useState<'schedule' | 'pomodoro'>(() => subView || 'pomodoro');
+  const [scheduleSubTab, setScheduleSubTab] = useState<'schedule' | 'pomodoro'>(() => subView || 'schedule');
   const [selectedDay, setSelectedDay] = useState<string>(todayAbbrev);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
@@ -93,6 +93,51 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   const [isCustomProgramModalOpen, setIsCustomProgramModalOpen] = useState<boolean>(false);
   const [isCustomInputOpen, setIsCustomInputOpen] = useState<boolean>(false);
   const [customInputMinutes, setCustomInputMinutes] = useState<string>('25');
+
+  // Active Camps Management State
+  const [activeCamps, setActiveCamps] = useState<ActiveCamp[]>(() => {
+    try {
+      const uid = currentUser?.id || '';
+      const saved = localStorage.getItem(`edumind_active_camps_${uid}`) || localStorage.getItem('edumind_active_camps_');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
+
+  useEffect(() => {
+    const loadCamps = () => {
+      try {
+        const uid = currentUser?.id || '';
+        const saved = localStorage.getItem(`edumind_active_camps_${uid}`) || localStorage.getItem('edumind_active_camps_');
+        if (saved) {
+          setActiveCamps(JSON.parse(saved));
+        } else {
+          setActiveCamps([]);
+        }
+      } catch {}
+    };
+
+    loadCamps();
+    window.addEventListener('edumind_camps_updated', loadCamps);
+    return () => window.removeEventListener('edumind_camps_updated', loadCamps);
+  }, [currentUser?.id]);
+
+  const handleRemoveCamp = (campId: string, campTitle: string) => {
+    if (!window.confirm(`"${campTitle}" kampını ve bu kampa ait tüm ders programı görevlerini programınızdan silmek istediğinize emin misiniz?`)) {
+      return;
+    }
+    const updated = activeCamps.filter((c) => c.id !== campId);
+    setActiveCamps(updated);
+    const uid = currentUser?.id || '';
+    localStorage.setItem(`edumind_active_camps_${uid}`, JSON.stringify(updated));
+
+    // Remove tasks associated with this camp from schedule
+    const campTasks = scheduleItems.filter((it) => it.campId === campId || it.campTitle === campTitle);
+    campTasks.forEach((t) => {
+      onDeleteItem?.(t.id);
+    });
+    window.dispatchEvent(new Event('edumind_camps_updated'));
+  };
 
   useEffect(() => {
     if (subView) {
@@ -1176,23 +1221,8 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         </div>
       )}
 
-      {/* Top Segment Switcher: Direct Pomodoro Access vs Timetable */}
-      <div className="grid grid-cols-2 p-1.5 bg-surface-container-low dark:bg-slate-800/80 rounded-2xl border border-card-border/60 gap-1.5 shadow-xs">
-        <button
-          type="button"
-          onClick={() => {
-            setScheduleSubTab('pomodoro');
-            onSubViewChange?.('pomodoro');
-          }}
-          className={`py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-            scheduleSubTab === 'pomodoro'
-              ? 'bg-rose-600 text-white shadow-md'
-              : 'text-text-muted hover:text-text-main dark:text-slate-400'
-          }`}
-        >
-          <span className="text-sm">🍅</span>
-          <span>Pomodoro Odaklanma</span>
-        </button>
+      {/* Top Segment Switcher: Ders Programı & Kamp FIRST, Pomodoro SECOND */}
+      <div className="grid grid-cols-2 p-1.5 bg-surface-container-low dark:bg-slate-800/80 rounded-2xl border border-card-border/60 gap-1.5 shadow-xs select-none">
         <button
           type="button"
           onClick={() => {
@@ -1207,6 +1237,21 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         >
           <span className="material-symbols-outlined text-sm">calendar_month</span>
           <span>Ders Programı & Kamp</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setScheduleSubTab('pomodoro');
+            onSubViewChange?.('pomodoro');
+          }}
+          className={`py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            scheduleSubTab === 'pomodoro'
+              ? 'bg-rose-600 text-white shadow-md'
+              : 'text-text-muted hover:text-text-main dark:text-slate-400'
+          }`}
+        >
+          <span className="text-sm">🍅</span>
+          <span>Pomodoro Odaklanma</span>
         </button>
       </div>
 
@@ -1223,23 +1268,101 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               </p>
             </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsCustomProgramModalOpen(true)}
-            className="bg-gradient-to-r from-primary to-indigo-600 hover:from-primary-hover hover:to-indigo-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-          >
-            <span className="material-symbols-outlined text-sm">auto_awesome</span>
-            <span>Özel Kamp Oluştur</span>
-          </button>
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="bg-surface-container-low hover:bg-surface-container text-text-main border border-card-border font-extrabold text-xs px-3.5 py-2 rounded-xl active:scale-95 transition-all shadow-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
-          >
-            <span className="material-symbols-outlined text-sm">add</span>
-            <span>+ Görev</span>
-          </button>
-        </div>
-      </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsCustomProgramModalOpen(true)}
+                className="bg-gradient-to-r from-primary to-indigo-600 hover:from-primary-hover hover:to-indigo-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                <span>Özel Kamp Oluştur</span>
+              </button>
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="bg-surface-container-low hover:bg-surface-container text-text-main border border-card-border font-extrabold text-xs px-3.5 py-2 rounded-xl active:scale-95 transition-all shadow-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              >
+                <span className="material-symbols-outlined text-sm">add</span>
+                <span>+ Görev</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Aktif Kamplarım Section */}
+          {activeCamps.length > 0 && (
+            <div className="bg-gradient-to-r from-primary/10 via-indigo-600/10 to-purple-600/10 border border-primary/30 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-xl">flag</span>
+                  <h3 className="font-black text-sm text-text-main">
+                    Aktif Kamplarım ({activeCamps.length})
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsCustomProgramModalOpen(true)}
+                  className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-xs">add</span>
+                  <span>Yeni Kamp Ekle</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {activeCamps.map((camp) => {
+                  const campTasks = scheduleItems.filter(
+                    (i) => i.campId === camp.id || i.campTitle === camp.title
+                  );
+                  const completedCount = campTasks.filter((i) => i.tamamlandi).length;
+                  const totalCount = Math.max(1, campTasks.length || camp.itemCount || 1);
+                  const progressPct = Math.round((completedCount / totalCount) * 100);
+
+                  return (
+                    <div
+                      key={camp.id}
+                      className="bg-surface dark:bg-slate-800/90 border border-card-border p-3.5 rounded-xl shadow-xs space-y-2.5 flex flex-col justify-between"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-md uppercase tracking-wider">
+                            {camp.category} Kampı
+                          </span>
+                          <h4 className="font-black text-xs sm:text-sm text-text-main mt-1 truncate">
+                            {camp.title}
+                          </h4>
+                          <p className="text-[11px] text-text-muted mt-0.5">
+                            Günde {camp.dailyHours} Saat • {camp.startDate} / {camp.endDate}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCamp(camp.id, camp.title)}
+                          title="Kampı ve kampla ilgili tüm görevleri programdan kaldır"
+                          className="text-rose-500 hover:bg-rose-500/10 p-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
+                          aria-label="Kampı kaldır"
+                        >
+                          <span className="material-symbols-outlined text-base">delete</span>
+                        </button>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-bold text-text-muted">
+                          <span>
+                            İlerleme: {completedCount}/{totalCount} Görev
+                          </span>
+                          <span className="text-primary font-black">%{progressPct}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-surface-container-high dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-primary to-emerald-500 transition-all duration-500 rounded-full"
+                            style={{ width: `${Math.min(100, progressPct)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
       {/* Days Strip - Compact */}
       <section className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar items-center">
@@ -2825,6 +2948,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
       <CustomProgramModal
         isOpen={isCustomProgramModalOpen}
         onClose={() => setIsCustomProgramModalOpen(false)}
+        currentUserId={currentUser?.id}
         onAddMultipleItems={(items) => {
           if (onAddMultipleItems) {
             onAddMultipleItems(items);
