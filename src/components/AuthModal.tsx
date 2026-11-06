@@ -975,12 +975,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       setIsAppleLoading(false);
                     }
                   }}
-                  className="w-full flex items-center justify-center gap-2.5 bg-black hover:bg-neutral-900 text-white border border-neutral-800 py-3 px-4 rounded-xl text-xs font-bold active:scale-98 transition-all cursor-pointer disabled:opacity-50 select-none shadow-sm"
+                  className="w-full flex items-center justify-center gap-2.5 bg-black hover:bg-neutral-900 text-white border border-black py-3 px-4 rounded-xl text-xs font-semibold active:scale-98 transition-all cursor-pointer disabled:opacity-50 select-none shadow-sm"
                 >
-                  <svg className="w-4 h-4 shrink-0 fill-current" viewBox="0 0 170 170">
-                    <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.08-7.58-7.8-11.64-14.16-5.87-9.1-10.42-19.14-13.63-30.12-3.21-10.98-4.82-21.61-4.82-31.9 0-14.78 3.84-26.68 11.53-35.7 7.68-9.02 17.2-13.6 28.56-13.75 4.9.11 10.13 1.25 15.69 3.42 5.56 2.18 9.38 3.31 11.45 3.42 1.63-.11 5.62-1.33 11.96-3.66 6.35-2.33 11.77-3.39 16.27-3.18 10.02.66 18.28 4.25 24.78 10.78 6.5 6.53 10.63 14.54 12.38 24.03-9.03 5.44-13.5 13.11-13.41 23.01.09 7.84 2.87 14.48 8.35 19.92 5.48 5.44 11.96 8.71 19.45 9.8-2.61 7.62-5.77 14.69-9.49 21.2zm-28.79-114.72c.11 3.59-.97 7.03-3.24 10.33-2.28 3.3-5.28 5.86-9.01 7.68-1.74.87-3.81 1.41-6.21 1.63-.33-3.48.7-7.03 3.09-10.65 2.39-3.62 5.54-6.32 9.45-8.1 1.74-.76 3.7-1.28 5.92-1.57z"/>
+                  {/* Apple Design Resources Official Vector Logo */}
+                  <svg className="w-4 h-4 shrink-0 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
                   </svg>
-                  <span>{isAppleLoading ? 'Apple ile Bağlanılıyor...' : 'Apple ile Devam Et'}</span>
+                  <span>
+                    {isAppleLoading
+                      ? 'Apple ile Bağlanılıyor...'
+                      : mode === 'login'
+                      ? 'Apple ile Giriş Yap'
+                      : 'Apple ile Kaydol'}
+                  </span>
                 </button>
               )}
 
