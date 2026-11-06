@@ -187,6 +187,18 @@ export const EXAM_CURRICULUM_DATA: ExamCurriculum[] = [
           'Batı Edebiyatı Akımları',
         ],
       },
+      {
+        ders: 'TYT Felsefe & Din Kültürü',
+        konular: [
+          'Felsefenin Anlamı ve Bilgi Felsefesi',
+          'Varlık ve Ahlak Felsefesi',
+          'Sanat ve Din Felsefesi',
+          'Siyaset ve Bilim Felsefesi',
+          'İslam İnanç Esasları ve İbadetler',
+          'Ahlaki Tutumlar ve Değerler',
+          'Kur\'an-ı Kerim\'de Bazı Kavramlar',
+        ],
+      },
     ],
   },
   {
@@ -909,9 +921,19 @@ export const READY_MADE_CAMPS: ReadyMadeCamp[] = [
     dailyHours: 3,
     badge: 'En Çok Tercih Edilen',
     icon: '🎯',
-    description: 'Sıfırdan zirveye tüm TYT konularını 90 günde eksiksiz bitirip netlerini maksimuma çıkar!',
+    description: 'Sıfırdan zirveye tüm TYT konularını (Türkçe, Matematik, Fen, Sosyal) 90 günde eksiksiz bitirip netlerini maksimuma çıkar!',
     examId: 'yks_tyt_ayt',
-    recommendedSubjects: ['TYT Türkçe', 'TYT Matematik', 'Geometri (TYT-AYT)', 'Fizik (TYT)', 'Kimya (TYT)', 'Biyoloji (TYT)'],
+    recommendedSubjects: [
+      'TYT Türkçe',
+      'TYT Matematik',
+      'Geometri (TYT-AYT)',
+      'Fizik (TYT-AYT)',
+      'Kimya (TYT-AYT)',
+      'Biyoloji (TYT-AYT)',
+      'Tarih (TYT-AYT)',
+      'Coğrafya (TYT-AYT)',
+      'TYT Felsefe & Din Kültürü',
+    ],
   },
   {
     id: 'camp_ayt_sayisal_60',
@@ -923,7 +945,13 @@ export const READY_MADE_CAMPS: ReadyMadeCamp[] = [
     icon: '🚀',
     description: 'AYT Matematik ve Fen branşlarını derinlemesine kavra, yüksek netlerle hedeflediğin bölüme yerleş.',
     examId: 'yks_tyt_ayt',
-    recommendedSubjects: ['AYT Matematik', 'Geometri (TYT-AYT)', 'Fizik (AYT)', 'Kimya (AYT)', 'Biyoloji (AYT)'],
+    recommendedSubjects: [
+      'AYT Matematik',
+      'Geometri (TYT-AYT)',
+      'Fizik (TYT-AYT)',
+      'Kimya (TYT-AYT)',
+      'Biyoloji (TYT-AYT)',
+    ],
   },
   {
     id: 'camp_ayt_ea_60',
@@ -935,7 +963,13 @@ export const READY_MADE_CAMPS: ReadyMadeCamp[] = [
     icon: '📚',
     description: 'AYT Matematik, Edebiyat, Tarih ve Coğrafya konularını 2 ayda tam donanımlı tamamla.',
     examId: 'yks_tyt_ayt',
-    recommendedSubjects: ['AYT Matematik', 'Geometri (TYT-AYT)', 'Edebiyat', 'Tarih (AYT)', 'Coğrafya (AYT)'],
+    recommendedSubjects: [
+      'AYT Matematik',
+      'Geometri (TYT-AYT)',
+      'AYT Edebiyat',
+      'Tarih (TYT-AYT)',
+      'Coğrafya (TYT-AYT)',
+    ],
   },
   {
     id: 'camp_lgs_45',
@@ -947,7 +981,14 @@ export const READY_MADE_CAMPS: ReadyMadeCamp[] = [
     icon: '🏆',
     description: '8. Sınıf tüm LGS branşlarını yeni nesil soru mantığı ve pratik yöntemlerle 45 günde tekrar et.',
     examId: 'lgs_8',
-    recommendedSubjects: ['LGS Türkçe', 'LGS Matematik', 'LGS Fen Bilimleri', 'LGS İnkılap Tarihi'],
+    recommendedSubjects: [
+      'LGS Türkçe',
+      'LGS Matematik',
+      'LGS Fen Bilimleri',
+      'LGS T.C. İnkılap Tarihi',
+      'LGS Din Kültürü',
+      'LGS İngilizce',
+    ],
   },
   {
     id: 'camp_geo_30',
@@ -970,8 +1011,14 @@ export const READY_MADE_CAMPS: ReadyMadeCamp[] = [
     badge: 'Memurluk Hedefi',
     icon: '🏛️',
     description: 'KPSS Genel Yetenek & Genel Kültür konularını 60 günde planlı şekilde bitir.',
-    examId: 'kpss_gy_gk',
-    recommendedSubjects: ['KPSS Türkçe', 'KPSS Matematik', 'KPSS Tarih', 'KPSS Coğrafya', 'KPSS Vatandaşlık'],
+    examId: 'kpss_gk_gy',
+    recommendedSubjects: [
+      'KPSS Türkçe',
+      'KPSS Matematik',
+      'KPSS Tarih',
+      'KPSS Coğrafya',
+      'KPSS Vatandaşlık & Güncel',
+    ],
   },
 ];
 
@@ -988,21 +1035,25 @@ export function generateCampScheduleItems(options: CampGeneratorOptions): Omit<P
       '18:00 - 18:45 (45 dk)',
       '19:00 - 19:45 (45 dk)',
       '20:00 - 20:45 (45 dk)',
+      '21:00 - 21:45 (45 dk)',
     ],
     night: [
       '19:30 - 20:15 (45 dk)',
       '20:30 - 21:15 (45 dk)',
       '21:30 - 22:15 (45 dk)',
+      '22:30 - 23:15 (45 dk)',
     ],
     morning: [
       '09:30 - 10:15 (45 dk)',
       '10:30 - 11:15 (45 dk)',
       '11:30 - 12:15 (45 dk)',
+      '12:30 - 13:15 (45 dk)',
     ],
     afternoon: [
       '14:00 - 14:45 (45 dk)',
       '15:00 - 15:45 (45 dk)',
       '16:00 - 16:45 (45 dk)',
+      '17:00 - 17:45 (45 dk)',
     ],
   };
 
@@ -1016,35 +1067,26 @@ export function generateCampScheduleItems(options: CampGeneratorOptions): Omit<P
     activeSlots = slotPresets.afternoon;
   }
 
-  // Strictly cap daily sessions at 2 or 3 to avoid cognitive burnout and schedule clutter
-  const sessionsPerDay = Math.min(3, Math.max(2, dailyHours));
+  const sessionsPerDay = Math.min(4, Math.max(1, dailyHours));
 
-  // Interleave topics across different subjects
+  // Interleave topics across all selected subjects
   const groupedByDers: Record<string, { ders: string; konu: string }[]> = {};
   selectedTopics.forEach((t) => {
     if (!groupedByDers[t.ders]) groupedByDers[t.ders] = [];
     groupedByDers[t.ders].push(t);
   });
 
-  const interleavedQueue: { ders: string; konu: string }[] = [];
   const dersKeys = Object.keys(groupedByDers);
-  const maxLen = Math.max(...dersKeys.map((k) => groupedByDers[k].length));
-  for (let i = 0; i < maxLen; i++) {
-    dersKeys.forEach((k) => {
-      if (groupedByDers[k][i]) {
-        interleavedQueue.push(groupedByDers[k][i]);
-      }
-    });
-  }
-
-  const workingQueue = [...interleavedQueue];
+  let dersPointer = 0;
   const studyDays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 
   studyDays.forEach((dayName) => {
     for (let sIdx = 0; sIdx < sessionsPerDay; sIdx++) {
-      const topic = workingQueue.shift();
       const slot = activeSlots[sIdx] || `18:00 - 18:45 (45 dk)`;
-      if (topic) {
+      if (dersKeys.length > 0) {
+        const ders = dersKeys[dersPointer % dersKeys.length];
+        dersPointer++;
+        const topic = groupedByDers[ders]?.shift() || { ders, konu: 'Haftalık Pekiştirme & Soru Çözümü' };
         const activitySuffix = sIdx === 0 ? 'Konu Özeti & Soru Çözümü' : 'Pekiştirme & Test (30 Soru)';
         generatedItems.push({
           gun: dayName,
@@ -1056,21 +1098,6 @@ export function generateCampScheduleItems(options: CampGeneratorOptions): Omit<P
           campId,
           campTitle,
         });
-      } else {
-        // If topics are done, fill with reinforcement
-        if (sIdx === 0) {
-          generatedItems.push({
-            gun: dayName,
-            ders: `${examName} Pekiştirme`,
-            konu: 'Haftalık Karma Soru Çözümü & Formül Tekrarı',
-            saat: slot,
-            tamamlandi: false,
-            isCurrent: false,
-            campId,
-            campTitle,
-          });
-        }
-        break;
       }
     }
   });
@@ -1080,7 +1107,7 @@ export function generateCampScheduleItems(options: CampGeneratorOptions): Omit<P
     gun: 'Paz',
     ders: `${examName} Haftalık Tekrar`,
     konu: 'Haftalık Konu Tekrarı & Yanlış Havuzu Çözümü',
-    saat: activeSlots[0],
+    saat: activeSlots[0] || '10:00 - 10:45 (45 dk)',
     tamamlandi: false,
     isCurrent: false,
     campId,
@@ -1090,7 +1117,7 @@ export function generateCampScheduleItems(options: CampGeneratorOptions): Omit<P
     gun: 'Paz',
     ders: 'Dinlenme & Motivasyon',
     konu: 'Zihin Dinlendirme & Yeni Hafta Planlaması',
-    saat: activeSlots[1],
+    saat: activeSlots[1] || '11:00 - 11:45 (45 dk)',
     tamamlandi: false,
     isCurrent: false,
     campId,

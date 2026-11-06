@@ -6,6 +6,7 @@ interface NavbarProps {
   setActiveTab: (tab: ActiveTab) => void;
   user: Kullanici;
   onWatchAd: () => void;
+  onOpenSchedule?: (subView?: 'schedule' | 'pomodoro') => void;
 }
 
 export const TopHeader: React.FC<{
@@ -156,7 +157,7 @@ export const TopHeader: React.FC<{
   );
 };
 
-export const BottomNavBar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
+export const BottomNavBar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onOpenSchedule }) => {
   const isQuestionsTabActive = activeTab === 'errorPool' || activeTab === 'solution';
   const isGrowthTabActive = activeTab === 'stats' || activeTab === 'leaderboard' || activeTab === 'schedule' || activeTab === 'deneme';
 
@@ -204,7 +205,11 @@ export const BottomNavBar: React.FC<NavbarProps> = ({ activeTab, setActiveTab })
       isActive: isGrowthTabActive,
       onClick: () => {
         triggerHaptic();
-        setActiveTab('schedule');
+        if (onOpenSchedule) {
+          onOpenSchedule('schedule');
+        } else {
+          setActiveTab('schedule');
+        }
       },
     },
     {

@@ -80,8 +80,15 @@ export function App() {
   const [friends, setFriendsState] = useState<Arkadas[]>(getFriends());
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
-  const [scheduleSubView, setScheduleSubView] = useState<'schedule' | 'pomodoro'>('pomodoro');
+  const [scheduleSubView, setScheduleSubView] = useState<'schedule' | 'pomodoro'>('schedule');
   const [selectedQuestion, setSelectedQuestion] = useState<SoruKaydi | null>(questions[0] || null);
+
+  // Scroll to top immediately when activeTab or scheduleSubView changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [activeTab, scheduleSubView]);
 
   const openSchedule = (subView: 'schedule' | 'pomodoro' = 'schedule') => {
     setScheduleSubView(subView);
@@ -2111,6 +2118,7 @@ export function App() {
         setActiveTab={setActiveTab}
         user={user}
         onWatchAd={handleWatchAd}
+        onOpenSchedule={openSchedule}
       />
 
       {/* Modals */}

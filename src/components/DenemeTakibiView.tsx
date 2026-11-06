@@ -417,7 +417,7 @@ export const DenemeTakibiView: React.FC<DenemeTakibiViewProps> = ({ onRewardXp, 
 
       {/* ADD DENEME MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-3 sm:p-6 pb-24 sm:pb-6 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-2.5 sm:p-6 pb-20 sm:pb-6 overflow-y-auto">
           <div className="bg-surface border border-card-border rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85dvh] sm:max-h-[85vh] my-auto overflow-hidden animate-fadeIn">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-card-border p-4 sm:p-5 shrink-0 bg-surface">

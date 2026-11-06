@@ -711,3 +711,56 @@ export async function clearPomodoroLocalNotification() {
     });
   } catch (e) {}
 }
+
+export const CAMP_STUDY_REMINDER_ID = 99986;
+
+/**
+ * Schedules a daily recurring native alarm for the student's selected study time
+ * according to the preferred camp time slot (morning, afternoon, evening, night).
+ */
+export async function scheduleCampStudyReminder(campTitle: string, preferredTimeSlot: string) {
+  let targetHour = 18;
+  let targetMinute = 0;
+  if (preferredTimeSlot === 'morning') {
+    targetHour = 9;
+    targetMinute = 30;
+  } else if (preferredTimeSlot === 'afternoon') {
+    targetHour = 14;
+    targetMinute = 0;
+  } else if (preferredTimeSlot === 'evening') {
+    targetHour = 18;
+    targetMinute = 0;
+  } else if (preferredTimeSlot === 'night') {
+    targetHour = 20;
+    targetMinute = 30;
+  }
+
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await LocalNotifications.cancel({
+        notifications: [{ id: CAMP_STUDY_REMINDER_ID }],
+      }).catch(() => {});
+
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: CAMP_STUDY_REMINDER_ID,
+            title: `🎯 Kamp Çalışma Zamanı Geldi!`,
+            body: `Bugünkü "${campTitle}" ders çalışma görevlerin hazır. Masanın başına geç ve hedefine odaklan!`,
+            schedule: {
+              on: { hour: targetHour, minute: targetMinute },
+              repeats: true,
+              every: 'day',
+              allowWhileIdle: true,
+            },
+            sound: 'default',
+            channelId: 'edumind_general',
+            smallIcon: 'ic_stat_icon',
+          },
+        ],
+      });
+    } catch (e) {
+      console.warn('Error scheduling camp study notification:', e);
+    }
+  }
+}
