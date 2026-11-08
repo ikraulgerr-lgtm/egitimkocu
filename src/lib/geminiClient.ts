@@ -198,7 +198,7 @@ export async function callGroqAI(
   systemPrompt: string = 'Sen MEB ve ÖSYM müfredatına tam hâkim uzman yapay zeka soru analiz öğretmenisin.',
   isJson: boolean = true
 ): Promise<string | null> {
-  const models = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'groq/compound', 'qwen/qwen3.6-27b', 'openai/gpt-oss-20b'];
+  const models = ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b'];
   for (const model of models) {
     try {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -230,7 +230,7 @@ export async function callGroqAI(
   return null;
 }
 
-const DEFAULT_GEMINI_KEY = ['AQ', 'Ab8RN6JvRUzPDS3D31WHmrbnHvslEq_b47jmDSJR9OZSHewTng'].join('.');
+const DEFAULT_GEMINI_KEY = ['AQ', 'Ab8RN6JoJ8naH8I9IRLa9DBZwFWxdDUEsZDya4udT6CmHH9JIQ'].join('.');
 
 // Get API Key from environment or storage
 function getApiKey(customKey?: string): string {
@@ -305,10 +305,10 @@ export async function optimizeImageForAi(
 
 async function callGeminiClientWithFallback(ai: GoogleGenAI, contents: any, isJson: boolean = true): Promise<string> {
   const modelsToTry = [
-    'gemini-2.5-pro',
-    'gemini-2.0-flash',
-    'gemini-1.5-pro',
-    'gemini-1.5-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-3.8-flash',
+    'gemini-flash-latest',
   ];
   let lastErr: any = null;
 

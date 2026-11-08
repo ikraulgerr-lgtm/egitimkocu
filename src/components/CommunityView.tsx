@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ToplulukSoru, Kullanici, ToplulukCevap } from '../types';
+import { ToplulukSoru, Kullanici, ToplulukCevap, Arkadas } from '../types';
 import { formatRelativeTime } from '../lib/dateUtils';
 import { getCommunityAiAnswerService } from '../lib/geminiClient';
 import { FormattedMathText } from './FormattedMathText';
 import { db, auth } from '../lib/firebase';
 import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore';
 import { INITIAL_COMMUNITY } from '../lib/storage';
+import { UserProfileModal, UserProfileTarget } from './UserProfileModal';
 
 const PROFANITY_LIST = [
   'küfür', 'hakaret', 'aptal', 'salak', 'gerizekalı', 'piç', 'orospu', 'siktir', 'sik', 'amk', 'aq',
@@ -24,6 +25,9 @@ function containsObjectionableContent(text: string): boolean {
 interface CommunityViewProps {
   posts: ToplulukSoru[];
   user: Kullanici;
+  friends?: Arkadas[];
+  onAddFriend?: (friend: Arkadas) => void;
+  showToast?: (msg: string) => void;
   onAddPost: (post: ToplulukSoru) => void;
   onToggleLike: (id: string) => void;
 }
@@ -31,6 +35,9 @@ interface CommunityViewProps {
 export const CommunityView: React.FC<CommunityViewProps> = ({
   posts,
   user,
+  friends = [],
+  onAddFriend,
+  showToast: parentShowToast,
   onAddPost,
   onToggleLike,
 }) => {
@@ -40,6 +47,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const [isAskModalOpen, setIsAskModalOpen] = useState<boolean>(false);
   const [isSubmittingAi, setIsSubmittingAi] = useState<boolean>(false);
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  const [selectedProfileUser, setSelectedProfileUser] = useState<UserProfileTarget | null>(null);
 
   // Moderation, Reporting and Blocking states (Apple Guideline 1.2 Compliant)
   const [blockedUserIds, setBlockedUserIds] = useState<string[]>(() => {
@@ -174,6 +182,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
+    if (parentShowToast) parentShowToast(msg);
     setTimeout(() => setToastMessage(null), 4000);
   };
 
@@ -672,15 +681,28 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
               >
                 {/* Post Header */}
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
+                  <div
+                    onClick={() => {
+                      setSelectedProfileUser({
+                        userId: post.userId,
+                        yazarAd: post.yazarAd,
+                        kullaniciAdi: post.kullaniciAdi,
+                        avatar: post.yazarAvatar,
+                      });
+                    }}
+                    className="flex items-center gap-3 cursor-pointer group/author"
+                    title="Kullanıcı Profilini İncele"
+                  >
                     <img
                       src={post.yazarAvatar}
                       alt={post.yazarAd}
-                      className="w-10 h-10 rounded-full border border-card-border object-cover bg-surface-container-low shrink-0"
+                      className="w-10 h-10 rounded-full border border-card-border object-cover bg-surface-container-low shrink-0 group-hover/author:scale-105 transition-transform"
                     />
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-black text-xs sm:text-sm text-text-main">{post.yazarAd}</span>
+                        <span className="font-black text-xs sm:text-sm text-text-main group-hover/author:text-primary transition-colors">
+                          {post.yazarAd}
+                        </span>
                         {post.kullaniciAdi && (
                           <span className="text-[10px] font-mono text-primary font-bold">
                             @{post.kullaniciAdi}
@@ -841,13 +863,25 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <div className="flex items-center gap-2 min-w-0">
+                              <div
+                                onClick={() => {
+                                  if (!c.isAi) {
+                                    setSelectedProfileUser({
+                                      yazarAd: c.yazarAd,
+                                      kullaniciAdi: c.kullaniciAdi,
+                                      avatar: c.avatar,
+                                    });
+                                  }
+                                }}
+                                className={`flex items-center gap-2 min-w-0 ${!c.isAi ? 'cursor-pointer group/commentAuthor' : ''}`}
+                                title={!c.isAi ? 'Kullanıcı Profilini İncele' : undefined}
+                              >
                                 <img
                                   src={c.avatar}
                                   alt={c.yazarAd}
-                                  className="w-6 h-6 rounded-full border border-card-border object-cover bg-card-bg shrink-0"
+                                  className="w-6 h-6 rounded-full border border-card-border object-cover bg-card-bg shrink-0 group-hover/commentAuthor:scale-105 transition-transform"
                                 />
-                                <span className="font-extrabold text-xs text-text-main flex items-center gap-1 truncate">
+                                <span className={`font-extrabold text-xs text-text-main flex items-center gap-1 truncate ${!c.isAi ? 'group-hover/commentAuthor:text-primary transition-colors' : ''}`}>
                                   {c.yazarAd}
                                   {c.isAi && (
                                     <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.2 rounded font-black shrink-0">
@@ -1227,6 +1261,17 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
           </div>
         </div>
       )}
+      {/* Instagram-Style User Profile Modal */}
+      <UserProfileModal
+        isOpen={Boolean(selectedProfileUser)}
+        onClose={() => setSelectedProfileUser(null)}
+        targetUser={selectedProfileUser}
+        currentUser={user}
+        allPosts={posts}
+        friends={friends}
+        onAddFriend={onAddFriend}
+        showToast={showToast}
+      />
     </div>
   );
 };

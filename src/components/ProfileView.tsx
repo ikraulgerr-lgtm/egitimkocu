@@ -68,6 +68,18 @@ const SINIF_OPTIONS = [
   'YÖKDİL / YDT İngilizce',
 ];
 
+const EXAM_OPTIONS: Array<{
+  id: 'YKS' | 'LGS' | 'KPSS' | 'YDS' | 'Hazırlanmıyorum';
+  label: string;
+  defaultDate: string;
+}> = [
+  { id: 'YKS', label: 'YKS 2027 (TYT - AYT)', defaultDate: '2027-06-19' },
+  { id: 'LGS', label: 'LGS 2027', defaultDate: '2027-06-06' },
+  { id: 'KPSS', label: 'KPSS 2027', defaultDate: '2027-07-18' },
+  { id: 'YDS', label: 'YDS 2027', defaultDate: '2027-04-11' },
+  { id: 'Hazırlanmıyorum', label: 'Sınava Hazırlanmıyorum', defaultDate: '' },
+];
+
 interface ProfileViewProps {
   user: Kullanici;
   questions?: SoruKaydi[];
@@ -116,6 +128,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [editName, setEditName] = useState<string>(user.ad);
   const [editKullaniciAdi, setEditKullaniciAdi] = useState<string>(user.kullaniciAdi || 'ogrenci');
   const [editSinif, setEditSinif] = useState<string>(user.sinif || SINIF_OPTIONS[0]);
+  const [editTargetExam, setEditTargetExam] = useState<'YKS' | 'LGS' | 'KPSS' | 'YDS' | 'Hazırlanmıyorum'>(
+    (user.targetExam as any) || 'YKS'
+  );
+  const [editTargetExamDate, setEditTargetExamDate] = useState<string>(user.targetExamDate || '2027-06-19');
   const [editEmail, setEditEmail] = useState<string>(user.email || '');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
@@ -125,8 +141,35 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setEditName(user.ad);
     setEditKullaniciAdi(user.kullaniciAdi || 'ogrenci');
     setEditSinif(user.sinif || SINIF_OPTIONS[0]);
+    setEditTargetExam((user.targetExam as any) || 'YKS');
+    setEditTargetExamDate(user.targetExamDate || '2027-06-19');
     setEditEmail(user.email || '');
-  }, [user.ad, user.kullaniciAdi, user.sinif, user.email]);
+  }, [user.ad, user.kullaniciAdi, user.sinif, user.targetExam, user.targetExamDate, user.email]);
+
+  const handleSinifChange = (newSinif: string) => {
+    setEditSinif(newSinif);
+    if (newSinif.includes('LGS')) {
+      setEditTargetExam('LGS');
+      setEditTargetExamDate('2027-06-06');
+    } else if (newSinif.includes('KPSS') || newSinif.includes('ALES')) {
+      setEditTargetExam('KPSS');
+      setEditTargetExamDate('2027-07-18');
+    } else if (newSinif.includes('YÖKDİL') || newSinif.includes('YDT') || newSinif.includes('İngilizce')) {
+      setEditTargetExam('YDS');
+      setEditTargetExamDate('2027-04-11');
+    } else if (newSinif.includes('YKS') || newSinif.includes('12. Sınıf')) {
+      setEditTargetExam('YKS');
+      setEditTargetExamDate('2027-06-19');
+    }
+  };
+
+  const handleExamChange = (newExam: 'YKS' | 'LGS' | 'KPSS' | 'YDS' | 'Hazırlanmıyorum') => {
+    setEditTargetExam(newExam);
+    const matched = EXAM_OPTIONS.find((e) => e.id === newExam);
+    if (matched) {
+      setEditTargetExamDate(matched.defaultDate);
+    }
+  };
 
   // Password Security Form States
   const [currentPassword, setCurrentPassword] = useState<string>('');
@@ -240,6 +283,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         kullaniciAdi: cleanUsername,
         kullaniciAdi_lower: cleanUsername,
         sinif: editSinif,
+        targetExam: editTargetExam,
+        targetExamDate: editTargetExamDate,
         email: editEmail.trim(),
       });
     }
@@ -539,10 +584,28 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-extrabold text-text-main">Sınıf / Sınav Hedefi</label>
+                <label className="text-xs font-extrabold text-text-main flex items-center justify-between">
+                  <span>Hedef Sınav (Sayaç)</span>
+                  <span className="text-[10px] text-primary font-bold">Sayaç Hedefi</span>
+                </label>
+                <select
+                  value={editTargetExam}
+                  onChange={(e) => handleExamChange(e.target.value as any)}
+                  className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main font-bold focus:outline-none focus:border-primary"
+                >
+                  {EXAM_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-extrabold text-text-main">Sınıf / Alan</label>
                 <select
                   value={editSinif}
-                  onChange={(e) => setEditSinif(e.target.value)}
+                  onChange={(e) => handleSinifChange(e.target.value)}
                   className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main font-bold focus:outline-none focus:border-primary"
                 >
                   {SINIF_OPTIONS.map((opt) => (
@@ -552,19 +615,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   ))}
                 </select>
               </div>
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-extrabold text-text-main block">
-                  <span>E-Posta Adresi</span>
-                </label>
-                <input
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main font-bold focus:outline-none focus:border-primary"
-                  placeholder="ogrenci@egitimkocum.ai"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-extrabold text-text-main block">
+                <span>E-Posta Adresi</span>
+              </label>
+              <input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                className="w-full bg-surface-container-low border border-card-border rounded-xl p-3 text-xs text-text-main font-bold focus:outline-none focus:border-primary"
+                placeholder="ogrenci@egitimkocum.ai"
+              />
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-card-border">

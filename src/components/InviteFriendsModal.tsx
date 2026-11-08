@@ -222,60 +222,30 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
         return;
       }
 
-      // Add to current user's local and Firestore friends immediately
-      const newFriend: Arkadas = {
-        id: matchedUser.id,
-        name: matchedUser.ad,
-        kullaniciAdi: matchedUser.kullaniciAdi || 'ogrenci',
-        avatar: matchedUser.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-        xp: matchedUser.xp || 100,
-        streak: matchedUser.seri || 1,
-        joinedAt: new Date().toLocaleDateString('tr-TR'),
-      };
-      onAddFriend(newFriend);
-
-      // Save mutually in Firestore if authenticated
+      // Send interactive friend request notification to target user
       if (myId && matchedUser.id) {
-        const myFriendObj: Arkadas = {
-          id: myId,
-          name: myName,
-          kullaniciAdi: myUsername,
-          avatar: myAvatar,
-          xp: currentUser.xp || 0,
-          streak: currentUser.seri || 1,
-          joinedAt: new Date().toLocaleDateString('tr-TR'),
+        const notifId = `notif_freq_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const friendRequestNotif = {
+          id: notifId,
+          type: 'friend_request' as const,
+          title: '👥 Yeni Arkadaşlık İsteği',
+          message: `@${myUsername} (${myName}) sana arkadaşlık isteği gönderdi!`,
+          senderId: myId,
+          senderName: myName,
+          senderUsername: myUsername,
+          senderAvatar: myAvatar,
+          recipientId: matchedUser.id,
+          recipientName: matchedUser.ad,
+          recipientUsername: matchedUser.kullaniciAdi,
+          createdAt: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+          read: false,
         };
-
-        try {
-          await setDoc(doc(db, 'users', myId, 'friends', matchedUser.id), { ...newFriend, userId: myId }, { merge: true });
-          await setDoc(doc(db, 'users', matchedUser.id, 'friends', myId), { ...myFriendObj, userId: matchedUser.id }, { merge: true });
-
-          // Send an instant notification to the target user
-          const notifId = `notif_friend_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-          const friendNotif = {
-            id: notifId,
-            type: 'friend_request' as const,
-            title: '👥 Yeni Arkadaş Eklendi!',
-            message: `@${myUsername} (${myName}) seni arkadaş olarak ekledi! Karşılıklı arkadaş oldunuz (+50 XP).`,
-            senderId: myId,
-            senderName: myName,
-            senderUsername: myUsername,
-            senderAvatar: myAvatar,
-            recipientId: matchedUser.id,
-            recipientName: matchedUser.ad,
-            recipientUsername: matchedUser.kullaniciAdi,
-            createdAt: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-            read: false,
-          };
-          const cleanNotif = JSON.parse(JSON.stringify(friendNotif));
-          await setDoc(doc(db, 'users', matchedUser.id, 'notifications', notifId), cleanNotif);
-          await setDoc(doc(db, 'users', matchedUser.id), { latestNotification: cleanNotif }, { merge: true });
-        } catch (e) {
-          console.error('Arkadaşlık kaydetme hatası:', e);
-        }
+        const cleanNotif = JSON.parse(JSON.stringify(friendRequestNotif));
+        await setDoc(doc(db, 'users', matchedUser.id, 'notifications', notifId), cleanNotif);
+        await setDoc(doc(db, 'users', matchedUser.id), { latestNotification: cleanNotif }, { merge: true });
       }
 
-      showToast(`🎉 @${matchedUser.kullaniciAdi || matchedUser.ad} arkadaş olarak eklendi! (+50 XP)`);
+      showToast(`📩 @${matchedUser.kullaniciAdi || matchedUser.ad} kullanıcısına arkadaşlık isteği gönderildi! Onaylandığında arkadaş listenize eklenecektir.`);
       setManualInput('');
       setSearchError(null);
     } catch (err: any) {
@@ -293,12 +263,12 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-card-border pb-3 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-2xl">person_add</span>
+            <div className="w-9 h-9 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-xl">person_add</span>
             </div>
             <div>
-              <h3 className="font-black text-base text-text-main">Arkadaşlarını Davet Et</h3>
-              <p className="text-xs text-text-muted font-medium">Birlikte çalışın, liderlik yarışına katılın</p>
+              <h3 className="font-black text-sm sm:text-base text-text-main">Arkadaşlarını Davet Et</h3>
+              <p className="text-[11px] text-text-muted font-medium">Birlikte çalışın, her davette +50 XP kazanın</p>
             </div>
           </div>
           <button
@@ -310,223 +280,148 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
         </div>
 
         {/* Scrollable Content */}
-        <div className="overflow-y-auto flex-1 overscroll-contain space-y-4 pr-1">
-          {/* Bonus Reward Banner */}
-          <div className="bg-primary/10 border border-primary/20 rounded-2xl p-3.5 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center shrink-0 font-black text-xs shadow-xs">
-                +50
-              </div>
+        <div className="overflow-y-auto flex-1 overscroll-contain space-y-3.5 pr-1">
+          {/* Clean Share Card */}
+          <div className="bg-surface-container-low border border-card-border rounded-2xl p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-black text-text-main">Her Davette +50 XP Kazan</p>
-                <p className="text-[11px] text-text-muted font-medium">Arkadaşın bağlandığında veya kullanıcı adını yazdığında ikiniz de anında +50 XP kazanırsınız.</p>
+                <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider block">Kullanıcı Adın</span>
+                <span className="text-sm font-black text-primary font-mono">@{myUsername}</span>
               </div>
-            </div>
-          </div>
-
-        {/* Username Quick Copy Card */}
-        <div className="bg-surface-container-low border border-card-border rounded-2xl p-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-lg">alternate_email</span>
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Senin Kullanıcı Adın</p>
-              <p className="text-xs font-black text-primary font-mono truncate">@{myUsername}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleCopyCode}
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1 cursor-pointer shrink-0 ${
-              copiedCode
-                ? 'bg-emerald-600 text-white'
-                : 'bg-surface-container hover:bg-card-border text-text-main border border-card-border'
-            }`}
-          >
-            <span className="material-symbols-outlined text-sm">{copiedCode ? 'check' : 'content_copy'}</span>
-            <span>{copiedCode ? 'Kopyalandı' : 'Kodu Kopyala'}</span>
-          </button>
-        </div>
-
-        {/* Invite Link Section */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-extrabold text-text-main flex items-center gap-1">
-            <span className="material-symbols-outlined text-primary text-base">link</span>
-            <span>Canlı Davet Bağlantısı</span>
-          </label>
-          <div className="flex items-center gap-2 bg-surface-container-low border border-card-border rounded-2xl p-1.5 pl-3">
-            <input
-              type="text"
-              readOnly
-              value={inviteUrl}
-              className="bg-transparent text-xs font-mono text-text-main w-full focus:outline-none select-all truncate"
-            />
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className={`px-3.5 py-2 rounded-xl font-black text-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-xs ${
-                copied
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-primary hover:bg-primary-hover text-white'
-              }`}
-            >
-              <span className="material-symbols-outlined text-base">
-                {copied ? 'check' : 'content_copy'}
+              <span className="bg-primary/10 text-primary border border-primary/20 text-[10px] font-black px-2.5 py-1 rounded-full">
+                +50 XP Hediye
               </span>
-              <span>{copied ? 'Kopyalandı' : 'Kopyala'}</span>
-            </button>
-          </div>
-        </div>
+            </div>
 
-        {/* Share Buttons */}
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-          <a
-            href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareText}\n${inviteUrl}`)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1 sm:gap-1.5 py-2 sm:py-2.5 px-1.5 sm:px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] sm:text-xs rounded-xl transition-all shadow-xs"
-          >
-            <span className="material-symbols-outlined text-sm sm:text-base">chat</span>
-            <span>WhatsApp</span>
-          </a>
-
-          <a
-            href={`https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(shareText)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1 sm:gap-1.5 py-2 sm:py-2.5 px-1.5 sm:px-3 bg-sky-600 hover:bg-sky-700 text-white font-bold text-[11px] sm:text-xs rounded-xl transition-all shadow-xs"
-          >
-            <span className="material-symbols-outlined text-sm sm:text-base">send</span>
-            <span>Telegram</span>
-          </a>
-
-          <button
-            type="button"
-            onClick={handleWebShare}
-            className="flex items-center justify-center gap-1 sm:gap-1.5 py-2 sm:py-2.5 px-1.5 sm:px-3 bg-surface-container-low hover:bg-card-border text-text-main font-bold text-[11px] sm:text-xs rounded-xl border border-card-border transition-all cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-sm sm:text-base">share</span>
-            <span>Paylaş</span>
-          </button>
-        </div>
-
-        {/* Manual Add Friend / Link Input */}
-        <div className="pt-2 border-t border-card-border space-y-2">
-          <label className="text-xs font-bold text-text-main flex items-center justify-between">
-            <span>İsim veya Davet Bağlantısı ile Ekle</span>
-            <span className="text-[10px] text-primary font-bold">+50 XP Bonus</span>
-          </label>
-          <form onSubmit={handleManualAdd} className="space-y-2">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={manualInput}
-                onChange={(e) => {
-                  setManualInput(e.target.value);
-                  if (searchError) setSearchError(null);
-                }}
-                placeholder="Arkadaşının adı veya paylaştığı davet linki..."
-                className="flex-1 bg-surface-container-low border border-card-border focus:border-primary rounded-xl px-3 py-2 text-xs text-text-main placeholder:text-text-muted focus:outline-none"
-              />
-              <button
-                type="submit"
-                disabled={!manualInput.trim() || isSearching}
-                className="px-4 py-2 bg-primary text-white font-black text-xs rounded-xl disabled:opacity-50 hover:bg-primary-hover transition-all cursor-pointer shrink-0 flex items-center gap-1.5"
+            <div className="grid grid-cols-2 gap-2">
+              <a
+                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareText}\n${inviteUrl}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs"
               >
-                {isSearching ? (
-                  <>
-                    <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                    <span>Aranıyor...</span>
-                  </>
-                ) : (
-                  <span>Ekle</span>
-                )}
+                <span className="material-symbols-outlined text-base">chat</span>
+                <span>WhatsApp</span>
+              </a>
+
+              <button
+                type="button"
+                onClick={handleWebShare}
+                className="flex items-center justify-center gap-1.5 py-2 px-3 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-xl transition-all shadow-xs cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-base">share</span>
+                <span>{copied ? 'Kopyalandı!' : 'Linki Paylaş'}</span>
               </button>
             </div>
-
-            {searchError && (
-              <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 text-xs font-medium flex items-start gap-1.5 animate-fadeIn">
-                <span className="material-symbols-outlined text-base shrink-0 mt-0.5">error</span>
-                <span>{searchError}</span>
-              </div>
-            )}
-          </form>
-        </div>
-
-        {/* Friends List */}
-        <div className="pt-2 border-t border-card-border space-y-2">
-          <div className="flex items-center justify-between">
-            <h4 className="font-extrabold text-xs text-text-main flex items-center gap-1">
-              <span className="material-symbols-outlined text-primary text-base">group</span>
-              <span>Mevcut Arkadaşlarım ({friends.length})</span>
-            </h4>
           </div>
 
-          <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-            {friends.length === 0 ? (
-              <div className="text-center py-5 text-text-muted text-xs bg-surface-container-low rounded-2xl border border-dashed border-card-border p-3">
-                Henüz arkadaşın yok. Yukarıdaki bağlantıyı göndererek arkadaşlarını davet et!
-              </div>
-            ) : (
-              friends.map((friend) => (
-                <div
-                  key={friend.id}
-                  className="flex items-center justify-between p-2.5 bg-surface-container-low rounded-2xl border border-card-border"
+          {/* Quick Add Friend Input */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-text-main flex items-center justify-between">
+              <span>Arkadaşlık İsteği Gönder</span>
+              <span className="text-[10px] text-text-muted">Kullanıcı adını yazıp istek gönderin</span>
+            </label>
+            <form onSubmit={handleManualAdd} className="space-y-1.5">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={manualInput}
+                  onChange={(e) => {
+                    setManualInput(e.target.value);
+                    if (searchError) setSearchError(null);
+                  }}
+                  placeholder="@kullanici_adi yazarak istek gönder..."
+                  className="flex-1 bg-surface-container-low border border-card-border focus:border-primary rounded-xl px-3 py-2 text-xs text-text-main placeholder:text-text-muted focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={!manualInput.trim() || isSearching}
+                  className="px-4 py-2 bg-primary text-white font-bold text-xs rounded-xl disabled:opacity-50 hover:bg-primary-hover transition-all cursor-pointer shrink-0 flex items-center gap-1"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <img
-                      src={friend.avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=Friend'}
-                      alt={friend.name}
-                      className="w-8 h-8 rounded-full border border-card-border object-cover bg-card-bg"
-                    />
-                    <div>
-                      <p className="font-black text-xs text-text-main">{friend.name}</p>
-                      {friend.kullaniciAdi && (
-                        <p className="text-[10px] text-primary font-mono font-bold">@{friend.kullaniciAdi}</p>
+                  {isSearching ? (
+                    <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                  ) : (
+                    <span>İstek Gönder</span>
+                  )}
+                </button>
+              </div>
+
+              {searchError && (
+                <div className="p-2 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 text-[11px] font-medium flex items-center gap-1.5 animate-fadeIn">
+                  <span className="material-symbols-outlined text-sm shrink-0">error</span>
+                  <span>{searchError}</span>
+                </div>
+              )}
+            </form>
+          </div>
+
+          {/* Friends List */}
+          <div className="pt-2 border-t border-card-border space-y-2">
+            <h4 className="font-extrabold text-xs text-text-main flex items-center justify-between">
+              <span>Arkadaşlarım ({friends.length})</span>
+            </h4>
+
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+              {friends.length === 0 ? (
+                <div className="text-center py-4 text-text-muted text-xs bg-surface-container-low rounded-xl border border-dashed border-card-border">
+                  Henüz arkadaş eklemediniz.
+                </div>
+              ) : (
+                friends.map((friend) => (
+                  <div
+                    key={friend.id}
+                    className="flex items-center justify-between p-2 bg-surface-container-low rounded-xl border border-card-border"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img
+                        src={friend.avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=Friend'}
+                        alt={friend.name}
+                        className="w-7 h-7 rounded-full border border-card-border object-cover bg-card-bg shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <p className="font-bold text-xs text-text-main truncate">{friend.name}</p>
+                        {friend.kullaniciAdi && (
+                          <p className="text-[10px] text-primary font-mono">@{friend.kullaniciAdi}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-black text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+                        {friend.xp} XP
+                      </span>
+                      {onRemoveFriend && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onRemoveFriend(friend.id);
+                            showToast(`${friend.name} arkadaş listenizden çıkarıldı.`);
+                          }}
+                          title="Sil"
+                          className="text-text-muted hover:text-rose-500 p-1 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-sm">close</span>
+                        </button>
                       )}
-                      <p className="text-[10px] text-text-muted font-bold">
-                        🔥 {friend.streak || 1} Gün Seri
-                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-black text-[11px] text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-                      {friend.xp} XP
-                    </span>
-                    {onRemoveFriend && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onRemoveFriend(friend.id);
-                          showToast(`${friend.name} arkadaş listenizden çıkarıldı.`);
-                        }}
-                        title="Arkadaşı Sil"
-                        className="text-text-muted hover:text-rose-500 p-1 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-base">delete</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Modal Footer / Close */}
-      <div className="p-4 border-t border-card-border flex justify-end shrink-0 bg-surface-container-low/50">
-        <button
-          type="button"
-          onClick={onClose}
-          className="py-2.5 px-5 bg-surface-container-low hover:bg-card-border text-text-main font-bold text-xs rounded-xl transition-colors cursor-pointer"
-        >
-          Kapat
-        </button>
-      </div>
+        {/* Modal Footer / Close */}
+        <div className="pt-2 border-t border-card-border flex justify-end shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-2 bg-surface-container-low hover:bg-card-border text-text-main font-bold text-xs rounded-xl transition-colors cursor-pointer"
+          >
+            Kapat
+          </button>
+        </div>
 
+      </div>
     </div>
-  </div>
-);
+  );
 };

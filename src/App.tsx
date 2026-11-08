@@ -1996,6 +1996,9 @@ export function App() {
           <CommunityView
             posts={posts}
             user={user}
+            friends={friendsState}
+            onAddFriend={handleAddFriend}
+            showToast={showToast}
             onAddPost={handleAddPost}
             onToggleLike={handleToggleLikePost}
           />
@@ -2309,42 +2312,67 @@ export function App() {
                         )}
 
                         {notif.type === 'friend_request' && (
-                          <button
-                            onClick={async () => {
-                              if (notif.senderId && auth.currentUser) {
-                                const newFriendForMe: Arkadas = {
-                                  id: notif.senderId,
-                                  name: notif.senderName || 'Öğrenci',
-                                  avatar: notif.senderAvatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-                                  xp: 100,
-                                  streak: 1,
-                                  joinedAt: new Date().toLocaleDateString('tr-TR'),
-                                };
-                                handleAddFriend(newFriendForMe);
-
-                                try {
-                                  const myFriendObjForSender: Arkadas = {
-                                    id: user.id,
-                                    name: user.ad || 'Öğrenci',
-                                    avatar: user.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-                                    xp: user.xp || 0,
-                                    streak: user.seri || 1,
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={async () => {
+                                if (notif.senderId && auth.currentUser) {
+                                  const newFriendForMe: Arkadas = {
+                                    id: notif.senderId,
+                                    name: notif.senderName || 'Öğrenci',
+                                    kullaniciAdi: notif.senderUsername || 'ogrenci',
+                                    avatar: notif.senderAvatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                                    xp: 100,
+                                    streak: 1,
                                     joinedAt: new Date().toLocaleDateString('tr-TR'),
                                   };
-                                  await setDoc(doc(db, 'users', notif.senderId, 'friends', user.id), {
-                                    ...myFriendObjForSender,
-                                    userId: notif.senderId,
-                                  });
-                                } catch (e) {}
-                              }
-                              cleanDeleteNotification(notif.id);
-                              setIsNotificationsCenterOpen(false);
-                              showToast(`🤝 ${notif.senderName || 'Kullanıcı'} ile artık arkadaşsınız! (+50 XP)`);
-                            }}
-                            className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs cursor-pointer shadow-md transition-all active:scale-95 flex items-center gap-1"
-                          >
-                            <span>✅ Kabul Et</span>
-                          </button>
+                                  handleAddFriend(newFriendForMe);
+
+                                  try {
+                                    const myFriendObjForSender: Arkadas = {
+                                      id: user.id,
+                                      name: user.ad || 'Öğrenci',
+                                      kullaniciAdi: user.kullaniciAdi || 'ogrenci',
+                                      avatar: user.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                                      xp: user.xp || 0,
+                                      streak: user.seri || 1,
+                                      joinedAt: new Date().toLocaleDateString('tr-TR'),
+                                    };
+                                    await setDoc(doc(db, 'users', notif.senderId, 'friends', user.id), {
+                                      ...myFriendObjForSender,
+                                      userId: notif.senderId,
+                                    });
+
+                                    // Send acceptance notification to the requester
+                                    const acceptNotifId = `notif_accept_${Date.now()}`;
+                                    await setDoc(doc(db, 'users', notif.senderId, 'notifications', acceptNotifId), {
+                                      id: acceptNotifId,
+                                      type: 'system',
+                                      title: '🎉 Arkadaşlık İsteğin Kabul Edildi!',
+                                      message: `@${user.kullaniciAdi || user.ad} arkadaşlık isteğini kabul etti! Artık arkadaşsınız (+50 XP).`,
+                                      createdAt: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                                      read: false,
+                                    });
+                                  } catch (e) {}
+                                }
+                                cleanDeleteNotification(notif.id);
+                                setIsNotificationsCenterOpen(false);
+                                showToast(`🤝 ${notif.senderName || 'Kullanıcı'} ile artık arkadaşsınız! (+50 XP)`);
+                              }}
+                              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs cursor-pointer shadow-md transition-all active:scale-95 flex items-center gap-1"
+                            >
+                              <span>✅ Kabul Et</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                cleanDeleteNotification(notif.id);
+                                showToast('❌ Arkadaşlık isteği reddedildi.');
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-card-border text-rose-500 font-bold text-xs cursor-pointer border border-card-border transition-all active:scale-95"
+                            >
+                              <span>Reddet</span>
+                            </button>
+                          </div>
                         )}
 
                         {notif.type === 'daily_goal' && (
@@ -2547,41 +2575,68 @@ export function App() {
               )}
 
               {activeBannerNotif.type === 'friend_request' && (
-                <button
-                  onClick={async () => {
-                    if (activeBannerNotif.senderId && auth.currentUser) {
-                      const newFriendForMe: Arkadas = {
-                        id: activeBannerNotif.senderId,
-                        name: activeBannerNotif.senderName || 'Öğrenci',
-                        avatar: activeBannerNotif.senderAvatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-                        xp: 100,
-                        streak: 1,
-                        joinedAt: new Date().toLocaleDateString('tr-TR'),
-                      };
-                      handleAddFriend(newFriendForMe);
-
-                      try {
-                        const myFriendObjForSender: Arkadas = {
-                          id: user.id,
-                          name: user.ad || 'Öğrenci',
-                          avatar: user.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
-                          xp: user.xp || 0,
-                          streak: user.seri || 1,
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={async () => {
+                      if (activeBannerNotif.senderId && auth.currentUser) {
+                        const newFriendForMe: Arkadas = {
+                          id: activeBannerNotif.senderId,
+                          name: activeBannerNotif.senderName || 'Öğrenci',
+                          kullaniciAdi: activeBannerNotif.senderUsername || 'ogrenci',
+                          avatar: activeBannerNotif.senderAvatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                          xp: 100,
+                          streak: 1,
                           joinedAt: new Date().toLocaleDateString('tr-TR'),
                         };
-                        await setDoc(doc(db, 'users', activeBannerNotif.senderId, 'friends', user.id), {
-                          ...myFriendObjForSender,
-                          userId: activeBannerNotif.senderId,
-                        });
-                      } catch (e) {}
-                    }
-                    cleanDeleteNotification(activeBannerNotif.id);
-                    showToast(`🤝 ${activeBannerNotif.senderName || 'Kullanıcı'} ile artık arkadaşsınız! (+50 XP)`);
-                  }}
-                  className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs cursor-pointer shadow-lg active:scale-95 transition-all flex items-center gap-1"
-                >
-                  <span>✅ Kabul Et</span>
-                </button>
+                        handleAddFriend(newFriendForMe);
+
+                        try {
+                          const myFriendObjForSender: Arkadas = {
+                            id: user.id,
+                            name: user.ad || 'Öğrenci',
+                            kullaniciAdi: user.kullaniciAdi || 'ogrenci',
+                            avatar: user.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1',
+                            xp: user.xp || 0,
+                            streak: user.seri || 1,
+                            joinedAt: new Date().toLocaleDateString('tr-TR'),
+                          };
+                          await setDoc(doc(db, 'users', activeBannerNotif.senderId, 'friends', user.id), {
+                            ...myFriendObjForSender,
+                            userId: activeBannerNotif.senderId,
+                          });
+
+                          // Send acceptance notification to requester
+                          const acceptNotifId = `notif_accept_${Date.now()}`;
+                          await setDoc(doc(db, 'users', activeBannerNotif.senderId, 'notifications', acceptNotifId), {
+                            id: acceptNotifId,
+                            type: 'system',
+                            title: '🎉 Arkadaşlık İsteğin Kabul Edildi!',
+                            message: `@${user.kullaniciAdi || user.ad} arkadaşlık isteğini kabul etti! Artık arkadaşsınız (+50 XP).`,
+                            createdAt: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                            read: false,
+                          });
+                        } catch (e) {}
+                      }
+                      cleanDeleteNotification(activeBannerNotif.id);
+                      setActiveBannerNotif(null);
+                      showToast(`🤝 ${activeBannerNotif.senderName || 'Kullanıcı'} ile artık arkadaşsınız! (+50 XP)`);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs cursor-pointer shadow-lg active:scale-95 transition-all flex items-center gap-1"
+                  >
+                    <span>✅ Kabul Et</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      cleanDeleteNotification(activeBannerNotif.id);
+                      setActiveBannerNotif(null);
+                      showToast('❌ Arkadaşlık isteği reddedildi.');
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 font-bold text-xs cursor-pointer border border-white/10 transition-all active:scale-95"
+                  >
+                    <span>Reddet</span>
+                  </button>
+                </div>
               )}
 
               {activeBannerNotif.type === 'daily_goal' && (
