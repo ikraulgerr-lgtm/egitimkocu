@@ -10,6 +10,7 @@ import { startNativeSpeechRecognition } from '../lib/nativeSpeech';
 import { mergeTranscripts } from '../lib/speechUtils';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
+import { ImageCropModal } from './ImageCropModal';
 
 interface HomeViewProps {
   user: Kullanici;
@@ -70,6 +71,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraPermissionState, setCameraPermissionState] = useState<'idle' | 'granted' | 'denied'>('idle');
+  const [pendingCropImage, setPendingCropImage] = useState<string | null>(null);
 
   // Clipboard Analysis states
   const [clipboardDetectedText, setClipboardDetectedText] = useState<string | null>(null);
@@ -536,7 +538,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const capturedBase64 = canvas.toDataURL('image/jpeg', 0.88);
-        handleCapture(capturedBase64);
+        setPendingCropImage(capturedBase64);
         return;
       }
     }
@@ -556,7 +558,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           source: CameraSource.Camera,
         });
         if (image.dataUrl) {
-          handleCapture(image.dataUrl);
+          setPendingCropImage(image.dataUrl);
           return;
         }
       } catch (camErr: any) {
@@ -583,7 +585,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           source: CameraSource.Photos,
         });
         if (image.dataUrl) {
-          handleCapture(image.dataUrl);
+          setPendingCropImage(image.dataUrl);
           return;
         }
       } catch (galErr: any) {
@@ -600,7 +602,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     if (file) {
       const reader = new FileReader();
       reader.onload = () => {
-        handleCapture(reader.result as string);
+        setPendingCropImage(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -1211,6 +1213,27 @@ export const HomeView: React.FC<HomeViewProps> = ({
         showToast={showHomeToast}
         onUpdateUser={onUpdateUser}
       />
+
+      {/* Image Cropping & Focusing Modal */}
+      {pendingCropImage && (
+        <ImageCropModal
+          isOpen={Boolean(pendingCropImage)}
+          imageSrc={pendingCropImage}
+          onConfirmCrop={(croppedBase64) => {
+            const img = croppedBase64;
+            setPendingCropImage(null);
+            handleCapture(img);
+          }}
+          onConfirmOriginal={(origBase64) => {
+            const img = origBase64;
+            setPendingCropImage(null);
+            handleCapture(img);
+          }}
+          onCancel={() => {
+            setPendingCropImage(null);
+          }}
+        />
+      )}
 
       {/* Local Toast Alert */}
       {homeToast && (

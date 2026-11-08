@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Kullanici, Arkadas } from '../types';
 import { db, auth } from '../lib/firebase';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { UserProfileModal, UserProfileTarget } from './UserProfileModal';
 
 interface LeaderboardViewProps {
   currentUser: Kullanici;
@@ -30,6 +31,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   const [globalUsers, setGlobalUsers] = useState<LeaderUser[]>([]);
   const [isLoadingGlobal, setIsLoadingGlobal] = useState<boolean>(false);
   const [sentRequestUserIds, setSentRequestUserIds] = useState<{ [uid: string]: boolean }>({});
+  const [selectedProfileTarget, setSelectedProfileTarget] = useState<UserProfileTarget | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   // Real-time live synchronization of all registered users from Firestore
   useEffect(() => {
@@ -228,7 +231,19 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
             {/* 2nd Place */}
             <div className="flex flex-col items-center flex-1 group">
               {top2 ? (
-                <>
+                <div
+                  onClick={() => {
+                    setSelectedProfileTarget({
+                      userId: top2.id,
+                      yazarAd: top2.name,
+                      kullaniciAdi: top2.kullaniciAdi,
+                      avatar: top2.avatar,
+                    });
+                    setIsProfileModalOpen(true);
+                  }}
+                  className="flex flex-col items-center w-full cursor-pointer"
+                  title="Profili Gör"
+                >
                   <div className="relative mb-2">
                     <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border-4 border-slate-300 p-0.5 overflow-hidden shadow-md group-hover:scale-105 transition-transform">
                       <img src={top2.avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1'} alt={top2.name} className="w-full h-full object-cover rounded-full" />
@@ -237,11 +252,11 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                       2
                     </div>
                   </div>
-                  <span className="font-extrabold text-xs text-text-main truncate w-20 text-center">{top2.name}</span>
+                  <span className="font-extrabold text-xs text-text-main truncate w-20 text-center group-hover:text-primary transition-colors">{top2.name}</span>
                   <div className="h-24 w-full bg-slate-200 dark:bg-slate-800 rounded-t-2xl mt-2 flex items-end justify-center pb-2 border-t-2 border-slate-300">
                     <span className="text-primary font-black text-xs">{top2.xp} XP</span>
                   </div>
-                </>
+                </div>
               ) : (
                 <button
                   onClick={onOpenInviteModal}
@@ -258,25 +273,51 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
             {/* 1st Place */}
             <div className="flex flex-col items-center flex-1 relative -top-4 group">
-              <div className="relative mb-2">
-                <span className="absolute -top-7 left-1/2 -translate-x-1/2 text-2xl animate-bounce">👑</span>
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-4 border-amber-400 p-0.5 overflow-hidden shadow-lg group-hover:scale-105 transition-transform">
-                  <img src={top1.avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1'} alt={top1.name} className="w-full h-full object-cover rounded-full" />
+              <div
+                onClick={() => {
+                  setSelectedProfileTarget({
+                    userId: top1.id,
+                    yazarAd: top1.name,
+                    kullaniciAdi: top1.kullaniciAdi,
+                    avatar: top1.avatar,
+                  });
+                  setIsProfileModalOpen(true);
+                }}
+                className="flex flex-col items-center w-full cursor-pointer"
+                title="Profili Gör"
+              >
+                <div className="relative mb-2">
+                  <span className="absolute -top-7 left-1/2 -translate-x-1/2 text-2xl animate-bounce">👑</span>
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-4 border-amber-400 p-0.5 overflow-hidden shadow-lg group-hover:scale-105 transition-transform">
+                    <img src={top1.avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1'} alt={top1.name} className="w-full h-full object-cover rounded-full" />
+                  </div>
+                  <div className="absolute -bottom-2 -right-1 bg-amber-400 text-slate-900 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shadow-md">
+                    1
+                  </div>
                 </div>
-                <div className="absolute -bottom-2 -right-1 bg-amber-400 text-slate-900 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shadow-md">
-                  1
+                <span className="font-black text-xs sm:text-sm text-text-main truncate w-24 text-center group-hover:text-primary transition-colors">{top1.name}</span>
+                <div className="h-36 w-full bg-gradient-to-t from-primary/20 to-primary/40 rounded-t-2xl mt-2 flex items-end justify-center pb-2 border-t-2 border-amber-400">
+                  <span className="text-primary font-black text-xs sm:text-sm">{top1.xp} XP</span>
                 </div>
-              </div>
-              <span className="font-black text-xs sm:text-sm text-text-main truncate w-24 text-center">{top1.name}</span>
-              <div className="h-36 w-full bg-gradient-to-t from-primary/20 to-primary/40 rounded-t-2xl mt-2 flex items-end justify-center pb-2 border-t-2 border-amber-400">
-                <span className="text-primary font-black text-xs sm:text-sm">{top1.xp} XP</span>
               </div>
             </div>
 
             {/* 3rd Place */}
             <div className="flex flex-col items-center flex-1 group">
               {top3 ? (
-                <>
+                <div
+                  onClick={() => {
+                    setSelectedProfileTarget({
+                      userId: top3.id,
+                      yazarAd: top3.name,
+                      kullaniciAdi: top3.kullaniciAdi,
+                      avatar: top3.avatar,
+                    });
+                    setIsProfileModalOpen(true);
+                  }}
+                  className="flex flex-col items-center w-full cursor-pointer"
+                  title="Profili Gör"
+                >
                   <div className="relative mb-2">
                     <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border-4 border-amber-700/60 p-0.5 overflow-hidden shadow-md group-hover:scale-105 transition-transform">
                       <img src={top3.avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1'} alt={top3.name} className="w-full h-full object-cover rounded-full" />
@@ -285,11 +326,11 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                       3
                     </div>
                   </div>
-                  <span className="font-extrabold text-xs text-text-main truncate w-20 text-center">{top3.name}</span>
+                  <span className="font-extrabold text-xs text-text-main truncate w-20 text-center group-hover:text-primary transition-colors">{top3.name}</span>
                   <div className="h-16 w-full bg-amber-900/10 dark:bg-amber-950/40 rounded-t-2xl mt-2 flex items-end justify-center pb-2 border-t-2 border-amber-700/60">
                     <span className="text-primary font-black text-xs">{top3.xp} XP</span>
                   </div>
-                </>
+                </div>
               ) : (
                 <button
                   onClick={onOpenInviteModal}
@@ -330,20 +371,34 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   : 'bg-surface-container-low border-card-border hover:border-primary/30'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <span className={`w-6 text-center font-black text-sm ${
+              <div
+                onClick={() => {
+                  if (userItem.id || userItem.name) {
+                    setSelectedProfileTarget({
+                      userId: userItem.id,
+                      yazarAd: userItem.name.replace(' (Sen)', ''),
+                      kullaniciAdi: userItem.kullaniciAdi,
+                      avatar: userItem.avatar,
+                    });
+                    setIsProfileModalOpen(true);
+                  }
+                }}
+                className="flex items-center gap-3 cursor-pointer group/user flex-1 min-w-0"
+                title="Profili Gör"
+              >
+                <span className={`w-6 text-center font-black text-sm shrink-0 ${
                   userItem.rank === 1 ? 'text-amber-500 font-extrabold' : userItem.rank === 2 ? 'text-slate-400' : userItem.rank === 3 ? 'text-amber-700' : 'text-text-muted'
                 }`}>
                   {userItem.rank}
                 </span>
 
-                <div className="w-10 h-10 rounded-full overflow-hidden border border-card-border shrink-0">
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-card-border shrink-0 group-hover/user:ring-2 group-hover/user:ring-primary/40 transition-all">
                   <img src={userItem.avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=DegreeChampion&backgroundColor=6366f1'} alt={userItem.name} className="w-full h-full object-cover" />
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <p className={`font-extrabold text-xs sm:text-sm ${userItem.isCurrentUser ? 'text-primary' : 'text-text-main'}`}>
+                    <p className={`font-extrabold text-xs sm:text-sm truncate group-hover/user:text-primary transition-colors ${userItem.isCurrentUser ? 'text-primary' : 'text-text-main'}`}>
                       {userItem.name}
                     </p>
                     {userItem.kullaniciAdi && (
@@ -416,6 +471,20 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           <span>Arkadaşlarını Davet Et</span>
         </button>
       </section>
+
+      {/* Instagram-Style User Profile Modal */}
+      {isProfileModalOpen && selectedProfileTarget && (
+        <UserProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => {
+            setIsProfileModalOpen(false);
+            setSelectedProfileTarget(null);
+          }}
+          targetUser={selectedProfileTarget}
+          currentUser={currentUser}
+          friends={friends}
+        />
+      )}
     </div>
   );
 };

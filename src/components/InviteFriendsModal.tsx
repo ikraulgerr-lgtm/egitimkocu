@@ -4,6 +4,7 @@ import { db, auth } from '../lib/firebase';
 import { collection, getDocs, doc, setDoc, getDoc } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
+import { UserProfileModal, UserProfileTarget } from './UserProfileModal';
 
 interface InviteFriendsModalProps {
   isOpen: boolean;
@@ -29,6 +30,8 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
   const [manualInput, setManualInput] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [selectedProfileTarget, setSelectedProfileTarget] = useState<UserProfileTarget | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   // Reset inputs when modal opens or closes
   React.useEffect(() => {
@@ -370,16 +373,28 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
                 friends.map((friend) => (
                   <div
                     key={friend.id}
-                    className="flex items-center justify-between p-2 bg-surface-container-low rounded-xl border border-card-border"
+                    className="flex items-center justify-between p-2 bg-surface-container-low hover:bg-surface-container rounded-xl border border-card-border transition-colors group"
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <div
+                      onClick={() => {
+                        setSelectedProfileTarget({
+                          userId: friend.id,
+                          yazarAd: friend.name,
+                          kullaniciAdi: friend.kullaniciAdi,
+                          avatar: friend.avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=Friend',
+                        });
+                        setIsProfileModalOpen(true);
+                      }}
+                      className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+                      title="Profili Gör"
+                    >
                       <img
                         src={friend.avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=Friend'}
                         alt={friend.name}
-                        className="w-7 h-7 rounded-full border border-card-border object-cover bg-card-bg shrink-0"
+                        className="w-7 h-7 rounded-full border border-card-border object-cover bg-card-bg shrink-0 group-hover:ring-2 group-hover:ring-primary/40 transition-all"
                       />
                       <div className="min-w-0">
-                        <p className="font-bold text-xs text-text-main truncate">{friend.name}</p>
+                        <p className="font-bold text-xs text-text-main truncate group-hover:text-primary transition-colors">{friend.name}</p>
                         {friend.kullaniciAdi && (
                           <p className="text-[10px] text-primary font-mono">@{friend.kullaniciAdi}</p>
                         )}
@@ -392,7 +407,8 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
                       {onRemoveFriend && (
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             onRemoveFriend(friend.id);
                             showToast(`${friend.name} arkadaş listenizden çıkarıldı.`);
                           }}
@@ -422,6 +438,22 @@ export const InviteFriendsModal: React.FC<InviteFriendsModalProps> = ({
         </div>
 
       </div>
+
+      {/* Instagram-Style User Profile Modal */}
+      {isProfileModalOpen && selectedProfileTarget && (
+        <UserProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => {
+            setIsProfileModalOpen(false);
+            setSelectedProfileTarget(null);
+          }}
+          targetUser={selectedProfileTarget}
+          currentUser={currentUser}
+          friends={friends}
+          onAddFriend={onAddFriend}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 };

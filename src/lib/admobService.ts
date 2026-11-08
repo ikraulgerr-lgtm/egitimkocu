@@ -38,12 +38,11 @@ export async function showRewardedAd(
   // 1. Web Simulation Mode (when testing on desktop/laptop browser)
   if (!Capacitor.isNativePlatform()) {
     return new Promise((resolve) => {
-      // Simulate 2.5s ad watching progress on web
       setTimeout(() => {
         onRewardEarned(1);
         if (onAdDismissed) onAdDismissed();
         resolve(true);
-      }, 2500);
+      }, 150);
     });
   }
 

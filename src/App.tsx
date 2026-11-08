@@ -1996,7 +1996,7 @@ export function App() {
           <CommunityView
             posts={posts}
             user={user}
-            friends={friendsState}
+            friends={friends}
             onAddFriend={handleAddFriend}
             showToast={showToast}
             onAddPost={handleAddPost}

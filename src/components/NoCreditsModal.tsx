@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-
 import { showRewardedAd } from '../lib/admobService';
 
 interface NoCreditsModalProps {
@@ -17,38 +16,27 @@ export const NoCreditsModal: React.FC<NoCreditsModalProps> = ({
   userKredi = 0,
   userMaxKredi = 10,
 }) => {
-  const [isWatchingAd, setIsWatchingAd] = useState(false);
-  const [adProgress, setAdProgress] = useState(0);
+  const [isStartingAd, setIsStartingAd] = useState(false);
 
   if (!isOpen) return null;
 
   const handleStartWatchAd = async () => {
-    setIsWatchingAd(true);
-    setAdProgress(10);
-
-    const progressTimer = setInterval(() => {
-      setAdProgress((prev) => (prev >= 85 ? 85 : prev + 15));
-    }, 350);
+    if (isStartingAd) return;
+    setIsStartingAd(true);
 
     try {
       await showRewardedAd(
         (earnedAmount) => {
-          clearInterval(progressTimer);
-          setAdProgress(100);
-          setTimeout(() => {
-            setIsWatchingAd(false);
-            onWatchAdSuccess(earnedAmount || 1);
-            onClose();
-          }, 300);
+          setIsStartingAd(false);
+          onWatchAdSuccess(earnedAmount || 1);
+          onClose();
         },
         () => {
-          clearInterval(progressTimer);
-          setIsWatchingAd(false);
+          setIsStartingAd(false);
         }
       );
     } catch (err) {
-      clearInterval(progressTimer);
-      setIsWatchingAd(false);
+      setIsStartingAd(false);
       onWatchAdSuccess(1);
       onClose();
     }
@@ -64,7 +52,7 @@ export const NoCreditsModal: React.FC<NoCreditsModalProps> = ({
         {/* Close Button */}
         <button
           onClick={onClose}
-          disabled={isWatchingAd}
+          disabled={isStartingAd}
           className="absolute top-4 right-4 text-text-muted hover:text-text-main p-1.5 rounded-full hover:bg-card-border/40 transition-colors cursor-pointer disabled:opacity-50"
         >
           <span className="material-symbols-outlined text-xl">close</span>
@@ -145,40 +133,32 @@ export const NoCreditsModal: React.FC<NoCreditsModalProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        {isWatchingAd ? (
-          <div className="bg-primary/10 border border-primary/20 p-5 rounded-2xl space-y-3 animate-fadeIn">
-            <div className="flex items-center justify-center gap-2 text-primary font-black text-sm">
-              <span className="material-symbols-outlined text-lg animate-spin">sync</span>
-              <span>Reklam İzleniyor... (%{adProgress})</span>
+        {/* Action Button - Immediate Ad Trigger without waiting progress bar */}
+        <div className="space-y-2.5 pt-1">
+          {userKredi >= userMaxKredi ? (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs font-bold text-amber-600 dark:text-amber-400">
+              Soru hakkınız maksimum seviyededir ({userKredi}/{userMaxKredi}). Soru çözdükçe azalan haklarınızı reklam izleyerek yenileyebilirsiniz.
             </div>
-            <div className="w-full bg-primary/20 h-2.5 rounded-full overflow-hidden">
-              <div
-                className="bg-primary h-full transition-all duration-300 ease-out"
-                style={{ width: `${adProgress}%` }}
-              />
-            </div>
-            <p className="text-[11px] text-text-muted">
-              Reklam tamamlandığında +1 Soru Hakkı bakiyene eklenecektir.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2.5 pt-1">
-            {userKredi >= userMaxKredi ? (
-              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs font-bold text-amber-600 dark:text-amber-400">
-                Soru hakkınız maksimum seviyededir ({userKredi}/{userMaxKredi}). Soru çözdükçe azalan haklarınızı reklam izleyerek yenileyebilirsiniz.
-              </div>
-            ) : (
-              <button
-                onClick={handleStartWatchAd}
-                className="w-full bg-primary hover:brightness-110 active:scale-[0.98] text-white font-black text-sm py-3.5 px-4 rounded-2xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-lg">play_circle</span>
-                <span>Reklam izleyerek soru hakkı kazan</span>
-              </button>
-            )}
-          </div>
-        )}
+          ) : (
+            <button
+              onClick={handleStartWatchAd}
+              disabled={isStartingAd}
+              className="w-full bg-primary hover:brightness-110 active:scale-[0.98] text-white font-black text-sm py-3.5 px-4 rounded-2xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-75"
+            >
+              {isStartingAd ? (
+                <>
+                  <span className="material-symbols-outlined text-lg animate-spin">sync</span>
+                  <span>Reklam Açılıyor...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-lg">play_circle</span>
+                  <span>Reklam İzleyerek Soru Hakkı Kazan</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
 
         {/* Footer Note */}
         <p className="text-[10px] text-text-muted pt-1">

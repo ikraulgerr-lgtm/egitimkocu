@@ -85,13 +85,28 @@ export const LofiAudioWidget: React.FC<LofiAudioWidgetProps> = ({
   const [volume, setVolume] = useState<number>(0.4); // 0.0 to 1.0
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
-  // Draggable Floating Widget State
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(() => {
+  // Helper for default position (always starts top-right right below XP badge)
+  const getDefaultPosition = () => {
+    if (typeof window === 'undefined') return { x: 300, y: 72 };
+    const btnW = 54;
+    return {
+      x: Math.max(12, window.innerWidth - btnW - 14),
+      y: 72,
+    };
+  };
+
+  // Draggable Floating Widget State - Starts below XP badge at top right
+  const [position, setPosition] = useState<{ x: number; y: number }>(() => {
     try {
       const saved = localStorage.getItem('lofi_widget_pos');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          return parsed;
+        }
+      }
     } catch (e) {}
-    return null;
+    return getDefaultPosition();
   });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const dragJustFinishedRef = useRef<boolean>(false);
@@ -596,16 +611,15 @@ export const LofiAudioWidget: React.FC<LofiAudioWidgetProps> = ({
   }
 
   // Floating Widget View (Draggable)
-  const isNearBottom = position ? position.y > window.innerHeight / 2 : true;
-  const isNearRight = position ? position.x > window.innerWidth / 2 : true;
+  const isNearBottom = position.y > window.innerHeight / 2;
+  const isNearRight = position.x > window.innerWidth / 2;
 
-  const containerStyle = position
-    ? { left: `${position.x}px`, top: `${position.y}px`, bottom: 'auto', right: 'auto' }
-    : { bottom: 'calc(140px + env(safe-area-inset-bottom, 0px))' };
+  const containerStyle = {
+    left: `${position.x}px`,
+    top: `${position.y}px`,
+  };
 
-  const containerClass = position
-    ? `fixed z-40 touch-none select-none ${className}`
-    : `fixed right-3 sm:right-6 z-40 touch-none select-none ${className}`;
+  const containerClass = `fixed z-40 touch-none select-none ${className}`;
 
   const popoverPosClass = `absolute ${isNearBottom ? 'bottom-full mb-3' : 'top-full mt-3'} ${
     isNearRight ? 'right-0' : 'left-0'

@@ -729,6 +729,110 @@ function cleanTextFormatting(str: string | undefined): string {
         </div>
       </section>
 
+      {/* Socratic Hint AI Box - Positioned immediately below the solution steps */}
+      <section className="bg-primary/5 dark:bg-primary/10 p-4 rounded-2xl border-l-4 border-primary space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-primary">smart_toy</span>
+          <h3 className="font-extrabold text-sm text-text-main">Yapay Zekaya Soru Sor / Sokratik İpucu Al</h3>
+        </div>
+
+        {/* Chat Messages */}
+        <div className="space-y-2 max-h-48 overflow-y-auto pr-1 no-scrollbar">
+          {socraticChat.map((msg, index) => (
+            <div 
+              key={index}
+              className={`p-3 rounded-xl text-xs leading-relaxed ${
+                msg.sender === 'ai' 
+                  ? 'bg-card-bg border border-card-border text-text-main font-medium' 
+                  : 'bg-primary text-white font-bold ml-6 text-right'
+              }`}
+            >
+              {cleanTextFormatting(msg.text)}
+            </div>
+          ))}
+
+          {isAskingAi && (
+            <div className="p-3 bg-card-bg rounded-xl text-xs text-text-muted flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
+              <span>Eğitim Koçum AI düşünüyor...</span>
+            </div>
+          )}
+        </div>
+
+        {/* Quick Dynamic Suggestion Chips */}
+        {(() => {
+          const ders = question.ders || 'Matematik';
+          const konu = question.konu || 'Konu';
+          const hata = question.hataTuru || 'İşlem Hatası';
+
+          const dynamicSuggestions = [
+            question.sokratikIpucu ? `💡 "${question.sokratikIpucu}"` : `2. Adımdaki ${hata} mantığını açıklar mısın?`,
+            ders === 'Fizik'
+              ? `⚡ ${konu} konusunda hangi fizik formülünü kullanmalıydım?`
+              : ders === 'Kimya'
+              ? `🧪 ${konu} denkleminde mol/tepkime kuralını hatırlatır mısın?`
+              : ders === 'Biyoloji'
+              ? `🧬 ${konu} konusundaki temel kavramları özetler misin?`
+              : ders === 'Türkçe'
+              ? `📖 ${konu} konusundaki püf noktaları anlatır mısın?`
+              : `📐 ${konu} konusundaki temel kuralı ve pratik yöntemi açıklar mısın?`,
+            `🎯 Benzer bir ${ders} sorusunda aynı hatayı yapmamak için neye dikkat etmeliyim?`,
+          ];
+
+          const visibleSuggestions = dynamicSuggestions.filter((text) => !removedSuggestions.includes(text));
+
+          if (visibleSuggestions.length === 0) return null;
+
+          return (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {visibleSuggestions.map((text, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setRemovedSuggestions((prev) => [...prev, text]);
+                    handleAskSocratic(text.replace(/^[💡⚡🧪🧬📖📐🎯]\s*/, ''));
+                  }}
+                  className="text-xs bg-card-bg hover:bg-primary hover:text-white px-3 py-1.5 rounded-lg border border-card-border transition-colors text-left cursor-pointer shadow-2xs font-medium"
+                >
+                  {cleanTextFormatting(text)}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* Question Text & Voice Input */}
+        <div className="relative mt-2">
+          <input
+            type="text"
+            value={customQuestionInput}
+            onChange={(e) => setCustomQuestionInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAskSocratic(customQuestionInput)}
+            placeholder={isListeningForChat ? 'Dinleniyor... Konuşun...' : 'Çözüm hakkında yapay zekaya bir şey sor...'}
+            className={`w-full bg-card-bg border ${
+              isListeningForChat ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-card-border'
+            } rounded-full py-2.5 pl-4 pr-20 text-xs focus:outline-none focus:ring-2 focus:ring-primary text-text-main`}
+          />
+          <button
+            type="button"
+            onClick={toggleChatVoiceInput}
+            className={`absolute right-10 top-1.5 p-1 rounded-full transition-transform cursor-pointer ${
+              isListeningForChat ? 'text-rose-500 animate-pulse scale-110' : 'text-text-muted hover:text-primary'
+            }`}
+            title={isListeningForChat ? 'Mikrofonu Kapat' : 'Sesle Soru Sor'}
+          >
+            <span className="material-symbols-outlined text-lg">{isListeningForChat ? 'mic_off' : 'mic'}</span>
+          </button>
+          <button
+            onClick={() => handleAskSocratic(customQuestionInput)}
+            className="absolute right-2 top-1.5 p-1 text-primary hover:scale-110 transition-transform cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-lg">send</span>
+          </button>
+        </div>
+      </section>
+
       {/* AI Pedagogical Schedule Recommendation Card */}
       {onAddToSchedule && (
         <section className="bg-gradient-to-r from-indigo-800 via-indigo-900 to-slate-950 p-4.5 rounded-2xl text-white shadow-md space-y-2 border border-indigo-700/50">
@@ -908,110 +1012,6 @@ function cleanTextFormatting(str: string | undefined): string {
         />
       </section>
 
-      {/* Socratic Hint AI Box */}
-      <section className="bg-primary/5 dark:bg-primary/10 p-4 rounded-2xl border-l-4 border-primary space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">smart_toy</span>
-          <h3 className="font-extrabold text-sm text-text-main">Yapay Zekaya Sor / Sokratik İpucu Al</h3>
-        </div>
-
-        {/* Chat Messages */}
-        <div className="space-y-2 max-h-48 overflow-y-auto pr-1 no-scrollbar">
-          {socraticChat.map((msg, index) => (
-            <div 
-              key={index}
-              className={`p-3 rounded-xl text-xs leading-relaxed ${
-                msg.sender === 'ai' 
-                  ? 'bg-card-bg border border-card-border text-text-main font-medium' 
-                  : 'bg-primary text-white font-bold ml-6 text-right'
-              }`}
-            >
-              {cleanTextFormatting(msg.text)}
-            </div>
-          ))}
-
-          {isAskingAi && (
-            <div className="p-3 bg-card-bg rounded-xl text-xs text-text-muted flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
-              <span>Eğitim Koçum AI düşünüyor...</span>
-            </div>
-          )}
-        </div>
-
-        {/* Quick Dynamic Suggestion Chips */}
-        {(() => {
-          const ders = question.ders || 'Matematik';
-          const konu = question.konu || 'Konu';
-          const hata = question.hataTuru || 'İşlem Hatası';
-
-          const dynamicSuggestions = [
-            question.sokratikIpucu ? `💡 "${question.sokratikIpucu}"` : `2. Adımdaki ${hata} mantığını açıklar mısın?`,
-            ders === 'Fizik'
-              ? `⚡ ${konu} konusunda hangi fizik formülünü kullanmalıydım?`
-              : ders === 'Kimya'
-              ? `🧪 ${konu} denkleminde mol/tepkime kuralını hatırlatır mısın?`
-              : ders === 'Biyoloji'
-              ? `🧬 ${konu} konusundaki temel kavramları özetler misin?`
-              : ders === 'Türkçe'
-              ? `📖 ${konu} konusundaki püf noktaları anlatır mısın?`
-              : `📐 ${konu} konusundaki temel kuralı ve pratik yöntemi açıklar mısın?`,
-            `🎯 Benzer bir ${ders} sorusunda aynı hatayı yapmamak için neye dikkat etmeliyim?`,
-          ];
-
-          const visibleSuggestions = dynamicSuggestions.filter((text) => !removedSuggestions.includes(text));
-
-          if (visibleSuggestions.length === 0) return null;
-
-          return (
-            <div className="flex flex-wrap gap-2 pt-1">
-              {visibleSuggestions.map((text, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => {
-                    setRemovedSuggestions((prev) => [...prev, text]);
-                    handleAskSocratic(text.replace(/^[💡⚡🧪🧬📖📐🎯]\s*/, ''));
-                  }}
-                  className="text-xs bg-card-bg hover:bg-primary hover:text-white px-3 py-1.5 rounded-lg border border-card-border transition-colors text-left cursor-pointer shadow-2xs font-medium"
-                >
-                  {cleanTextFormatting(text)}
-                </button>
-              ))}
-            </div>
-          );
-        })()}
-
-        {/* Question Text & Voice Input */}
-        <div className="relative mt-2">
-          <input
-            type="text"
-            value={customQuestionInput}
-            onChange={(e) => setCustomQuestionInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAskSocratic(customQuestionInput)}
-            placeholder={isListeningForChat ? 'Dinleniyor... Konuşun...' : 'Başka bir şey sor...'}
-            className={`w-full bg-card-bg border ${
-              isListeningForChat ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-card-border'
-            } rounded-full py-2.5 pl-4 pr-20 text-xs focus:outline-none focus:ring-2 focus:ring-primary text-text-main`}
-          />
-          <button
-            type="button"
-            onClick={toggleChatVoiceInput}
-            className={`absolute right-10 top-1.5 p-1 rounded-full transition-transform cursor-pointer ${
-              isListeningForChat ? 'text-rose-500 animate-pulse scale-110' : 'text-text-muted hover:text-primary'
-            }`}
-            title={isListeningForChat ? 'Mikrofonu Kapat' : 'Sesle Soru Sor'}
-          >
-            <span className="material-symbols-outlined text-lg">{isListeningForChat ? 'mic_off' : 'mic'}</span>
-          </button>
-          <button
-            onClick={() => handleAskSocratic(customQuestionInput)}
-            className="absolute right-2 top-1.5 p-1 text-primary hover:scale-110 transition-transform cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-lg">send</span>
-          </button>
-        </div>
-      </section>
-
       {/* Bottom Sticky Action Buttons & Difficulty Selector */}
       <div
         className="fixed left-0 right-0 z-40 bg-background/95 dark:bg-background/95 backdrop-blur-xl p-2.5 sm:p-3 border-t border-card-border shadow-2xl max-w-2xl mx-auto space-y-1.5 sm:space-y-2 transition-colors"
@@ -1049,21 +1049,11 @@ function cleanTextFormatting(str: string | undefined): string {
         </div>
 
         <div className="flex items-center gap-2">
-          {onStartQuiz && (
-            <button
-              onClick={() => onStartQuiz(question)}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-2.5 sm:py-3 px-2 sm:px-3 rounded-xl flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-base">fact_check</span>
-              <span>Test Çöz</span>
-            </button>
-          )}
-
           <button
             onClick={() => onGenerateSimilar(question, selectedZorluk)}
-            className="flex-1 bg-primary hover:bg-primary-hover text-white font-extrabold text-xs py-2.5 sm:py-3 px-2 sm:px-3 rounded-xl flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-md cursor-pointer"
+            className="flex-1 bg-primary hover:bg-primary-hover text-white font-extrabold text-xs sm:text-sm py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer"
           >
-            <span className="material-symbols-outlined text-base">dynamic_feed</span>
+            <span className="material-symbols-outlined text-base sm:text-lg">dynamic_feed</span>
             <span>Benzer Üret ({selectedZorluk})</span>
           </button>
 
@@ -1072,11 +1062,11 @@ function cleanTextFormatting(str: string | undefined): string {
             <button
               disabled
               type="button"
-              className="px-3 py-2.5 sm:py-3 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-extrabold text-xs flex items-center justify-center gap-1 border border-emerald-500/20 shadow-xs cursor-default shrink-0"
+              className="px-3.5 py-2.5 sm:py-3 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-extrabold text-xs flex items-center justify-center gap-1.5 border border-emerald-500/20 shadow-xs cursor-default shrink-0"
               title="Bu soru zaten havuzunuzda kayıtlı"
             >
               <span className="material-symbols-outlined text-base">check</span>
-              <span className="hidden xs:inline">Kayıtlı</span>
+              <span>Kayıtlı</span>
             </button>
           ) : (
             <button
@@ -1085,7 +1075,7 @@ function cleanTextFormatting(str: string | undefined): string {
                 onSaveToErrorPool(question);
                 setSavedStatus(true);
               }}
-              className="px-3 py-2.5 sm:py-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs flex items-center justify-center gap-1 shadow-md transition-all cursor-pointer shrink-0"
+              className="px-3.5 py-2.5 sm:py-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer shrink-0"
               title="Bu benzer soruyu hata havuzuna kaydet"
             >
               <span className="material-symbols-outlined text-base">bookmark_add</span>
