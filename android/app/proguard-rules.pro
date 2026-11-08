@@ -1,8 +1,7 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
+# Project specific ProGuard rules for EduMind
+# Applied via proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 
-# Keep line numbers for error reporting
+# Preserve line numbers and essential reflection annotations
 -keepattributes SourceFile,LineNumberTable
 -keepattributes *Annotation*
 -keepattributes JavascriptInterface
@@ -10,7 +9,7 @@
 -keepattributes InnerClasses
 -keepattributes EnclosingMethod
 
-# Capacitor Core and Bridge
+# Capacitor Core and Plugin Bridge
 -keep public class * extends com.getcapacitor.Plugin {
     public *;
 }
@@ -23,32 +22,15 @@
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;
 }
+-keep @interface com.getcapacitor.** { *; }
+-keep @interface com.getcapacitor.annotation.** { *; }
 
-# Capacitor Plugins and Community Packages
--keep class com.getcapacitor.** { *; }
--keep class com.getcapacitor.community.** { *; }
--keep class io.capawesome.** { *; }
-
-# Firebase & Google Play Services & Auth
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
--dontwarn com.google.firebase.**
--dontwarn com.google.android.gms.**
-
-# Unused Optional OAuth Providers in Firebase Auth Plugin (Facebook, Twitter, Play Games)
+# Suppress harmless warnings for optional third-party classes not present at runtime
 -dontwarn com.facebook.**
 -dontwarn com.twitter.**
 -dontwarn com.google.android.gms.games.**
 -dontwarn com.google.android.play.core.**
-
-# Google Mobile Ads / AdMob
--keep class com.google.android.gms.ads.** { *; }
--keep class androidx.browser.customtabs.** { *; }
-
-# Google Play Billing Client
--keep class com.android.billingclient.** { *; }
+-dontwarn com.google.firebase.**
+-dontwarn com.google.android.gms.**
 -dontwarn com.android.billingclient.**
-
-# AndroidX Core & WebKit
--keep class androidx.webkit.** { *; }
 -dontwarn androidx.webkit.**
