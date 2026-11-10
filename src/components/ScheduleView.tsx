@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { App as CapApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { ProgramOgesi, SoruKaydi, ActiveTab, Arkadas, Kullanici, Bildirim, ActiveCamp } from '../types';
 import { LofiAudioWidget } from './LofiAudioWidget';
 import { CustomProgramModal } from './CustomProgramModal';
@@ -146,16 +148,69 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   }, [subView]);
 
   // Pomodoro Focus Timer State (Customizable Work & Break)
-  const [customWorkMinutes, setCustomWorkMinutes] = useState<number>(25);
-  const [customBreakMinutes, setCustomBreakMinutes] = useState<number>(5);
+  const [customWorkMinutes, setCustomWorkMinutes] = useState<number>(() => {
+    return parseInt(localStorage.getItem('pomo_custom_work_mins') || '25', 10);
+  });
+  const [customBreakMinutes, setCustomBreakMinutes] = useState<number>(() => {
+    return parseInt(localStorage.getItem('pomo_custom_break_mins') || '5', 10);
+  });
 
   const WORK_TIME = customWorkMinutes * 60;
   const BREAK_TIME = customBreakMinutes * 60;
 
-  const [pomoMode, setPomoMode] = useState<'work' | 'break'>('work');
-  const [pomoTimeLeft, setPomoTimeLeft] = useState<number>(25 * 60);
-  const [isPomoRunning, setIsPomoRunning] = useState<boolean>(false);
-  const [pomoSelectedItemId, setPomoSelectedItemId] = useState<string>('free');
+  // Restore active running state if app was minimized or closed
+  const initialPomoState = (() => {
+    try {
+      const savedRunning = localStorage.getItem('pomo_is_running') === 'true';
+      const savedTargetTimeStr = localStorage.getItem('pomo_target_end_time');
+      const savedMode = (localStorage.getItem('pomo_mode') as 'work' | 'break') || 'work';
+      const savedWorkMins = parseInt(localStorage.getItem('pomo_custom_work_mins') || '25', 10);
+      const savedBreakMins = parseInt(localStorage.getItem('pomo_custom_break_mins') || '5', 10);
+
+      if (savedRunning && savedTargetTimeStr) {
+        const target = parseInt(savedTargetTimeStr, 10);
+        const remaining = Math.max(0, Math.ceil((target - Date.now()) / 1000));
+        return {
+          isRunning: true,
+          mode: savedMode,
+          timeLeft: remaining,
+          targetEndTime: target,
+        };
+      }
+      const savedTimeLeftStr = localStorage.getItem('pomo_time_left');
+      if (savedTimeLeftStr) {
+        const parsed = parseInt(savedTimeLeftStr, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          return {
+            isRunning: false,
+            mode: savedMode,
+            timeLeft: parsed,
+            targetEndTime: null,
+          };
+        }
+      }
+      return {
+        isRunning: false,
+        mode: savedMode,
+        timeLeft: savedMode === 'work' ? savedWorkMins * 60 : savedBreakMins * 60,
+        targetEndTime: null,
+      };
+    } catch {}
+    return {
+      isRunning: false,
+      mode: 'work' as const,
+      timeLeft: 25 * 60,
+      targetEndTime: null,
+    };
+  })();
+
+  const [pomoMode, setPomoMode] = useState<'work' | 'break'>(initialPomoState.mode);
+  const [pomoTimeLeft, setPomoTimeLeft] = useState<number>(initialPomoState.timeLeft);
+  const [isPomoRunning, setIsPomoRunning] = useState<boolean>(initialPomoState.isRunning);
+  const targetEndTimeRef = useRef<number | null>(initialPomoState.targetEndTime);
+  const [pomoSelectedItemId, setPomoSelectedItemId] = useState<string>(() => {
+    return localStorage.getItem('pomo_selected_item_id') || 'free';
+  });
   const [completedPomoCount, setCompletedPomoCount] = useState<number>(() => {
     return parseInt(localStorage.getItem('completed_pomodoros_count') || '0', 10);
   });
@@ -918,18 +973,67 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     }
   };
 
-  // Pomodoro Countdown Timer Effect
+  // Real-time synchronization when app returns from background / unlocks / tab focus
+  useEffect(() => {
+    const handleSyncOnResume = () => {
+      if (isPomoRunning && targetEndTimeRef.current) {
+        const now = Date.now();
+        const remaining = Math.max(0, Math.ceil((targetEndTimeRef.current - now) / 1000));
+        setPomoTimeLeft(remaining);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleSyncOnResume);
+    window.addEventListener('focus', handleSyncOnResume);
+
+    let removeCapAppListener: (() => void) | null = null;
+    if (Capacitor.isNativePlatform()) {
+      CapApp.addListener('appStateChange', (state) => {
+        if (state.isActive) {
+          handleSyncOnResume();
+        }
+      }).then((h) => {
+        removeCapAppListener = () => h.remove();
+      }).catch(() => {});
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleSyncOnResume);
+      window.removeEventListener('focus', handleSyncOnResume);
+      if (removeCapAppListener) removeCapAppListener();
+    };
+  }, [isPomoRunning]);
+
+  // Pomodoro Countdown Timer Effect (Wall-clock accurate)
   useEffect(() => {
     let interval: any = null;
 
     if (isPomoRunning && pomoTimeLeft > 0) {
+      if (!targetEndTimeRef.current) {
+        const targetTime = Date.now() + pomoTimeLeft * 1000;
+        targetEndTimeRef.current = targetTime;
+        try {
+          localStorage.setItem('pomo_target_end_time', String(targetTime));
+          localStorage.setItem('pomo_is_running', 'true');
+        } catch (e) {}
+      }
+
       interval = setInterval(() => {
-        setPomoTimeLeft((prev) => {
-          const next = prev - 1;
-          return next >= 0 ? next : 0;
-        });
+        if (targetEndTimeRef.current) {
+          const now = Date.now();
+          const remaining = Math.max(0, Math.ceil((targetEndTimeRef.current - now) / 1000));
+          setPomoTimeLeft(remaining);
+        } else {
+          setPomoTimeLeft((prev) => Math.max(0, prev - 1));
+        }
       }, 1000);
     } else if (isPomoRunning && pomoTimeLeft === 0) {
+      targetEndTimeRef.current = null;
+      try {
+        localStorage.removeItem('pomo_target_end_time');
+        localStorage.setItem('pomo_is_running', 'false');
+      } catch (e) {}
+
       // Timer Complete! Play audible alert bell chime
       if (pomoMode === 'work') {
         // Work Session Finished - Play Work Complete Chime Bell!
@@ -1024,6 +1128,15 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     const nextRunning = !isPomoRunning;
     if (nextRunning) {
       playPomodoroBellSound('start');
+      const targetTime = Date.now() + pomoTimeLeft * 1000;
+      targetEndTimeRef.current = targetTime;
+      try {
+        localStorage.setItem('pomo_target_end_time', String(targetTime));
+        localStorage.setItem('pomo_is_running', 'true');
+        localStorage.setItem('pomo_mode', pomoMode);
+        localStorage.setItem('pomo_selected_item_id', pomoSelectedItemId);
+      } catch (e) {}
+
       updatePomodoroNotification({
         mode: pomoMode,
         durationSeconds: pomoTimeLeft,
@@ -1031,6 +1144,13 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         roomTitle: activeGroupRoom?.title,
       });
     } else {
+      targetEndTimeRef.current = null;
+      try {
+        localStorage.removeItem('pomo_target_end_time');
+        localStorage.setItem('pomo_is_running', 'false');
+        localStorage.setItem('pomo_time_left', String(pomoTimeLeft));
+      } catch (e) {}
+
       updatePomodoroNotification({
         mode: pomoMode,
         durationSeconds: pomoTimeLeft,
@@ -1044,7 +1164,15 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   const handleSetWorkMinutes = (mins: number) => {
     const val = Math.max(1, Math.min(180, mins));
     setCustomWorkMinutes(val);
+    try {
+      localStorage.setItem('pomo_custom_work_mins', String(val));
+    } catch (e) {}
     if (pomoMode === 'work') {
+      targetEndTimeRef.current = null;
+      try {
+        localStorage.removeItem('pomo_target_end_time');
+        localStorage.setItem('pomo_is_running', 'false');
+      } catch (e) {}
       setIsPomoRunning(false);
       setPomoTimeLeft(val * 60);
       clearPomodoroLocalNotification();
@@ -1054,7 +1182,15 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   const handleSetBreakMinutes = (mins: number) => {
     const val = Math.max(1, Math.min(60, mins));
     setCustomBreakMinutes(val);
+    try {
+      localStorage.setItem('pomo_custom_break_mins', String(val));
+    } catch (e) {}
     if (pomoMode === 'break') {
+      targetEndTimeRef.current = null;
+      try {
+        localStorage.removeItem('pomo_target_end_time');
+        localStorage.setItem('pomo_is_running', 'false');
+      } catch (e) {}
       setIsPomoRunning(false);
       setPomoTimeLeft(val * 60);
       clearPomodoroLocalNotification();
@@ -1062,6 +1198,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   };
 
   const handleResetPomo = (mode: 'work' | 'break' = pomoMode) => {
+    targetEndTimeRef.current = null;
+    try {
+      localStorage.removeItem('pomo_target_end_time');
+      localStorage.setItem('pomo_is_running', 'false');
+      localStorage.removeItem('pomo_time_left');
+    } catch (e) {}
     setIsPomoRunning(false);
     setPomoMode(mode);
     setPomoTimeLeft(mode === 'work' ? customWorkMinutes * 60 : customBreakMinutes * 60);
@@ -1069,6 +1211,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   };
 
   const handleSelectPomoMode = (mode: 'work' | 'break') => {
+    targetEndTimeRef.current = null;
+    try {
+      localStorage.removeItem('pomo_target_end_time');
+      localStorage.setItem('pomo_is_running', 'false');
+      localStorage.setItem('pomo_mode', mode);
+    } catch (e) {}
     setIsPomoRunning(false);
     setPomoMode(mode);
     setPomoTimeLeft(mode === 'work' ? customWorkMinutes * 60 : customBreakMinutes * 60);
@@ -2877,16 +3025,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             {!isPomoRunning ? (
               <button
                 type="button"
-                onClick={() => {
-                  playPomodoroBellSound('start');
-                  setIsPomoRunning(true);
-                  updatePomodoroNotification({
-                    mode: pomoMode,
-                    durationSeconds: pomoTimeLeft,
-                    isRunning: true,
-                    roomTitle: activeGroupRoom?.title,
-                  });
-                }}
+                onClick={handleTogglePomo}
                 className="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-8 py-3.5 rounded-2xl flex items-center gap-2 text-base cursor-pointer shadow-lg shadow-emerald-600/30 transition-all hover:scale-105 active:scale-95"
               >
                 <span className="material-symbols-outlined text-2xl">play_arrow</span>
@@ -2895,15 +3034,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             ) : (
               <button
                 type="button"
-                onClick={() => {
-                  setIsPomoRunning(false);
-                  updatePomodoroNotification({
-                    mode: pomoMode,
-                    durationSeconds: pomoTimeLeft,
-                    isRunning: false,
-                    roomTitle: activeGroupRoom?.title,
-                  });
-                }}
+                onClick={handleTogglePomo}
                 className="bg-amber-600 hover:bg-amber-500 text-white font-black px-8 py-3.5 rounded-2xl flex items-center gap-2 text-base cursor-pointer shadow-lg shadow-amber-600/30 transition-all hover:scale-105 active:scale-95"
               >
                 <span className="material-symbols-outlined text-2xl">pause</span>
@@ -2913,12 +3044,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
             <button
               type="button"
-              onClick={() => {
-                setIsPomoRunning(false);
-                const resetTime = pomoMode === 'work' ? customWorkMinutes * 60 : customBreakMinutes * 60;
-                setPomoTimeLeft(resetTime);
-                clearPomodoroLocalNotification();
-              }}
+              onClick={() => handleResetPomo()}
               className="bg-white/10 hover:bg-white/20 text-slate-200 font-bold px-5 py-3.5 rounded-2xl flex items-center gap-1.5 text-xs sm:text-sm cursor-pointer border border-white/15 transition-all active:scale-95"
             >
               <span className="material-symbols-outlined text-lg">restart_alt</span>

@@ -181,12 +181,15 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col justify-between p-3 sm:p-5 select-none animate-fadeIn">
-      {/* Top Header Controls */}
-      <div className="flex items-center justify-between text-white pb-3 pt-1 border-b border-white/10 shrink-0">
+    <div className="fixed inset-0 z-[99999] bg-black/95 backdrop-blur-xl flex flex-col justify-between pt-[max(env(safe-area-inset-top),24px)] pb-[max(env(safe-area-inset-bottom),24px)] px-3 sm:px-6 select-none animate-fadeIn">
+      {/* Top Header Controls with Safe Area Cushion */}
+      <div className="flex items-center justify-between text-white pb-3 pt-2 border-b border-white/15 shrink-0">
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary text-xl">crop</span>
-          <span className="font-extrabold text-sm sm:text-base">Soruyu Kırp & Odakla</span>
+          <span className="material-symbols-outlined text-primary text-2xl">crop</span>
+          <div>
+            <h3 className="font-extrabold text-sm sm:text-base leading-tight">Soruyu Kırp & Odakla</h3>
+            <p className="text-[10px] text-white/60">Yapay zekanın doğru çözmesi için soruyu seçin</p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -194,32 +197,33 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           <button
             type="button"
             onClick={rotateClockwise}
-            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            className="py-1.5 px-3 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border border-white/10"
             title="Fotoğrafı 90° Döndür"
           >
             <span className="material-symbols-outlined text-base">rotate_right</span>
-            <span className="hidden sm:inline">Döndür</span>
+            <span>Döndür</span>
           </button>
 
           {/* Close / Cancel */}
           <button
             type="button"
             onClick={onCancel}
-            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white/80 hover:text-white transition-all cursor-pointer"
+            className="py-1.5 px-2.5 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white/90 hover:text-white text-xs font-bold transition-all cursor-pointer border border-white/10 flex items-center gap-1"
             title="İptal Et / Yeniden Çek"
           >
-            <span className="material-symbols-outlined text-lg">close</span>
+            <span className="material-symbols-outlined text-base">close</span>
+            <span className="hidden xs:inline">Vazgeç</span>
           </button>
         </div>
       </div>
 
       {/* Main Image Cropping Work Area */}
-      <div className="flex-1 flex items-center justify-center p-2 min-h-0 relative overflow-hidden">
+      <div className="flex-1 flex items-center justify-center p-2 min-h-0 relative overflow-hidden my-1">
         <div
           ref={containerRef}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          className="relative max-w-full max-h-[65vh] flex items-center justify-center touch-none select-none rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+          className="relative max-w-full max-h-[58vh] flex items-center justify-center touch-none select-none rounded-2xl overflow-hidden shadow-2xl border border-white/20"
         >
           {/* Base Image */}
           <img
@@ -230,14 +234,14 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
               transform: `rotate(${rotation}deg)`,
               transition: 'transform 0.2s ease-out',
             }}
-            className="max-h-[65vh] max-w-full object-contain pointer-events-none block"
+            className="max-h-[58vh] max-w-full object-contain pointer-events-none block"
           />
 
           {/* Semi-transparent dark overlay around crop area */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6))`,
+              background: `linear-gradient(rgba(0,0,0,0.65), rgba(0,0,0,0.65))`,
               clipPath: `polygon(
                 0% 0%, 100% 0%, 100% 100%, 0% 100%,
                 0% ${crop.y}%,
@@ -258,7 +262,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
               width: `${crop.w}%`,
               height: `${crop.h}%`,
             }}
-            className="absolute border-2 border-primary shadow-[0_0_0_1px_rgba(255,255,255,0.7)] cursor-move touch-none"
+            className="absolute border-2 border-primary shadow-[0_0_0_1px_rgba(255,255,255,0.8)] cursor-move touch-none"
             onPointerDown={(e) => handlePointerDown('move', e)}
           >
             {/* Grid Lines inside crop box for precise alignment */}
@@ -277,27 +281,27 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             {/* Corner Resize Handles */}
             {/* NW */}
             <div
-              className="absolute -top-2.5 -left-2.5 w-6 h-6 bg-primary border-2 border-white rounded-full cursor-nwse-resize touch-none shadow-md"
+              className="absolute -top-3 -left-3 w-7 h-7 bg-primary border-2 border-white rounded-full cursor-nwse-resize touch-none shadow-lg"
               onPointerDown={(e) => handlePointerDown('nw', e)}
             />
             {/* NE */}
             <div
-              className="absolute -top-2.5 -right-2.5 w-6 h-6 bg-primary border-2 border-white rounded-full cursor-nesw-resize touch-none shadow-md"
+              className="absolute -top-3 -right-3 w-7 h-7 bg-primary border-2 border-white rounded-full cursor-nesw-resize touch-none shadow-lg"
               onPointerDown={(e) => handlePointerDown('ne', e)}
             />
             {/* SW */}
             <div
-              className="absolute -bottom-2.5 -left-2.5 w-6 h-6 bg-primary border-2 border-white rounded-full cursor-nesw-resize touch-none shadow-md"
+              className="absolute -bottom-3 -left-3 w-7 h-7 bg-primary border-2 border-white rounded-full cursor-nesw-resize touch-none shadow-lg"
               onPointerDown={(e) => handlePointerDown('sw', e)}
             />
             {/* SE */}
             <div
-              className="absolute -bottom-2.5 -right-2.5 w-6 h-6 bg-primary border-2 border-white rounded-full cursor-nwse-resize touch-none shadow-md"
+              className="absolute -bottom-3 -right-3 w-7 h-7 bg-primary border-2 border-white rounded-full cursor-nwse-resize touch-none shadow-lg"
               onPointerDown={(e) => handlePointerDown('se', e)}
             />
 
             {/* Center Drag Hint */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-50">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-60">
               <span className="material-symbols-outlined text-white text-2xl drop-shadow">drag_pan</span>
             </div>
           </div>
@@ -305,28 +309,28 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       </div>
 
       {/* Helper text */}
-      <p className="text-center text-[11px] text-white/70 py-1">
-        💡 Köşelerden tutup çekerek sadece sorunun olduğu alanı seçin.
+      <p className="text-center text-xs text-white/80 py-1.5 font-medium">
+        💡 Köşelerdeki mor dairelerden çekerek sadece soruyu çerçeveleyin.
       </p>
 
       {/* Bottom Action Buttons */}
-      <div className="flex items-center gap-2.5 pt-2 border-t border-white/10 shrink-0">
+      <div className="flex items-center gap-2.5 pt-3 pb-1 border-t border-white/15 shrink-0">
         <button
           type="button"
           onClick={() => onConfirmOriginal(imageSrc)}
-          className="flex-1 py-3 px-3 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white font-extrabold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-white/10"
+          className="flex-1 py-3.5 px-3 rounded-2xl bg-white/15 hover:bg-white/25 active:scale-95 text-white font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-white/15"
         >
-          <span className="material-symbols-outlined text-base">photo_library</span>
-          <span>Tümünü Gönder</span>
+          <span className="material-symbols-outlined text-lg">fullscreen</span>
+          <span>Tümünü Kullan</span>
         </button>
 
         <button
           type="button"
           onClick={performCropAndSubmit}
-          className="flex-[2] py-3 px-4 rounded-xl bg-primary hover:bg-primary-hover active:scale-95 text-white font-black text-xs sm:text-sm shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-primary/30"
+          className="flex-[2] py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs sm:text-sm shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-emerald-600/30"
         >
-          <span className="material-symbols-outlined text-lg">crop</span>
-          <span>Kırp & Çözüme Başla</span>
+          <span className="material-symbols-outlined text-xl">check_circle</span>
+          <span>Kırpmayı Onayla & Çöz</span>
         </button>
       </div>
     </div>

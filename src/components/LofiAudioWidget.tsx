@@ -85,28 +85,18 @@ export const LofiAudioWidget: React.FC<LofiAudioWidgetProps> = ({
   const [volume, setVolume] = useState<number>(0.4); // 0.0 to 1.0
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
-  // Helper for default position (always starts top-right right below XP badge)
-  const getDefaultPosition = () => {
-    if (typeof window === 'undefined') return { x: 300, y: 72 };
-    const btnW = 54;
-    return {
-      x: Math.max(12, window.innerWidth - btnW - 14),
-      y: 72,
-    };
-  };
-
-  // Draggable Floating Widget State - Starts below XP badge at top right
-  const [position, setPosition] = useState<{ x: number; y: number }>(() => {
+  // Draggable Floating Widget State - Anchored by CSS to top-right by default
+  const [customPos, setCustomPos] = useState<{ x: number; y: number } | null>(() => {
     try {
-      const saved = localStorage.getItem('lofi_widget_pos');
+      const saved = localStorage.getItem('lofi_widget_custom_drag_pos_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+        if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number') {
           return parsed;
         }
       }
     } catch (e) {}
-    return getDefaultPosition();
+    return null;
   });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const dragJustFinishedRef = useRef<boolean>(false);
@@ -158,7 +148,7 @@ export const LofiAudioWidget: React.FC<LofiAudioWidgetProps> = ({
       const newX = Math.max(minX, Math.min(maxX, initX + dx));
       const newY = Math.max(minY, Math.min(maxY, initY + dy));
 
-      setPosition({ x: newX, y: newY });
+      setCustomPos({ x: newX, y: newY });
     }
   };
 
@@ -177,9 +167,9 @@ export const LofiAudioWidget: React.FC<LofiAudioWidgetProps> = ({
       const finalX = Math.max(8, Math.min(window.innerWidth - btnW - 8, initX + dx));
       const finalY = Math.max(50, Math.min(window.innerHeight - btnH - 65, initY + dy));
       const finalPos = { x: finalX, y: finalY };
-      setPosition(finalPos);
+      setCustomPos(finalPos);
       try {
-        localStorage.setItem('lofi_widget_pos', JSON.stringify(finalPos));
+        localStorage.setItem('lofi_widget_custom_drag_pos_v2', JSON.stringify(finalPos));
       } catch (e) {}
 
       setTimeout(() => {
@@ -610,14 +600,13 @@ export const LofiAudioWidget: React.FC<LofiAudioWidgetProps> = ({
     );
   }
 
-  // Floating Widget View (Draggable)
-  const isNearBottom = position.y > window.innerHeight / 2;
-  const isNearRight = position.x > window.innerWidth / 2;
+  // Floating Widget View (Draggable or default top-right anchor)
+  const isNearBottom = customPos ? customPos.y > (typeof window !== 'undefined' ? window.innerHeight / 2 : 300) : false;
+  const isNearRight = customPos ? customPos.x > (typeof window !== 'undefined' ? window.innerWidth / 2 : 200) : true;
 
-  const containerStyle = {
-    left: `${position.x}px`,
-    top: `${position.y}px`,
-  };
+  const containerStyle: React.CSSProperties = customPos
+    ? { left: `${customPos.x}px`, top: `${customPos.y}px` }
+    : { right: '12px', top: 'calc(env(safe-area-inset-top, 0px) + 64px)' };
 
   const containerClass = `fixed z-40 touch-none select-none ${className}`;
 
@@ -643,12 +632,30 @@ export const LofiAudioWidget: React.FC<LofiAudioWidgetProps> = ({
                 <p className="text-[10px] text-text-muted">Odaklanma & Zihinsel Rahatlama</p>
               </div>
             </div>
-            <button
-              onClick={() => setIsExpanded(false)}
-              className="p-1 text-text-muted hover:text-text-main rounded-lg hover:bg-surface-container-low cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-sm">close</span>
-            </button>
+            <div className="flex items-center gap-1">
+              {customPos && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomPos(null);
+                    try {
+                      localStorage.removeItem('lofi_widget_custom_drag_pos_v2');
+                      localStorage.removeItem('lofi_widget_pos');
+                    } catch (e) {}
+                  }}
+                  className="p-1 text-text-muted hover:text-text-main rounded-lg hover:bg-surface-container-low cursor-pointer"
+                  title="Konumu Sağ Üste Sıfırla"
+                >
+                  <span className="material-symbols-outlined text-sm">restart_alt</span>
+                </button>
+              )}
+              <button
+                onClick={() => setIsExpanded(false)}
+                className="p-1 text-text-muted hover:text-text-main rounded-lg hover:bg-surface-container-low cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
           </div>
 
           {/* Themes Grid */}
@@ -724,9 +731,6 @@ export const LofiAudioWidget: React.FC<LofiAudioWidgetProps> = ({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
         onClick={handleButtonClick}
         title="Tıkla: Menüyü Aç / Sürükle & İsteğin Yere Taşı"
         style={{ touchAction: 'none' }}

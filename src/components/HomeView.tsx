@@ -556,6 +556,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
           allowEditing: false,
           resultType: CameraResultType.DataUrl,
           source: CameraSource.Camera,
+          promptLabelHeader: 'Soru Fotoğrafı Çek',
+          promptLabelCancel: 'İptal',
+          promptLabelPhoto: 'Galeriden Seç',
+          promptLabelPicture: 'Fotoğraf Çek',
         });
         if (image.dataUrl) {
           setPendingCropImage(image.dataUrl);
@@ -583,6 +587,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
           allowEditing: false,
           resultType: CameraResultType.DataUrl,
           source: CameraSource.Photos,
+          promptLabelHeader: 'Galeriden Soru Seç',
+          promptLabelCancel: 'İptal',
+          promptLabelPhoto: 'Galeriden Seç',
+          promptLabelPicture: 'Fotoğraf Çek',
         });
         if (image.dataUrl) {
           setPendingCropImage(image.dataUrl);

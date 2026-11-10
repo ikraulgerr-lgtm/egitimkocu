@@ -5,7 +5,14 @@
   <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>tr</string>
+	<key>CFBundleAllowMixedLocalizations</key>
+	<true/>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>tr</string>
+		<string>en</string>
+	</array>
 	<key>CFBundleDisplayName</key>
         <string>Eğitim Koçum AI</string>
 	<key>CFBundleExecutable</key>
